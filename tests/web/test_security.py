@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from video_color_checker.security import (
+from colorcheck.web.security import (
     FixedWindowRateLimiter,
     PublicInputError,
     cleanup_expired_jobs,

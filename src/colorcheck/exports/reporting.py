@@ -4,9 +4,9 @@ import html
 import json
 from pathlib import Path
 
-from video_color_checker.editor_guides import all_guides
-from video_color_checker.lut import write_cdl, write_cube_lut
-from video_color_checker.models import AnalysisReport
+from colorcheck.exports.guides import all_guides
+from colorcheck.exports.lut import write_cdl, write_cube_lut
+from colorcheck.models import AnalysisReport
 
 
 def _frame_rows(report: AnalysisReport) -> str:
@@ -162,7 +162,7 @@ Confidence: {report.correction.confidence:.3f}</pre>
 """
 
 
-def write_report_package(report: AnalysisReport, out_dir: str | Path) -> dict[str, Path]:
+def write_report_outputs(report: AnalysisReport, out_dir: str | Path) -> dict[str, Path]:
     output_dir = Path(out_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 

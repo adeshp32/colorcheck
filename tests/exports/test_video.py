@@ -6,13 +6,13 @@ import subprocess
 import cv2
 import pytest
 
-from video_color_checker.models import CorrectionPlan
-from video_color_checker.video_export import (
+from colorcheck.exports.video import (
     has_audio_stream,
     probe_source_video_settings,
     write_corrected_master,
     write_corrected_video,
 )
+from colorcheck.models import CorrectionPlan
 
 
 def identity_correction() -> CorrectionPlan:

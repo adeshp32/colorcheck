@@ -7,11 +7,16 @@
 __pycache__
 .pytest_cache
 .ruff_cache
+*.egg-info
 reports
 sample-media
 storage
 tests
-k8s
+deploy
+docs
+scripts
+compose.yaml
+railway.toml
 *.mp4
 *.mov
 *.mkv

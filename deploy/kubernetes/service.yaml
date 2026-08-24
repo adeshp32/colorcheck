@@ -1,12 +1,12 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: video-color-checker
+  name: colorcheck
   labels:
-    app: video-color-checker
+    app: colorcheck
 spec:
   selector:
-    app: video-color-checker
+    app: colorcheck
   ports:
     - name: http
       port: 80

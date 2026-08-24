@@ -4,16 +4,16 @@ import argparse
 import json
 from pathlib import Path
 
-from video_color_checker.analyzer import analyze_video
+from colorcheck.analysis.pipeline import analyze_video
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Generate a color consistency report for a video and reference frame."
+        description="Analyze target footage against an image or video color reference."
     )
-    parser.add_argument("--reference", required=True, help="Path to the reference image/frame.")
+    parser.add_argument("--reference", required=True, help="Path to the reference image or video.")
     parser.add_argument("--video", required=True, help="Path to the target video.")
-    parser.add_argument("--out", required=True, help="Directory for the report package.")
+    parser.add_argument("--out", required=True, help="Directory for generated outputs.")
     parser.add_argument(
         "--samples",
         type=int,

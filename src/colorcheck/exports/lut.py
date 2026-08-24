@@ -5,8 +5,8 @@ from xml.sax.saxutils import escape
 
 import numpy as np
 
-from video_color_checker.correction import apply_correction_array
-from video_color_checker.models import CorrectionPlan
+from colorcheck.analysis.correction import apply_correction_array
+from colorcheck.models import CorrectionPlan
 
 
 def write_cube_lut(path: str | Path, correction: CorrectionPlan, size: int = 17) -> Path:

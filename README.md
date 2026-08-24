@@ -1,41 +1,38 @@
-# Video Color Consistency Checker
+# ColorCheck
 
-Version 1 of an AI-assisted color review tool for editors.
+[![CI](https://github.com/adeshp32/colorcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/adeshp32/colorcheck/actions/workflows/ci.yml)
 
-The app compares a target video against a reference image or reference video, builds a lighting/color drift report, exports a guarded corrected preview, and provides bounded correction guidance for common editors:
+Reference-aware, guardrail-first video color intelligence for editors.
 
-- DaVinci Resolve
-- Adobe Premiere Pro
-- Avid Media Composer
-- iMovie
+ColorCheck compares target footage with an image or video reference, measures perceptual color and lighting drift with PyTorch, and produces conservative corrections without modifying the source. It generates browser previews, quality-preserved editing masters, LUT/CDL files, structured reports, and workflow guidance for DaVinci Resolve, Premiere Pro, Avid Media Composer, and iMovie.
 
-It also generates portable correction files:
+## Capabilities
 
-- `recommended_correction.cube`
-- `recommended_correction.cdl`
-- `report.json`
-- `report.html`
-- `corrected_preview.mp4`
-- `corrected_master.mov`
-- editor-specific Markdown instructions
+- Match target frames against a still or lighting-similar moments from a reference clip.
+- Measure structural similarity, perceptual color distance, luminance, contrast, saturation, and temperature drift.
+- Recommend bounded exposure, contrast, saturation, and channel-balance adjustments.
+- Let editors control correction strength and define a lighting-preservation threshold.
+- Preserve source audio in the H.264 preview when an audio stream is present.
+- Preserve supported codec, resolution, timing, bit depth, color metadata, and audio characteristics in the editing master.
+- Export individual CUBE, CDL, JSON, HTML, MP4, MOV, and editor-guide files.
 
-## What Version 1 Does
+## Architecture
 
-- Samples frames from a target video.
-- Accepts either a still image or a sampled video as the reference look.
-- Uses PyTorch tensors for image similarity and lighting drift metrics.
-- Matches target frames against similar reference-video lighting moments when a reference clip is used.
-- Estimates exposure, contrast, saturation, and color balance differences.
-- Lets the user choose correction strength from 0% to 100%.
-- Warns when the selected strength risks changing the original lighting setup.
-- Applies guardrails so recommendations and preview exports stay conservative.
-- Generates a browser-compatible H.264 corrected preview without modifying the original video and preserves source audio when present.
-- Generates a high-quality editing master that preserves supported source codec, resolution, timing, bit depth, color metadata, and audio characteristics.
-- Provides Docker and Kubernetes files for local deployment practice.
+```text
+src/colorcheck/
+|-- analysis/   # Perceptual metrics, correction logic, and orchestration
+|-- exports/    # Video, LUT, report, and editor-guide generation
+|-- web/        # FastAPI routes, browser pages, and upload security
+|-- config.py   # Environment-backed runtime limits
+|-- models.py   # Shared typed domain models
+`-- cli.py      # Command-line entry point
+```
 
-The original upload is never modified. Browser previews prioritize compatibility, while the separate editing master preserves supported source codec, resolution, timing, bit depth, HDR/color metadata, and audio characteristics. Video pixels must be re-encoded after a correction, so compressed output cannot be bit-for-bit identical to the source.
+The dependency direction is intentionally simple: interfaces call the analysis pipeline, the pipeline coordinates domain logic and exporters, and lower-level modules never depend on the web layer. See [Architecture](docs/architecture.md) for the complete request and data lifecycle.
 
 ## Quick Start
+
+Requirements: Python 3.11 or newer and FFmpeg.
 
 ```bash
 python3.12 -m venv .venv
@@ -44,74 +41,76 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-Analyze a video:
+Start the web application:
 
 ```bash
-vcc-analyze --reference path/to/reference.jpg --video path/to/video.mp4 --out reports/demo --strength 50 --lighting-threshold 60
-vcc-analyze --reference path/to/reference_clip.mp4 --video path/to/video.mp4 --out reports/demo-video-ref --strength 45
+uvicorn colorcheck.web.app:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Run the local API:
+Open `http://127.0.0.1:8000`.
+
+Run the CLI:
 
 ```bash
-uvicorn video_color_checker.api:app --reload --host 127.0.0.1 --port 8000
+colorcheck \
+  --reference path/to/reference.jpg \
+  --video path/to/video.mp4 \
+  --out reports/demo \
+  --strength 50 \
+  --lighting-threshold 60
 ```
 
-Open:
-
-```text
-http://localhost:8000
-```
-
-The JSON endpoint requires the same ownership confirmation as the web form:
+Run with Docker:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/analyze \
-  -F reference=@path/to/reference.jpg \
-  -F video=@path/to/video.mp4 \
-  -F rights_confirmed=true
+docker compose up --build
 ```
+
+## Output Contract
+
+| File | Purpose |
+| --- | --- |
+| `corrected_preview.mp4` | Browser-compatible H.264 preview with source audio when available |
+| `corrected_master.mov` | High-quality editing master with supported source characteristics preserved |
+| `recommended_correction.cube` | Portable 3D LUT |
+| `recommended_correction.cdl` | ASC CDL correction values |
+| `report.html` | Human-readable analysis |
+| `report.json` | Structured analysis data |
+| `*_steps.md` | Editor-specific application guidance |
+
+Video pixels must be re-encoded after correction, so a corrected file cannot be bit-for-bit identical to the source. ColorCheck never modifies the original upload.
 
 ## Safety Model
 
-Version 1 is intentionally guardrail-first. It does not rewrite your original footage. The generated preview video, LUT, and CDL are conservative recommendations designed to stay inside these limits:
+- Exposure is capped at approximately 0.35 stops.
+- Contrast and saturation multipliers remain between 0.85 and 1.15.
+- Per-channel balance remains between 0.92 and 1.08.
+- Lighting-shift and clipping-risk checks warn before a correction becomes destructive.
+- Source uploads receive generic internal names and are deleted immediately after processing.
+- Generated jobs expire automatically and are reachable only through unguessable job identifiers.
+- Upload size, duration, resolution, request rate, and processing concurrency are bounded.
+- The release container runs as a non-root user with a read-only filesystem and no Linux capabilities.
 
-- Exposure shift capped at about 0.35 stops.
-- Saturation multiplier capped between 0.85 and 1.15.
-- Contrast multiplier capped between 0.85 and 1.15.
-- Per-channel color balance capped between 0.92 and 1.08.
-- Recommendations are marked risky if estimated clipping exceeds guardrail limits.
-- A lighting-shift score warns when the chosen strength is likely to alter the original lighting setup.
+Read the [security policy](.github/SECURITY.md) and [privacy notes](docs/privacy.md) before operating a public instance.
 
-## Public Demo Safety
-
-- Source uploads are renamed internally and deleted immediately after processing.
-- Failed jobs are removed instead of retaining partial uploads.
-- Generated results expire after six hours by default.
-- Upload size, video duration, resolution, per-IP rate, and concurrent processing are limited.
-- Download paths use strict job-ID and filename allowlists.
-- Browser security headers and same-origin form checks are enabled.
-- Internal stack traces and local filesystem paths are not returned to visitors.
-- The Docker and Kubernetes configurations run without root privileges or Linux capabilities.
-
-See [SECURITY.md](SECURITY.md) and [PRIVACY.md](PRIVACY.md) before operating a public instance.
-
-## Public Hosting
-
-The recommended first deployment is Railway using the included Dockerfile and `railway.toml`. It is the lowest-friction fit for the current synchronous video workflow. See [DEPLOYMENT.md](DEPLOYMENT.md) for exact limits, cost controls, and the longer-term Cloud Run/object-storage architecture.
-
-## Kubernetes
-
-Build and run locally:
+## Verification
 
 ```bash
-docker build -t video-color-checker:local .
-kubectl apply -f k8s/
-kubectl port-forward service/video-color-checker 8000:80
+ruff check src tests
+pytest -q
+docker build -t colorcheck:local .
 ```
 
-Then open:
+GitHub Actions runs the lint and test suite on every push and pull request. Dependabot checks Python, Docker, and GitHub Actions dependencies weekly.
 
-```text
-http://localhost:8000
+## Deployment
+
+The first public deployment target is Railway using the included `Dockerfile` and `railway.toml`. The current synchronous pipeline is intentionally limited to one analysis at a time. See the [deployment guide](docs/deployment.md) for resource limits, cost controls, and the asynchronous growth path.
+
+Kubernetes manifests are available in [`deploy/kubernetes`](deploy/kubernetes):
+
+```bash
+docker build -t colorcheck:local .
+kubectl apply -f deploy/kubernetes/
+kubectl port-forward service/colorcheck 8000:80
 ```

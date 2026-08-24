@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from video_color_checker.models import AnalysisReport
+from colorcheck.models import AnalysisReport
 
 
 def _shared_values(report: AnalysisReport) -> str:

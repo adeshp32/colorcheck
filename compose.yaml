@@ -1,7 +1,9 @@
+name: colorcheck
+
 services:
   app:
     build: .
-    image: video-color-checker:local
+    image: colorcheck:local
     ports:
       - "8000:8000"
     environment:

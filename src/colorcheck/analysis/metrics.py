@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 import torch
 
-from video_color_checker.models import FrameAnalysis, LightingProfile
+from colorcheck.models import FrameAnalysis, LightingProfile
 
 RGB_TO_LUMA = torch.tensor([0.2126, 0.7152, 0.0722], dtype=torch.float32)
 

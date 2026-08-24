@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: video-color-checker
+  name: colorcheck
   labels:
-    app: video-color-checker
+    app: colorcheck
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: video-color-checker
+      app: colorcheck
   template:
     metadata:
       labels:
-        app: video-color-checker
+        app: colorcheck
     spec:
       securityContext:
         fsGroup: 10001
@@ -20,7 +20,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: video-color-checker:local
+          image: colorcheck:local
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000

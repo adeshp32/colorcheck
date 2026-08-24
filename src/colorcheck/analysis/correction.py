@@ -4,7 +4,7 @@ import math
 
 import numpy as np
 
-from video_color_checker.models import (
+from colorcheck.models import (
     CorrectionPlan,
     FrameAnalysis,
     GuardrailResult,
@@ -47,7 +47,7 @@ def aggregate_profile(frames: list[FrameAnalysis]) -> LightingProfile:
         float(np.median([frame.target_profile.rgb_std[channel] for frame in frames]))
         for channel in range(3)
     )
-    from video_color_checker.image_metrics import nearest_lighting_archetype
+    from colorcheck.analysis.metrics import nearest_lighting_archetype
 
     label, distance = nearest_lighting_archetype(
         median_attr("luma_mean"),

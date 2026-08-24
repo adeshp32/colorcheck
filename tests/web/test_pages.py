@@ -1,4 +1,4 @@
-from video_color_checker.ui import home_page
+from colorcheck.web.pages import home_page
 
 
 def test_generate_button_has_loading_state_and_no_gradient() -> None:
@@ -44,7 +44,7 @@ def test_preview_uses_browser_compatible_mp4_source() -> None:
         "corrected_master_filename": "corrected_master.mov",
     }
 
-    from video_color_checker.ui import job_page
+    from colorcheck.web.pages import job_page
 
     page = job_page("test-job", report)
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
-import os
 import shutil
 import threading
 import uuid
@@ -14,8 +13,10 @@ from urllib.parse import urlsplit
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
-from video_color_checker.analyzer import analyze_video
-from video_color_checker.security import (
+from colorcheck.analysis.pipeline import analyze_video
+from colorcheck.config import AppSettings
+from colorcheck.web.pages import home_page, job_page
+from colorcheck.web.security import (
     FixedWindowRateLimiter,
     MediaLimits,
     PublicInputError,
@@ -25,26 +26,18 @@ from video_color_checker.security import (
     validate_job_id,
     validate_media,
 )
-from video_color_checker.ui import home_page, job_page
 
 LOGGER = logging.getLogger(__name__)
-STORAGE_ROOT = Path(os.environ.get("VCC_STORAGE_DIR", "storage")).resolve()
-JOBS_ROOT = STORAGE_ROOT / "jobs"
-MAX_UPLOAD_MB = max(10, int(os.environ.get("VCC_MAX_UPLOAD_MB", "250")))
-MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
-MAX_REQUEST_BYTES = (MAX_UPLOAD_MB * 2 + 4) * 1024 * 1024
-JOB_TTL_HOURS = max(1, int(os.environ.get("VCC_JOB_TTL_HOURS", "6")))
+SETTINGS = AppSettings.from_environment()
+JOBS_ROOT = SETTINGS.storage_root / "jobs"
 MEDIA_LIMITS = MediaLimits(
-    max_upload_bytes=MAX_UPLOAD_BYTES,
-    max_video_seconds=max(10, int(os.environ.get("VCC_MAX_VIDEO_SECONDS", "120"))),
-    max_video_pixels=max(
-        1_000_000,
-        round(float(os.environ.get("VCC_MAX_VIDEO_MEGAPIXELS", "8.3")) * 1_000_000),
-    ),
-    max_image_pixels=50_000_000,
+    max_upload_bytes=SETTINGS.max_upload_bytes,
+    max_video_seconds=SETTINGS.max_video_seconds,
+    max_video_pixels=SETTINGS.max_video_pixels,
+    max_image_pixels=SETTINGS.max_image_pixels,
 )
 RATE_LIMITER = FixedWindowRateLimiter(
-    limit=max(1, int(os.environ.get("VCC_ANALYSES_PER_HOUR", "6"))),
+    limit=SETTINGS.analyses_per_hour,
     window_seconds=3600,
 )
 ANALYSIS_SLOT = threading.BoundedSemaphore(value=1)
@@ -112,11 +105,19 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
     acquired = False
     if analysis_request:
         content_length = request.headers.get("content-length")
-        if content_length and content_length.isdigit() and int(content_length) > MAX_REQUEST_BYTES:
+        if (
+            content_length
+            and content_length.isdigit()
+            and int(content_length) > SETTINGS.max_request_bytes
+        ):
             return _secure_response(
                 JSONResponse(
                     status_code=413,
-                    content={"detail": f"Combined uploads must be under {MAX_UPLOAD_MB * 2} MB."},
+                    content={
+                        "detail": (
+                            f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+                        )
+                    },
                 ),
                 request,
             )
@@ -129,7 +130,7 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
             message = await original_receive()
             if message["type"] == "http.request":
                 received_bytes += len(message.get("body", b""))
-                if received_bytes > MAX_REQUEST_BYTES:
+                if received_bytes > SETTINGS.max_request_bytes:
                     body_too_large = True
                     raise RequestBodyTooLarge
             return message
@@ -163,12 +164,16 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
         if analysis_request and body_too_large:
             response = JSONResponse(
                 status_code=413,
-                content={"detail": f"Combined uploads must be under {MAX_UPLOAD_MB * 2} MB."},
+                content={
+                    "detail": f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+                },
             )
     except RequestBodyTooLarge:
         response = JSONResponse(
             status_code=413,
-            content={"detail": f"Combined uploads must be under {MAX_UPLOAD_MB * 2} MB."},
+            content={
+                "detail": f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+            },
         )
     finally:
         if acquired:
@@ -178,7 +183,7 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
 
 def _ensure_storage() -> None:
     JOBS_ROOT.mkdir(parents=True, exist_ok=True)
-    cleanup_expired_jobs(JOBS_ROOT, ttl_seconds=JOB_TTL_HOURS * 3600)
+    cleanup_expired_jobs(JOBS_ROOT, ttl_seconds=SETTINGS.job_ttl_hours * 3600)
 
 
 def _save_upload(upload: UploadFile, destination: Path) -> None:

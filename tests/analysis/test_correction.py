@@ -1,11 +1,11 @@
-from video_color_checker.correction import (
+from colorcheck.analysis.correction import (
     LIMITS,
     estimate_lighting_shift,
     evaluate_guardrails,
     recommend_correction,
     scale_correction,
 )
-from video_color_checker.models import CorrectionPlan, FrameAnalysis, LightingProfile
+from colorcheck.models import CorrectionPlan, FrameAnalysis, LightingProfile
 
 
 def profile(luma: float, saturation: float, temperature: float) -> LightingProfile:

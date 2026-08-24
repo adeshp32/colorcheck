@@ -3,9 +3,9 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "video-color-checker"
+name = "colorcheck"
 version = "0.1.0"
-description = "PyTorch-powered video color consistency reports and editor correction guidance."
+description = "Reference-aware video color analysis with guardrailed correction exports."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [project.scripts]
-vcc-analyze = "video_color_checker.cli:main"
+colorcheck = "colorcheck.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

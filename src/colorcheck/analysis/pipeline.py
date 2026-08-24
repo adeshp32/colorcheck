@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from video_color_checker.correction import (
+from colorcheck.analysis.correction import (
     aggregate_profile,
     clamp_percent,
     estimate_lighting_shift,
@@ -12,21 +12,21 @@ from video_color_checker.correction import (
     recommend_correction,
     scale_correction,
 )
-from video_color_checker.image_metrics import (
+from colorcheck.analysis.metrics import (
     compare_frame,
     load_image_rgb,
     nearest_lighting_archetype,
     profile_image,
     sample_video_frames,
 )
-from video_color_checker.models import (
+from colorcheck.exports.reporting import write_report_outputs
+from colorcheck.exports.video import write_corrected_master, write_corrected_video
+from colorcheck.models import (
     AnalysisReport,
     AnalysisSummary,
     ExportSettings,
     LightingProfile,
 )
-from video_color_checker.reporting import write_report_package
-from video_color_checker.video_export import write_corrected_master, write_corrected_video
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 
@@ -231,7 +231,7 @@ def analyze_video(
         corrected_video_filename=corrected_video_filename,
         corrected_master_filename=corrected_master_filename,
     )
-    written = write_report_package(report, output_dir)
+    written = write_report_outputs(report, output_dir)
     if corrected_video:
         written["corrected_video"] = corrected_video.path
     if corrected_master:

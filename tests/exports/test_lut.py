@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from video_color_checker.lut import write_cdl, write_cube_lut
-from video_color_checker.models import CorrectionPlan
+from colorcheck.exports.lut import write_cdl, write_cube_lut
+from colorcheck.models import CorrectionPlan
 
 
 def correction() -> CorrectionPlan:
