@@ -557,14 +557,31 @@ def page_shell(title: str, body: str) -> str:
       input.addEventListener("input", sync);
       sync();
     }});
-    document.querySelector(".analysis-form")?.addEventListener("submit", (event) => {{
+    const analysisForm = document.querySelector(".analysis-form");
+    analysisForm?.addEventListener("submit", (event) => {{
       const form = event.currentTarget;
+      if (form.dataset.submitting === "true") {{
+        event.preventDefault();
+        return;
+      }}
       if (!form.checkValidity()) return;
       const submitButton = form.querySelector(".submit");
-      if (!submitButton || submitButton.disabled) return;
+      if (!submitButton) return;
+      form.dataset.submitting = "true";
+      form.setAttribute("aria-busy", "true");
       submitButton.disabled = true;
       submitButton.setAttribute("aria-busy", "true");
-      submitButton.textContent = "Generating preview...";
+      submitButton.textContent = "Mapping report & video...";
+    }});
+    window.addEventListener("pageshow", () => {{
+      if (!analysisForm) return;
+      const submitButton = analysisForm.querySelector(".submit");
+      analysisForm.dataset.submitting = "false";
+      analysisForm.removeAttribute("aria-busy");
+      if (!submitButton) return;
+      submitButton.disabled = false;
+      submitButton.removeAttribute("aria-busy");
+      submitButton.textContent = submitButton.dataset.defaultLabel;
     }});
     apply();
   </script>
@@ -634,7 +651,7 @@ def home_page() -> str:
             <input name="rights_confirmed" type="checkbox" required>
             <span>I have permission to process these files. Uploads are deleted after processing and generated results expire automatically.</span>
           </label>
-          <button class="submit" type="submit">Generate preview report</button>
+          <button class="submit" type="submit" data-default-label="Generate Mapped Report &amp; Video">Generate Mapped Report &amp; Video</button>
         </div>
       </form>
       <div class="mini-grid" aria-label="Outputs">

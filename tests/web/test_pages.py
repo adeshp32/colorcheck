@@ -9,7 +9,10 @@ def test_generate_button_has_loading_state_and_no_gradient() -> None:
     assert 'class="about-text about-story"' in page
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page
-    assert 'submitButton.textContent = "Generating preview..."' in page
+    assert "Generate Mapped Report &amp; Video" in page
+    assert 'if (form.dataset.submitting === "true")' in page
+    assert "event.preventDefault();" in page
+    assert 'submitButton.textContent = "Mapping report & video..."' in page
     assert 'submitButton.setAttribute("aria-busy", "true")' in page
     assert ".submit {" in page
     assert "background: transparent;" in page

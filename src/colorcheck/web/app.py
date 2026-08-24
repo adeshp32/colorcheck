@@ -158,20 +158,22 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
                 JSONResponse(status_code=403, content={"detail": "Cross-site upload blocked."}),
                 request,
             )
-        allowed, retry_after = RATE_LIMITER.allow(_client_key(request))
-        if not allowed:
-            response = JSONResponse(
-                status_code=429,
-                content={"detail": "Upload limit reached. Please try again later."},
-                headers={"Retry-After": str(retry_after)},
-            )
-            return _secure_response(response, request)
         acquired = ANALYSIS_SLOT.acquire(blocking=False)
         if not acquired:
             response = JSONResponse(
                 status_code=503,
                 content={"detail": "ColorCheck is processing another video. Please try again shortly."},
                 headers={"Retry-After": "30"},
+            )
+            return _secure_response(response, request)
+        allowed, retry_after = RATE_LIMITER.allow(_client_key(request))
+        if not allowed:
+            ANALYSIS_SLOT.release()
+            acquired = False
+            response = JSONResponse(
+                status_code=429,
+                content={"detail": "Upload limit reached. Please try again later."},
+                headers={"Retry-After": str(retry_after)},
             )
             return _secure_response(response, request)
     try:
