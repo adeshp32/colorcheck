@@ -748,6 +748,7 @@ def job_page(job_id: str, report: dict[str, object]) -> str:
   <section class="panel" style="padding:18px; margin-bottom:18px;">
     <h2>Corrected preview</h2>
     <p class="hint">{html.escape(audio_message)}</p>
+    <p class="hint">The browser preview is capped at 1080p for responsive playback. Download the quality-preserved master for the source resolution and bit depth.</p>
     <video class="preview-video" controls playsinline preload="metadata">
       <source src="/jobs/{job_id}/{html.escape(str(corrected_video_filename))}?codec=h264" type="video/mp4">
       Your browser could not play this preview. Download the MP4 below instead.

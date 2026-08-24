@@ -6,9 +6,14 @@ import subprocess
 import cv2
 import pytest
 
+import colorcheck.exports.video as video_exports
 from colorcheck.exports.video import (
+    MasterExportResult,
+    SourceVideoSettings,
+    VideoExportResult,
     has_audio_stream,
     probe_source_video_settings,
+    write_corrected_exports,
     write_corrected_master,
     write_corrected_video,
 )
@@ -40,6 +45,31 @@ def video_codec(video_path) -> str:
             "-of",
             "default=noprint_wrappers=1:nokey=1",
             str(video_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def media_stream_hash(video_path, stream: str) -> str:
+    result = subprocess.run(
+        [
+            shutil.which("ffmpeg") or "ffmpeg",
+            "-v",
+            "error",
+            "-i",
+            str(video_path),
+            "-map",
+            stream,
+            "-c",
+            "copy",
+            "-f",
+            "hash",
+            "-hash",
+            "sha256",
+            "-",
         ],
         capture_output=True,
         text=True,
@@ -87,8 +117,13 @@ def test_corrected_video_preserves_source_audio(tmp_path) -> None:
     assert output.exists()
     assert capture.isOpened()
     assert int(capture.get(cv2.CAP_PROP_FRAME_COUNT)) > 0
+    assert (int(capture.get(cv2.CAP_PROP_FRAME_WIDTH)), int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))) == (
+        64,
+        48,
+    )
     assert video_codec(output) == "h264"
     assert has_audio_stream(output) is True
+    assert not list(tmp_path.glob("*.video-only.*"))
     capture.release()
 
 
@@ -157,3 +192,72 @@ def test_corrected_master_preserves_hevc_main10_hdr_characteristics(tmp_path) ->
     assert settings.color_transfer == "arib-std-b67"
     assert settings.color_primaries == "bt2020"
     assert has_audio_stream(output) is True
+    assert media_stream_hash(source, "0:a:0") == media_stream_hash(output, "0:a:0")
+    assert result.encoder_name in {"hevc_videotoolbox", "libx265"}
+    assert not list(tmp_path.glob(".*.cube"))
+
+
+def test_videotoolbox_plan_preserves_hevc_main10(monkeypatch) -> None:
+    settings = SourceVideoSettings(
+        codec_name="hevc",
+        profile="Main 10",
+        pixel_format="yuv420p10le",
+        width=3840,
+        height=2160,
+        color_range="tv",
+        color_space="bt2020nc",
+        color_transfer="arib-std-b67",
+        color_primaries="bt2020",
+    )
+    monkeypatch.setattr(video_exports.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        video_exports,
+        "_available_video_encoders",
+        lambda: frozenset({"hevc_videotoolbox"}),
+    )
+
+    plan = video_exports._videotoolbox_master_plan(settings)
+
+    assert plan is not None
+    assert plan.name == "hevc_videotoolbox"
+    assert plan.pixel_format == "p010le"
+    assert plan.hardware_accelerated
+    assert "main10" in plan.arguments
+
+
+def test_corrected_exports_builds_preview_from_completed_master(tmp_path, monkeypatch) -> None:
+    source = tmp_path / "source.mov"
+    master_path = tmp_path / "master.mov"
+    preview_path = tmp_path / "preview.mp4"
+    calls = []
+
+    def fake_master(video_path, output_path, correction):
+        calls.append(("master", video_path, output_path, correction))
+        return MasterExportResult(
+            path=master_path,
+            codec_name="hevc",
+            profile="Main 10",
+            pixel_format="yuv420p10le",
+            codec_preserved=True,
+            encoder_name="hevc_videotoolbox",
+            hardware_accelerated=True,
+        )
+
+    def fake_preview(video_path, output_path, correction=None):
+        calls.append(("preview", video_path, output_path, correction))
+        return VideoExportResult(path=preview_path, audio_status="preserved")
+
+    monkeypatch.setattr(video_exports, "write_corrected_master", fake_master)
+    monkeypatch.setattr(video_exports, "write_corrected_preview", fake_preview)
+
+    result = write_corrected_exports(
+        source,
+        preview_path,
+        master_path,
+        identity_correction(),
+    )
+
+    assert result.master.path == master_path
+    assert result.preview.path == preview_path
+    assert calls[0][0] == "master"
+    assert calls[1] == ("preview", master_path, preview_path, None)

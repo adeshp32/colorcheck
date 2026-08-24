@@ -21,9 +21,11 @@ The analysis and export layers do not import the web application. This keeps the
 2. Uploaded media is renamed, written with byte limits, and validated with Pillow or FFprobe.
 3. The analysis pipeline samples frames and computes reference-aware perceptual metrics.
 4. Correction logic creates a bounded plan and evaluates clipping and lighting-shift risk.
-5. Exporters produce the preview, editing master, LUT/CDL files, reports, and editor guides.
-6. Source uploads are deleted in a `finally` block; only allowlisted generated artifacts remain.
-7. Expired job directories are removed according to the configured retention period.
+5. The exporter applies the correction once while producing the quality-preserved master, using supported hardware encoding when available.
+6. A browser-friendly preview is derived from the completed master without repeating the color correction.
+7. Exporters write the LUT/CDL files, reports, and editor guides.
+8. Source uploads are deleted in a `finally` block; only allowlisted generated artifacts remain.
+9. Expired job directories are removed according to the configured retention period.
 
 ## Deployment Model
 

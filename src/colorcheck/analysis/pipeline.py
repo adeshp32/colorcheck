@@ -20,7 +20,7 @@ from colorcheck.analysis.metrics import (
     sample_video_frames,
 )
 from colorcheck.exports.reporting import write_report_outputs
-from colorcheck.exports.video import write_corrected_master, write_corrected_video
+from colorcheck.exports.video import write_corrected_exports
 from colorcheck.models import (
     AnalysisReport,
     AnalysisSummary,
@@ -200,19 +200,16 @@ def analyze_video(
     corrected_video = None
     corrected_master = None
     audio_status = "not_exported"
-    if corrected_video_filename:
-        corrected_video = write_corrected_video(
+    if corrected_video_filename and corrected_master_filename:
+        corrected_exports = write_corrected_exports(
             video_path,
             output_dir / corrected_video_filename,
-            correction,
-        )
-        audio_status = corrected_video.audio_status
-    if corrected_master_filename:
-        corrected_master = write_corrected_master(
-            video_path,
             output_dir / corrected_master_filename,
             correction,
         )
+        corrected_video = corrected_exports.preview
+        corrected_master = corrected_exports.master
+        audio_status = corrected_video.audio_status
     report = AnalysisReport(
         reference_path=Path(reference_path).name,
         video_path=Path(video_path).name,

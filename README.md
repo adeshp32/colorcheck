@@ -14,6 +14,7 @@ ColorCheck compares target footage with an image or video reference, measures pe
 - Let editors control correction strength and define a lighting-preservation threshold.
 - Preserve source audio in the H.264 preview when an audio stream is present.
 - Preserve supported codec, resolution, timing, bit depth, color metadata, and audio characteristics in the editing master.
+- Use Apple VideoToolbox automatically on native macOS for high-fidelity hardware encoding, with portable software fallbacks.
 - Export individual CUBE, CDL, JSON, HTML, MP4, MOV, and editor-guide files.
 
 ## Architecture
@@ -70,7 +71,7 @@ docker compose up --build
 
 | File | Purpose |
 | --- | --- |
-| `corrected_preview.mp4` | Browser-compatible H.264 preview with source audio when available |
+| `corrected_preview.mp4` | Browser-compatible H.264 preview, capped at 1080p, with source audio when available |
 | `corrected_master.mov` | High-quality editing master with supported source characteristics preserved |
 | `recommended_correction.cube` | Portable 3D LUT |
 | `recommended_correction.cdl` | ASC CDL correction values |
@@ -79,6 +80,8 @@ docker compose up --build
 | `*_steps.md` | Editor-specific application guidance |
 
 Video pixels must be re-encoded after correction, so a corrected file cannot be bit-for-bit identical to the source. ColorCheck never modifies the original upload.
+
+The optimized exporter corrects and encodes the quality-preserved master once, then derives the browser preview from that completed master. See the reproducible [performance notes](docs/performance.md) for benchmark and fidelity results.
 
 ## Safety Model
 
