@@ -9,12 +9,14 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO
+from urllib.parse import urlsplit
 
 from PIL import Image, UnidentifiedImageError
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".avi", ".mkv", ".webm"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 JOB_ID_PATTERN = re.compile(r"^[0-9a-f]{32}$")
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 
 class PublicInputError(ValueError):
@@ -66,6 +68,50 @@ class FixedWindowRateLimiter:
                 return False, retry_after
             bucket.count += 1
             return True, 0
+
+
+def _normalized_origin(value: str) -> tuple[str, str, int] | None:
+    try:
+        parsed = urlsplit(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return None
+        default_port = 443 if parsed.scheme == "https" else 80
+        return parsed.scheme, parsed.hostname.lower().rstrip("."), parsed.port or default_port
+    except ValueError:
+        return None
+
+
+def upload_origin_allowed(
+    origin: str | None,
+    expected_origins: tuple[str, ...],
+    fetch_site: str | None = None,
+) -> bool:
+    """Accept browser same-origin uploads while remaining proxy and localhost aware."""
+    site = (fetch_site or "").strip().lower()
+    if site == "cross-site":
+        return False
+    if site == "same-origin":
+        return True
+    if not origin:
+        return True
+
+    submitted = _normalized_origin(origin)
+    if submitted is None:
+        return False
+    for candidate in expected_origins:
+        expected = _normalized_origin(candidate)
+        if submitted == expected:
+            return True
+        if expected is not None:
+            same_local_origin = (
+                submitted[0] == expected[0]
+                and submitted[2] == expected[2]
+                and submitted[1] in LOOPBACK_HOSTS
+                and expected[1] in LOOPBACK_HOSTS
+            )
+            if same_local_origin:
+                return True
+    return False
 
 
 def upload_destination(input_dir: Path, filename: str | None, role: str) -> Path:

@@ -12,6 +12,7 @@ from colorcheck.web.security import (
     cleanup_expired_jobs,
     save_upload_limited,
     upload_destination,
+    upload_origin_allowed,
     validate_job_id,
 )
 
@@ -67,3 +68,31 @@ def test_job_ids_are_restricted() -> None:
     validate_job_id("a" * 32)
     with pytest.raises(PublicInputError):
         validate_job_id("../../private")
+
+
+def test_upload_origin_accepts_same_origin_and_local_aliases() -> None:
+    assert upload_origin_allowed(
+        "https://colorcheck.example",
+        ("https://colorcheck.example",),
+    )
+    assert upload_origin_allowed(
+        "http://localhost:8000",
+        ("http://127.0.0.1:8000",),
+    )
+    assert upload_origin_allowed(
+        "https://colorcheck.example",
+        ("http://internal-service:8000",),
+        fetch_site="same-origin",
+    )
+
+
+def test_upload_origin_rejects_cross_site_requests() -> None:
+    assert not upload_origin_allowed(
+        "https://attacker.example",
+        ("https://colorcheck.example",),
+    )
+    assert not upload_origin_allowed(
+        "https://colorcheck.example",
+        ("https://colorcheck.example",),
+        fetch_site="cross-site",
+    )

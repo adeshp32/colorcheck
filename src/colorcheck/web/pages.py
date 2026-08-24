@@ -386,6 +386,10 @@ def page_shell(title: str, body: str) -> str:
       font-size: 1.08rem;
       margin-top: 20px;
     }}
+    .about-story {{
+      font-weight: 350;
+      line-height: 1.75;
+    }}
     .footer {{
       padding: 54px 0 72px;
       border-top: 1px solid var(--line);
@@ -648,7 +652,7 @@ def home_page() -> str:
   <section class="info" id="about" aria-labelledby="about-title">
     <p class="eyebrow">About the project</p>
     <h2 class="section-title" id="about-title">Built from editing frustration, shaped by machine learning curiosity.</h2>
-    <p class="about-text">I made ColorCheck for the amateur editor version of myself: someone who can feel when two shots do not quite belong together, but wants a clearer way to measure why. It sits at the overlap of visual art, editing judgment, and machine learning by turning reference footage into practical, bounded color guidance instead of letting automation push an image until it breaks.</p>
+    <p class="about-text about-story">I made ColorCheck for the amateur editor version of myself: someone who can feel when two shots do not quite belong together, but wants a clearer way to measure why. It sits at the overlap of visual art, editing judgment, and machine learning by turning reference footage into practical, bounded color guidance instead of letting automation push an image until it breaks.</p>
   </section>
   <footer class="footer">
     <div>

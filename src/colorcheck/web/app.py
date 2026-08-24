@@ -8,7 +8,6 @@ import threading
 import uuid
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlsplit
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -23,6 +22,7 @@ from colorcheck.web.security import (
     cleanup_expired_jobs,
     save_upload_limited,
     upload_destination,
+    upload_origin_allowed,
     validate_job_id,
     validate_media,
 )
@@ -136,9 +136,24 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
             return message
 
         request._receive = receive_limited
-        origin = request.headers.get("origin")
-        request_host = request.headers.get("x-forwarded-host", request.headers.get("host", ""))
-        if origin and urlsplit(origin).netloc.lower() != request_host.lower():
+        request_host = request.headers.get("host", "")
+        forwarded_host = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip()
+        expected_origins = tuple(
+            candidate
+            for candidate in (
+                f"{request.url.scheme}://{request_host}" if request_host else "",
+                f"{forwarded_proto or request.url.scheme}://{forwarded_host}"
+                if forwarded_host
+                else "",
+            )
+            if candidate
+        )
+        if not upload_origin_allowed(
+            request.headers.get("origin"),
+            expected_origins,
+            request.headers.get("sec-fetch-site"),
+        ):
             return _secure_response(
                 JSONResponse(status_code=403, content={"detail": "Cross-site upload blocked."}),
                 request,
