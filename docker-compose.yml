@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    image: video-color-checker:local
+    ports:
+      - "8000:8000"
+    environment:
+      VCC_STORAGE_DIR: /app/storage
+      VCC_MAX_UPLOAD_MB: 250
+      VCC_MAX_VIDEO_SECONDS: 120
+      VCC_MAX_VIDEO_MEGAPIXELS: 8.3
+      VCC_JOB_TTL_HOURS: 6
+      VCC_ANALYSES_PER_HOUR: 6
+    volumes:
+      - ./storage:/app/storage
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

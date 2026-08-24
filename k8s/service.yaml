@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: video-color-checker
+  labels:
+    app: video-color-checker
+spec:
+  selector:
+    app: video-color-checker
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+  type: ClusterIP

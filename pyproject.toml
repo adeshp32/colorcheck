@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-color-checker"
+version = "0.1.0"
+description = "PyTorch-powered video color consistency reports and editor correction guidance."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115.0",
+  "jinja2>=3.1.4",
+  "numpy>=1.26.4",
+  "opencv-python-headless>=4.10.0.84",
+  "pillow>=10.4.0",
+  "python-multipart>=0.0.9",
+  "torch>=2.3.0",
+  "uvicorn[standard]>=0.30.6"
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.0",
+  "ruff>=0.6.0"
+]
+
+[project.scripts]
+vcc-analyze = "video_color_checker.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

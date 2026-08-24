@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video-color-checker
+  labels:
+    app: video-color-checker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: video-color-checker
+  template:
+    metadata:
+      labels:
+        app: video-color-checker
+    spec:
+      securityContext:
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: video-color-checker:local
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: VCC_STORAGE_DIR
+              value: /app/storage
+            - name: VCC_MAX_UPLOAD_MB
+              value: "250"
+            - name: VCC_MAX_VIDEO_SECONDS
+              value: "120"
+            - name: VCC_MAX_VIDEO_MEGAPIXELS
+              value: "8.3"
+            - name: VCC_JOB_TTL_HOURS
+              value: "6"
+            - name: VCC_ANALYSES_PER_HOUR
+              value: "6"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10001
+          volumeMounts:
+            - name: job-storage
+              mountPath: /app/storage
+            - name: temp-storage
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 8
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+      volumes:
+        - name: job-storage
+          emptyDir: {}
+        - name: temp-storage
+          emptyDir: {}
