@@ -4,6 +4,8 @@ from colorcheck.web.pages import home_page
 def test_generate_button_has_loading_state_and_no_gradient() -> None:
     page = home_page()
 
+    assert "Color that isn't artificial." in page
+    assert 'class="palette-swatches" role="img"' in page
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page
     assert 'submitButton.textContent = "Generating preview..."' in page

@@ -1,18 +1,21 @@
 # Public Deployment
 
-## Recommended First Host: Railway
+## Recommended Host
 
-Railway is the simplest low-cost fit for this version because it builds the existing Dockerfile, accepts large HTTP uploads, supplies HTTPS and a public domain, and supports requests long enough for short video processing. The Hobby plan starts at $5 per month and includes $5 of usage. Enable Serverless mode so the portfolio demo sleeps after inactivity.
+Railway is the best first host for the current synchronous video pipeline. It builds the existing Dockerfile, provides HTTPS and a public domain, and allows longer uploads and requests than most free web-service tiers. The [Hobby plan](https://docs.railway.com/pricing/plans) starts at $5 per month, and that amount is applied to usage.
 
-Recommended service settings:
+## Deploy
 
-- Build from this GitHub repository with the included `railway.toml`.
-- Generate a Railway public domain and keep HTTPS enabled.
-- Enable Serverless under **Settings > Deploy > Serverless**.
-- Set replica limits to 2 vCPU and 4 GB RAM initially.
-- Set a $5 email alert and a $10 hard compute limit.
-- Keep one replica; the app intentionally processes one analysis at a time.
-- Use `/healthz` as the health check.
+1. Sign in to Railway with GitHub.
+2. Choose **New Project**, then **Deploy from GitHub repo**.
+3. Select `adeshp32/colorcheck` and deploy the `main` branch.
+4. Add the environment variables below to the service.
+5. Under **Settings > Networking**, choose **Generate Domain**.
+6. Under **Settings > Deploy**, enable [Serverless](https://docs.railway.com/guides/cut-idle-costs-serverless).
+7. Keep one replica and set its limit to 2 vCPU and 4 GB RAM.
+8. Configure a $5 usage alert and a $10 hard limit using Railway's [cost controls](https://docs.railway.com/pricing/cost-control).
+
+The included `railway.toml` selects the Dockerfile, checks `/healthz`, and restarts failed containers. The application intentionally processes one analysis at a time.
 
 Set these variables for the public demo:
 
@@ -25,9 +28,13 @@ VCC_JOB_TTL_HOURS=3
 VCC_ANALYSES_PER_HOUR=4
 ```
 
-The 1080p/60-second public limits keep synchronous work beneath typical proxy timeouts. Local development can retain the larger defaults from `.env.example`.
+The 1080p/60-second limits keep synchronous work inside Railway's [public-network request limits](https://docs.railway.com/networking/public-networking/specs-and-limits). Local development can retain the larger defaults from `.env.example`.
 
 Railway storage is intentionally ephemeral for this demo. A restart can remove generated results earlier than the configured retention period. That is acceptable because the app makes no durability promise and deletes source footage after processing.
+
+## Cost Model
+
+Railway charges for measured CPU, memory, storage, and egress according to its [usage pricing](https://docs.railway.com/pricing). Serverless mode stops compute charges after ten minutes without outbound traffic. The $5 monthly Hobby subscription is the practical minimum; a lightly used portfolio demo should generally remain within that included usage, but the hard limit is still important.
 
 ## Growth Path
 
@@ -35,7 +42,7 @@ For sustained public use, move uploads and exports to object storage and process
 
 ## Alternatives
 
-- **Hugging Face Docker Spaces:** excellent ML-demo hardware, but creating Docker Spaces currently requires a $9/month PRO account. Storage is non-persistent.
-- **Render Free:** not suitable for this app's PyTorch and FFmpeg workload because the free instance provides only 512 MB RAM and 0.1 CPU.
-- **Koyeb Free:** similarly limited to 512 MB RAM and 0.1 vCPU.
-- **Cloud Run now:** potentially very inexpensive, but HTTP/1 requests are limited to 32 MiB and the container filesystem is disposable. Use it after direct object-storage uploads are implemented.
+- **Hugging Face Docker Spaces:** useful ML-demo hardware, but Docker Space creation currently requires a [$9/month PRO account](https://huggingface.co/pricing).
+- **Render Free:** its [512 MB RAM and 0.1 CPU](https://render.com/docs/compute-plans) are not sufficient for this PyTorch and FFmpeg workload.
+- **Koyeb Free:** its [512 MB RAM and 0.1 vCPU](https://www.koyeb.com/docs/reference/instances) have the same limitation.
+- **Cloud Run now:** potentially inexpensive, but [HTTP/1 requests are limited to 32 MiB](https://docs.cloud.google.com/run/quotas). Use it after direct object-storage uploads are implemented.

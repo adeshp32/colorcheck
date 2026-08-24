@@ -144,12 +144,12 @@ def page_shell(title: str, body: str) -> str:
       margin: 0 auto;
     }}
     .hero {{
-      min-height: calc(100vh - 78px);
+      min-height: min(720px, calc(86vh - 78px));
       display: grid;
       grid-template-columns: minmax(0, 0.92fr) minmax(320px, 1.08fr);
-      gap: clamp(22px, 5vw, 68px);
+      gap: clamp(22px, 4vw, 52px);
       align-items: center;
-      padding: clamp(34px, 6vw, 84px) 0 72px;
+      padding: clamp(28px, 4vw, 56px) 0 48px;
     }}
     .eyebrow {{
       width: fit-content;
@@ -163,21 +163,21 @@ def page_shell(title: str, body: str) -> str:
       margin-bottom: 18px;
     }}
     h1 {{
-      max-width: 11ch;
+      max-width: 12ch;
       margin: 0;
-      font-size: clamp(3.2rem, 8vw, 7.2rem);
-      line-height: 0.9;
+      font-size: clamp(2.65rem, 5.8vw, 5.25rem);
+      line-height: 0.96;
       letter-spacing: 0;
     }}
     .lede {{
       max-width: 54ch;
       color: var(--muted);
       font-size: clamp(1.05rem, 2vw, 1.3rem);
-      margin: 22px 0 0;
+      margin: 16px 0 0;
     }}
     .descriptor {{
       max-width: 54ch;
-      margin: 18px 0 0;
+      margin: 14px 0 0;
       font-weight: 850;
     }}
     .panel {{
@@ -189,6 +189,7 @@ def page_shell(title: str, body: str) -> str:
       overflow: hidden;
     }}
     .analysis-panel {{
+      position: relative;
       font-family: var(--tool-font);
       border-color: rgba(255, 255, 255, 0.62);
       background:
@@ -198,6 +199,26 @@ def page_shell(title: str, body: str) -> str:
         inset 0 1px 0 rgba(255,255,255,0.86),
         inset 0 -1px 0 rgba(92,92,255,0.12),
         0 28px 82px rgba(56, 56, 168, 0.22);
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }}
+    .analysis-panel::before {{
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 5px;
+      background: linear-gradient(
+        90deg,
+        #5c5cff 0 28%,
+        #d989a0 28% 52%,
+        #8ac8bb 52% 76%,
+        #f1c879 76% 100%
+      );
+    }}
+    .analysis-panel:focus-within {{
+      border-color: color-mix(in srgb, var(--accent) 52%, white);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.86),
+        0 30px 86px rgba(56, 56, 168, 0.25);
     }}
     [data-theme="dark"] .analysis-panel {{
       border-color: rgba(188, 188, 255, 0.22);
@@ -207,11 +228,38 @@ def page_shell(title: str, body: str) -> str:
     }}
     .tool-head {{
       display: flex;
+      align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 18px;
+      padding: 22px 18px 18px;
       border-bottom: 1px solid var(--line);
     }}
+    .tool-head-actions {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+    }}
+    .palette-swatches {{
+      display: grid;
+      grid-template-columns: repeat(4, 18px);
+      gap: 4px;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--cream);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
+    }}
+    .palette-swatches span {{
+      width: 18px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid rgba(23, 23, 43, 0.12);
+    }}
+    .palette-swatches span:nth-child(1) {{ background: #5c5cff; }}
+    .palette-swatches span:nth-child(2) {{ background: #d989a0; }}
+    .palette-swatches span:nth-child(3) {{ background: #8ac8bb; }}
+    .palette-swatches span:nth-child(4) {{ background: #f1c879; }}
     .status-pill {{
       border-radius: 999px;
       background: linear-gradient(135deg, var(--accent-soft), var(--third-soft));
@@ -239,6 +287,11 @@ def page_shell(title: str, body: str) -> str:
       min-height: 54px;
       padding: 13px 14px;
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.76);
+      transition: border-color 160ms ease, background-color 160ms ease;
+    }}
+    input[type="file"]:hover, input[type="number"]:hover {{
+      border-color: color-mix(in srgb, var(--accent) 44%, var(--line));
+      background: color-mix(in srgb, var(--cream) 88%, var(--accent-soft));
     }}
     input[type="range"] {{
       width: 100%;
@@ -310,14 +363,16 @@ def page_shell(title: str, body: str) -> str:
       background: color-mix(in srgb, var(--glass-strong) 74%, transparent);
     }}
     .mini-grid div {{ padding: 14px 18px; border-right: 1px solid var(--line); }}
+    .mini-grid div:nth-child(1) {{ box-shadow: inset 0 3px #d989a0; }}
+    .mini-grid div:nth-child(2) {{ box-shadow: inset 0 3px var(--accent); }}
+    .mini-grid div:nth-child(3) {{ box-shadow: inset 0 3px var(--third); }}
     .mini-grid div:last-child {{ border-right: 0; }}
     .mini-grid span {{ display: block; color: var(--muted); font-size: 0.82rem; }}
     .mini-grid strong {{ display: block; margin-top: 2px; }}
     section.info {{
-      min-height: 66vh;
       display: grid;
       align-content: center;
-      padding: 64px 0;
+      padding: 56px 0;
     }}
     .section-title {{
       max-width: 760px;
@@ -434,6 +489,8 @@ def page_shell(title: str, body: str) -> str:
       .mini-grid {{ grid-template-columns: 1fr; }}
       .mini-grid div {{ border-right: 0; border-bottom: 1px solid var(--line); }}
       .mini-grid div:last-child {{ border-bottom: 0; }}
+      .tool-head {{ align-items: flex-start; }}
+      .tool-head-actions {{ align-items: flex-end; flex-direction: column-reverse; }}
       nav a {{ display: none; }}
     }}
     @media (prefers-reduced-motion: reduce) {{
@@ -516,7 +573,7 @@ def home_page() -> str:
   <section class="hero" id="tool" aria-labelledby="hero-title">
     <div>
       <p class="eyebrow">Reference-led color review</p>
-      <h1 id="hero-title">Color that stays honest.</h1>
+      <h1 id="hero-title">Color that isn't artificial.</h1>
       <p class="descriptor">Compares a video to a reference look, then exports a guarded corrected preview and editor-ready color guidance.</p>
       <p class="lede">Upload a reference image or reference video, then add the clip you want checked. ColorCheck samples the footage, finds matching lighting moments, flags drift, and lets you choose how strongly the correction should be applied.</p>
     </div>
@@ -526,7 +583,15 @@ def home_page() -> str:
           <strong>Analyze footage</strong>
           <div class="hint">Image or video reference accepted</div>
         </div>
-        <div class="status-pill">Preview + report</div>
+        <div class="tool-head-actions">
+          <div class="palette-swatches" role="img" aria-label="Reference palette: violet, rose, mint, and amber">
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+          </div>
+          <div class="status-pill">Preview + report</div>
+        </div>
       </div>
       <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data">
         <label class="field-reference">
