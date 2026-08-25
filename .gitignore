@@ -27,3 +27,4 @@ reports/
 *.tiff
 *.webp
 !docs/assets/*.png
+!docs/screenshots/*.png

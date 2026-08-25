@@ -6,6 +6,16 @@ Reference-aware, guardrail-first video color intelligence for editors.
 
 ColorCheck compares target footage with an image or video reference, measures perceptual color and lighting drift with PyTorch, and produces conservative corrections without modifying the source. It generates browser previews, quality-preserved editing masters, LUT/CDL files, structured reports, and workflow guidance for DaVinci Resolve, Premiere Pro, Avid Media Composer, and iMovie.
 
+## Product Proof
+
+![ColorCheck reference-led analysis interface](docs/screenshots/colorcheck-analyze.png)
+
+![ColorCheck completed analysis and safety metrics](docs/screenshots/colorcheck-analysis-summary.png)
+
+![ColorCheck corrected video preview](docs/screenshots/colorcheck-corrected-preview.png)
+
+![ColorCheck editor-ready exports](docs/screenshots/colorcheck-exports.png)
+
 ## Capabilities
 
 - Match target frames against a still or lighting-similar moments from a reference clip.
