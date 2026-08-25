@@ -68,10 +68,13 @@ class RequestBodyTooLarge(Exception):
 
 
 def _client_key(request: Request) -> str:
-    railway_ip = request.headers.get("x-real-ip", "").strip()
-    if railway_ip:
+    proxy_ip = (
+        request.headers.get("cf-connecting-ip", "").strip()
+        or request.headers.get("x-real-ip", "").strip()
+    )
+    if proxy_ip:
         try:
-            return ipaddress.ip_address(railway_ip).compressed
+            return ipaddress.ip_address(proxy_ip).compressed
         except ValueError:
             pass
     return request.client.host[:64] if request.client else "unknown"
@@ -115,7 +118,7 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
                     status_code=413,
                     content={
                         "detail": (
-                            f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+                            f"Combined uploads must be under {SETTINGS.max_request_mb} MB."
                         )
                     },
                 ),
@@ -182,14 +185,14 @@ async def public_safety_boundary(request: Request, call_next) -> Response:
             response = JSONResponse(
                 status_code=413,
                 content={
-                    "detail": f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+                    "detail": f"Combined uploads must be under {SETTINGS.max_request_mb} MB."
                 },
             )
     except RequestBodyTooLarge:
         response = JSONResponse(
             status_code=413,
             content={
-                "detail": f"Combined uploads must be under {SETTINGS.max_upload_mb * 2} MB."
+                "detail": f"Combined uploads must be under {SETTINGS.max_request_mb} MB."
             },
         )
     finally:
@@ -256,7 +259,11 @@ def _run_analysis(
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     _ensure_storage()
-    return home_page()
+    return home_page(
+        max_upload_mb=SETTINGS.max_upload_mb,
+        max_request_mb=SETTINGS.max_request_mb,
+        max_video_seconds=SETTINGS.max_video_seconds,
+    )
 
 
 @app.get("/healthz")

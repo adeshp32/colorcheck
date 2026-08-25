@@ -589,8 +589,12 @@ def page_shell(title: str, body: str) -> str:
 </html>"""
 
 
-def home_page() -> str:
-    body = """<div class="page">
+def home_page(
+    max_upload_mb: int = 250,
+    max_request_mb: int = 504,
+    max_video_seconds: int = 120,
+) -> str:
+    body = f"""<div class="page">
   <section class="hero" id="tool" aria-labelledby="hero-title">
     <div>
       <p class="eyebrow">Reference-led color review</p>
@@ -603,6 +607,7 @@ def home_page() -> str:
         <div>
           <strong>Analyze footage</strong>
           <div class="hint">Image or video reference accepted</div>
+          <div class="hint">Up to {max_upload_mb} MB per file, {max_request_mb} MB combined, and {max_video_seconds}-second clips</div>
         </div>
         <div class="tool-head-actions">
           <div class="palette-swatches" role="img" aria-label="Reference palette: violet, rose, mint, and amber">

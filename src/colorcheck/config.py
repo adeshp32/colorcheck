@@ -9,6 +9,7 @@ from pathlib import Path
 class AppSettings:
     storage_root: Path
     max_upload_mb: int
+    max_request_mb: int
     max_video_seconds: int
     max_video_pixels: int
     max_image_pixels: int
@@ -21,14 +22,20 @@ class AppSettings:
 
     @property
     def max_request_bytes(self) -> int:
-        multipart_overhead_mb = 4
-        return (self.max_upload_mb * 2 + multipart_overhead_mb) * 1024 * 1024
+        return self.max_request_mb * 1024 * 1024
 
     @classmethod
     def from_environment(cls) -> AppSettings:
+        max_upload_mb = max(10, int(os.environ.get("VCC_MAX_UPLOAD_MB", "250")))
+        default_request_mb = max_upload_mb * 2 + 4
+        max_request_mb = max(
+            max_upload_mb + 4,
+            int(os.environ.get("VCC_MAX_REQUEST_MB", str(default_request_mb))),
+        )
         return cls(
             storage_root=Path(os.environ.get("VCC_STORAGE_DIR", "storage")).resolve(),
-            max_upload_mb=max(10, int(os.environ.get("VCC_MAX_UPLOAD_MB", "250"))),
+            max_upload_mb=max_upload_mb,
+            max_request_mb=max_request_mb,
             max_video_seconds=max(10, int(os.environ.get("VCC_MAX_VIDEO_SECONDS", "120"))),
             max_video_pixels=max(
                 1_000_000,

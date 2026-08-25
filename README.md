@@ -108,7 +108,12 @@ GitHub Actions runs the lint and test suite on every push and pull request. Depe
 
 ## Deployment
 
-The first public deployment target is Railway using the included `Dockerfile` and `railway.toml`. The current synchronous pipeline is intentionally limited to one analysis at a time. See the [deployment guide](docs/deployment.md) for resource limits, cost controls, and the asynchronous growth path.
+The planned free public deployment runs the existing container on an Oracle Cloud Always Free
+Ampere VM and publishes the custom domain through Cloudflare Tunnel. The origin remains private,
+while Cloudflare provides HTTPS, DNS, DDoS protection, and the public hostname. The synchronous
+pipeline is intentionally limited to one analysis at a time. See the
+[deployment guide](docs/deployment.md) for the public upload ceiling, domain route, and security
+checklist.
 
 Kubernetes manifests are available in [`deploy/kubernetes`](deploy/kubernetes):
 

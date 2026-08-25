@@ -9,6 +9,7 @@ services:
     environment:
       VCC_STORAGE_DIR: /app/storage
       VCC_MAX_UPLOAD_MB: 250
+      VCC_MAX_REQUEST_MB: 504
       VCC_MAX_VIDEO_SECONDS: 120
       VCC_MAX_VIDEO_MEGAPIXELS: 8.3
       VCC_JOB_TTL_HOURS: 6

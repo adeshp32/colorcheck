@@ -2,7 +2,7 @@ from colorcheck.web.pages import home_page
 
 
 def test_generate_button_has_loading_state_and_no_gradient() -> None:
-    page = home_page()
+    page = home_page(max_upload_mb=90, max_request_mb=95, max_video_seconds=60)
 
     assert "Color that isn't artificial." in page
     assert 'class="palette-swatches" role="img"' in page
@@ -10,6 +10,7 @@ def test_generate_button_has_loading_state_and_no_gradient() -> None:
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page
     assert "Generate Mapped Report &amp; Video" in page
+    assert "Up to 90 MB per file, 95 MB combined, and 60-second clips" in page
     assert 'if (form.dataset.submitting === "true")' in page
     assert "event.preventDefault();" in page
     assert 'submitButton.textContent = "Mapping report & video..."' in page

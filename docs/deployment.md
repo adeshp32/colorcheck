@@ -1,48 +1,85 @@
 # Public Deployment
 
-## Recommended Host
+## Recommended Architecture
 
-Railway is the best first host for the current synchronous video pipeline. It builds the existing Dockerfile, provides HTTPS and a public domain, and allows longer uploads and requests than most free web-service tiers. The [Hobby plan](https://docs.railway.com/pricing/plans) starts at $5 per month, and that amount is applied to usage.
+The first public release uses the custom domain on Cloudflare and runs the ColorCheck
+container on an Oracle Cloud Always Free Ampere VM:
 
-## Deploy
+```text
+Browser -> Cloudflare HTTPS/WAF/DDoS protection -> Cloudflare Tunnel -> ColorCheck container
+```
 
-1. Sign in to Railway with GitHub.
-2. Choose **New Project**, then **Deploy from GitHub repo**.
-3. Select `adeshp32/colorcheck` and deploy the `main` branch.
-4. Add the environment variables below to the service.
-5. Under **Settings > Networking**, choose **Generate Domain**.
-6. Under **Settings > Deploy**, enable [Serverless](https://docs.railway.com/guides/cut-idle-costs-serverless).
-7. Keep one replica and set its limit to 2 vCPU and 4 GB RAM.
-8. Configure a $5 usage alert and a $10 hard limit using Railway's [cost controls](https://docs.railway.com/pricing/cost-control).
+[Cloudflare Tunnel](https://developers.cloudflare.com/tunnel/) is available on all plans and
+creates an outbound-only connection from the VM. The application port does not need to be
+opened to the Internet, and Cloudflare maps a hostname such as `color.example.com` to the local
+service. Oracle's [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)
+provide the CPU and memory that PyTorch and FFmpeg require, subject to regional capacity and
+idle-resource reclamation.
 
-The included `railway.toml` selects the Dockerfile, checks `/healthz`, and restarts failed containers. The application intentionally processes one analysis at a time.
+Cloudflare Pages alone cannot run this application. Pages is suitable for static files, while
+ColorCheck needs a long-running Python process, FFmpeg, PyTorch, writable temporary storage,
+and substantially more memory than a Worker isolate. Cloudflare Containers can run Docker
+images, but currently requires the [$5 Workers Paid plan](https://developers.cloudflare.com/containers/pricing/).
 
-Set these variables for the public demo:
+## Public Limits
+
+Cloudflare Free accepts request bodies up to
+[100 MB](https://developers.cloudflare.com/workers/platform/limits/). The initial deployment
+keeps the entire multipart upload below that boundary:
 
 ```text
 VCC_STORAGE_DIR=/app/storage
-VCC_MAX_UPLOAD_MB=200
+VCC_MAX_UPLOAD_MB=90
+VCC_MAX_REQUEST_MB=95
 VCC_MAX_VIDEO_SECONDS=60
 VCC_MAX_VIDEO_MEGAPIXELS=2.1
-VCC_JOB_TTL_HOURS=3
-VCC_ANALYSES_PER_HOUR=4
+VCC_JOB_TTL_HOURS=2
+VCC_ANALYSES_PER_HOUR=3
 ```
 
-The 1080p/60-second limits keep synchronous work inside Railway's [public-network request limits](https://docs.railway.com/networking/public-networking/specs-and-limits). Local development can retain the larger defaults from `.env.example`.
+Each individual file may be up to 90 MB, but the reference and target together, including form
+data, must remain under 95 MB. Clips are limited to 60 seconds and approximately 1080p. These
+are portfolio-demo limits, not model limitations. The application rejects oversized requests,
+deletes source uploads after processing, expires generated results, and processes one correction
+at a time.
 
-Railway storage is intentionally ephemeral for this demo. A restart can remove generated results earlier than the configured retention period. That is acceptable because the app makes no durability promise and deletes source footage after processing.
+## Domain Route
 
-## Cost Model
+1. Add the domain to Cloudflare and activate its assigned nameservers.
+2. Create a remotely managed tunnel named `colorcheck-production`.
+3. Run `cloudflared` beside the application container on the Oracle VM.
+4. Add a published application route for the chosen hostname.
+5. Point the route to `http://app:8000` when both services share a Docker network.
+6. Keep the Oracle ingress firewall closed for application ports; SSH should be restricted to
+   an administrator IP or Oracle Bastion.
+7. Confirm `/healthz` returns `{"status":"ok"}` through the public hostname.
 
-Railway charges for measured CPU, memory, storage, and egress according to its [usage pricing](https://docs.railway.com/pricing). Serverless mode stops compute charges after ten minutes without outbound traffic. The $5 monthly Hobby subscription is the practical minimum; a lightly used portfolio demo should generally remain within that included usage, but the hard limit is still important.
+Cloudflare creates the tunnel DNS record automatically when the route is added through the
+dashboard. The tunnel token is a secret and belongs only in the VM's local `.env` file or secret
+store. It must never be committed to GitHub.
 
-## Growth Path
+## Security Checklist
 
-For sustained public use, move uploads and exports to object storage and process jobs asynchronously. A production architecture should use direct browser-to-bucket uploads, a queue, isolated workers, signed download URLs, persistent rate limiting, malware scanning, and account-level quotas. Google Cloud Run plus Cloud Storage is a strong pay-per-use destination after that architecture change, but the current synchronous HTTP/1 upload flow is not the best first deployment for large videos.
+- Use Cloudflare's proxied hostname and HTTPS only.
+- Keep the origin private behind Cloudflare Tunnel.
+- Set a Cloudflare rate-limit rule for `POST /analyze-form` and `POST /analyze` when available.
+- Disable caching for `/jobs/*`; ColorCheck already sends `private, no-store`.
+- Retain one application worker and one in-process analysis slot.
+- Monitor disk use and keep the two-hour job expiry enabled.
+- Back up no uploads; source media is deliberately temporary.
+- Rotate the tunnel token immediately if it is exposed.
 
-## Alternatives
+## Larger Uploads
 
-- **Hugging Face Docker Spaces:** useful ML-demo hardware, but Docker Space creation currently requires a [$9/month PRO account](https://huggingface.co/pricing).
-- **Render Free:** its [512 MB RAM and 0.1 CPU](https://render.com/docs/compute-plans) are not sufficient for this PyTorch and FFmpeg workload.
-- **Koyeb Free:** its [512 MB RAM and 0.1 vCPU](https://www.koyeb.com/docs/reference/instances) have the same limitation.
-- **Cloud Run now:** potentially inexpensive, but [HTTP/1 requests are limited to 32 MiB](https://docs.cloud.google.com/run/quotas). Use it after direct object-storage uploads are implemented.
+Do not raise the synchronous request limit past Cloudflare's plan boundary. The scalable path is
+direct browser-to-[R2](https://developers.cloudflare.com/r2/pricing/) multipart upload, followed
+by an asynchronous worker job and signed result URLs. R2 includes 10 GB-month of Standard
+storage and free Internet egress each month, but that architecture should be added only after the
+small public demo is stable.
+
+## Paid Fallback
+
+Railway remains the simplest fallback when Oracle capacity is unavailable. Its
+[Hobby plan](https://docs.railway.com/pricing/plans) starts at $5 per month and can build the
+included Dockerfile directly. The application's public limits should remain enabled regardless
+of host.
