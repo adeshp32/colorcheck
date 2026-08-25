@@ -6,6 +6,8 @@ def test_generate_button_has_loading_state_and_no_gradient() -> None:
 
     assert "Color that isn't artificial." in page
     assert 'class="palette-swatches" role="img"' in page
+    assert 'src="/assets/colorcheck-wordmark.svg" alt="colorcheck."' in page
+    assert 'href="/assets/colorcheck-mark.svg" type="image/svg+xml"' in page
     assert 'class="about-text about-story"' in page
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page

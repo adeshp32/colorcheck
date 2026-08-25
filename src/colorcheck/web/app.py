@@ -11,6 +11,7 @@ from typing import Annotated
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 from colorcheck.analysis.pipeline import analyze_video
 from colorcheck.config import AppSettings
@@ -60,6 +61,11 @@ app = FastAPI(
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
+)
+app.mount(
+    "/assets",
+    StaticFiles(directory=Path(__file__).with_name("assets")),
+    name="assets",
 )
 
 

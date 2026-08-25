@@ -12,6 +12,7 @@ def page_shell(title: str, body: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
+  <link rel="icon" href="/assets/colorcheck-mark.svg" type="image/svg+xml">
   <style>
     :root {{
       --bg: #f9f8ff;
@@ -108,19 +109,15 @@ def page_shell(title: str, body: str) -> str:
     .brand {{
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      font-weight: 850;
-      letter-spacing: 0;
       text-decoration: none;
-      color: var(--ink);
     }}
-    .mark {{
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent), #dedefe 68%, var(--third));
-      border: 1px solid rgba(255,255,255,0.46);
-      box-shadow: inset 0 0 0 6px rgba(255,255,255,0.18);
+    .brand-logo {{
+      display: block;
+      width: 142px;
+      height: auto;
+    }}
+    [data-theme="dark"] .brand-logo {{
+      filter: brightness(1.28);
     }}
     nav {{
       display: flex;
@@ -507,7 +504,7 @@ def page_shell(title: str, body: str) -> str:
 <body>
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Video Color Checker home"><span class="mark" aria-hidden="true"></span><span>ColorCheck</span></a>
+    <a class="brand" href="/" aria-label="ColorCheck home"><img class="brand-logo" src="/assets/colorcheck-wordmark.svg" alt="colorcheck."></a>
     <nav aria-label="Primary navigation">
       <a href="/#tool">Analyze</a>
       <a href="/#about">About</a>

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-labelledby="title description">
+  <title id="title">cc.</title>
+  <desc id="description">Compact lowercase ColorCheck mark in a violet-to-ice reverse gradient.</desc>
+  <defs>
+    <linearGradient id="mark-gradient" x1="5" y1="8" x2="42" y2="39" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3434bd"/>
+      <stop offset="0.55" stop-color="#5c5cff"/>
+      <stop offset="1" stop-color="#c7cbff"/>
+    </linearGradient>
+  </defs>
+  <rect x="1" y="1" width="46" height="46" rx="12" fill="#f7f7ff" stroke="#dfe1ff"/>
+  <text
+    x="5"
+    y="31"
+    fill="url(#mark-gradient)"
+    font-family="Avenir Next, Inter, Helvetica Neue, Arial, sans-serif"
+    font-size="25"
+    font-weight="750"
+    letter-spacing="0"
+  >cc</text>
+  <circle cx="40" cy="29" r="2.8" fill="#5c5cff"/>
+</svg>

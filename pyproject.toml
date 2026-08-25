@@ -31,6 +31,9 @@ colorcheck = "colorcheck.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"colorcheck.web" = ["assets/*.svg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
