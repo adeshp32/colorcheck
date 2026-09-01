@@ -5,17 +5,18 @@ services:
     build: .
     image: colorcheck:local
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${VCC_PORT:-8000}:8000"
     environment:
       VCC_STORAGE_DIR: /app/storage
-      VCC_MAX_UPLOAD_MB: 250
-      VCC_MAX_REQUEST_MB: 504
-      VCC_MAX_VIDEO_SECONDS: 120
-      VCC_MAX_VIDEO_MEGAPIXELS: 8.3
-      VCC_JOB_TTL_HOURS: 6
-      VCC_ANALYSES_PER_HOUR: 6
+      VCC_MAX_UPLOAD_MB: ${VCC_MAX_UPLOAD_MB:-250}
+      VCC_MAX_REQUEST_MB: ${VCC_MAX_REQUEST_MB:-504}
+      VCC_MAX_VIDEO_SECONDS: ${VCC_MAX_VIDEO_SECONDS:-120}
+      VCC_MAX_VIDEO_MEGAPIXELS: ${VCC_MAX_VIDEO_MEGAPIXELS:-8.3}
+      VCC_JOB_TTL_HOURS: ${VCC_JOB_TTL_HOURS:-6}
+      VCC_ANALYSES_PER_HOUR: ${VCC_ANALYSES_PER_HOUR:-6}
     volumes:
       - ./storage:/app/storage
+    restart: unless-stopped
     read_only: true
     tmpfs:
       - /tmp
@@ -23,3 +24,8 @@ services:
       - ALL
     security_opt:
       - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
