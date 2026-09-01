@@ -34,6 +34,7 @@ services:
     image: cloudflare/cloudflared:latest
     profiles:
       - public
+    user: "${CLOUDFLARED_UID:-1000}:${CLOUDFLARED_GID:-1000}"
     command:
       - tunnel
       - --no-autoupdate
