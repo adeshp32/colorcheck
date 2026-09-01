@@ -11,7 +11,8 @@ def test_generate_button_has_loading_state_and_no_gradient() -> None:
     assert 'class="about-text about-story"' in page
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page
-    assert "Confirm you have permission to process this media." in page
+    assert "Confirm that you have permission to process this media." in page
+    assert "Generated results are retained temporarily" in page
     assert "Generate Mapped Report &amp; Video" in page
     assert "Up to 90 MB per file, 95 MB combined, and 60-second clips" in page
     assert 'if (form.dataset.submitting === "true")' in page
