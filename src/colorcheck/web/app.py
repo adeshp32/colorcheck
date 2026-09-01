@@ -97,6 +97,7 @@ def _secure_response(response: Response, request: Request) -> Response:
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
     if request.url.path.startswith("/jobs/"):
         response.headers["Cache-Control"] = "no-store, private"
     forwarded_proto = request.headers.get("x-forwarded-proto", request.url.scheme)
@@ -275,6 +276,11 @@ def home() -> str:
 @app.get("/healthz")
 def healthcheck() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots() -> Response:
+    return Response("User-agent: *\nDisallow: /\n", media_type="text/plain")
 
 
 def _require_rights_confirmation(rights_confirmed: bool) -> None:
