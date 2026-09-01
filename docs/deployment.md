@@ -54,6 +54,33 @@ at a time.
    an administrator IP or Oracle Bastion.
 7. Confirm `/healthz` returns `{"status":"ok"}` through the public hostname.
 
+## Automatic Updates
+
+The Oracle deployment can follow tested changes on `main` without accepting an inbound
+deployment connection. A systemd timer checks GitHub once per minute. When a new commit has a
+successful `test` check, it fast-forwards the server checkout, builds an isolated candidate
+image, waits for its Docker health check, and only then replaces the live application. The
+previous image is retained as `colorcheck:rollback` and restored if the live health check fails.
+
+Install the timer once from the Oracle checkout:
+
+```bash
+cd ~/colorcheck
+git pull --ff-only
+bash deploy/oracle/install-auto-deploy.sh
+```
+
+Inspect its schedule and recent logs with:
+
+```bash
+systemctl list-timers colorcheck-auto-deploy.timer
+journalctl -u colorcheck-auto-deploy.service -n 80 --no-pager
+```
+
+The updater refuses to deploy when the server checkout contains tracked local changes or cannot
+fast-forward to `origin/main`. Local `.env`, `.secrets`, storage, and deployment-state files are
+ignored by Git and remain untouched.
+
 Cloudflare creates the tunnel DNS record automatically when the route is added through the
 dashboard. The tunnel token is a secret and belongs only in the VM's local `.env` file or secret
 store. It must never be committed to GitHub.

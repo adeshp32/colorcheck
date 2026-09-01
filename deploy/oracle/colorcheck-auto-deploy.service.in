@@ -1,0 +1,19 @@
+[Unit]
+Description=Deploy tested ColorCheck updates
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=__USER__
+Group=__GROUP__
+WorkingDirectory=__REPO_DIR__
+Environment=COLORCHECK_REPO_DIR=__REPO_DIR__
+ExecStart=__REPO_DIR__/deploy/oracle/auto-deploy.sh
+TimeoutStartSec=30min
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

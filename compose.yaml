@@ -3,7 +3,7 @@ name: colorcheck
 services:
   app:
     build: .
-    image: colorcheck:local
+    image: ${VCC_IMAGE:-colorcheck:local}
     ports:
       - "127.0.0.1:${VCC_PORT:-8000}:8000"
     environment:
