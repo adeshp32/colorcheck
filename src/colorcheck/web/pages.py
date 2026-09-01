@@ -651,7 +651,7 @@ def home_page(
         <div class="field-action">
           <label class="consent">
             <input name="rights_confirmed" type="checkbox" required>
-            <span>I have permission to process these files. Uploads are deleted after processing and generated results expire automatically.</span>
+            <span>Confirm you have permission to process this media. Source files are deleted after processing, and generated results expire automatically.</span>
           </label>
           <button class="submit" type="submit" data-default-label="Generate Mapped Report &amp; Video">Generate Mapped Report &amp; Video</button>
         </div>
