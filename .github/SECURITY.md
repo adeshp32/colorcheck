@@ -11,8 +11,9 @@ Please use GitHub's private vulnerability reporting feature instead of opening a
 ## Public Demo Boundaries
 
 - Uploaded filenames are replaced with generic internal names.
-- Source uploads are deleted immediately after processing, including failed jobs.
-- Generated results expire automatically; the default retention period is six hours.
+- Analysis inputs are deleted after processing, including failed jobs.
+- Export sources are deleted as soon as streaming ends; abandoned upload sessions expire after two hours.
+- Corrected video is never stored. Reports and correction files expire after six hours by default.
 - Upload size, duration, resolution, rate, and processing concurrency are limited.
 - Job identifiers and downloadable filenames are strictly validated.
 - Analysis errors returned to visitors do not expose stack traces or local paths.

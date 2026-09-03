@@ -13,10 +13,12 @@ from colorcheck.analysis.correction import (
     scale_correction,
 )
 from colorcheck.analysis.metrics import (
-    compare_frame,
+    PreparedImage,
+    VideoFrame,
+    compare_prepared_frame,
     load_image_rgb,
     nearest_lighting_archetype,
-    profile_image,
+    prepare_image,
     sample_video_frames,
 )
 from colorcheck.exports.reporting import write_report_outputs
@@ -89,34 +91,35 @@ def _profile_distance(reference: LightingProfile, target: LightingProfile) -> fl
 def _reference_candidates(
     reference_path: str | Path,
     sample_count: int,
-) -> tuple[list[tuple[np.ndarray, LightingProfile, str]], LightingProfile]:
+) -> tuple[list[tuple[PreparedImage, str]], LightingProfile]:
     if _is_video(reference_path):
         reference_frames = sample_video_frames(reference_path, sample_count=sample_count)
         candidates = [
             (
-                frame.rgb,
-                profile_image(frame.rgb),
+                prepare_image(frame.rgb),
                 f"reference video at {frame.timestamp_sec:.2f}s",
             )
             for frame in reference_frames
         ]
     else:
         reference_rgb = load_image_rgb(reference_path)
-        candidates = [(reference_rgb, profile_image(reference_rgb), "reference image")]
+        candidates = [(prepare_image(reference_rgb), "reference image")]
 
-    aggregate_reference = _aggregate_lighting_profiles([candidate[1] for candidate in candidates])
+    aggregate_reference = _aggregate_lighting_profiles(
+        [candidate[0].profile for candidate in candidates]
+    )
     return candidates, aggregate_reference
 
 
 def _best_reference_for_target(
-    candidates: list[tuple[np.ndarray, LightingProfile, str]],
+    candidates: list[tuple[PreparedImage, str]],
     target_profile: LightingProfile,
-) -> tuple[np.ndarray, str]:
-    best_rgb, _best_profile, best_label = min(
+) -> tuple[PreparedImage, str]:
+    best_reference, best_label = min(
         candidates,
-        key=lambda candidate: _profile_distance(candidate[1], target_profile),
+        key=lambda candidate: _profile_distance(candidate[0].profile, target_profile),
     )
-    return best_rgb, best_label
+    return best_reference, best_label
 
 
 def _drift_level(overall_score: float) -> str:
@@ -143,33 +146,40 @@ def _recommendation(
     return "Correction guidance is available, but guardrails flagged risk. Apply manually and reduce strength."
 
 
-def analyze_video(
-    reference_path: str | Path,
-    video_path: str | Path,
-    out_dir: str | Path,
-    sample_count: int = 24,
-    correction_strength_percent: int = 50,
-    lighting_shift_threshold_percent: int = 60,
+def _analyze_frames(
+    reference_candidates: list[tuple[PreparedImage, str]],
+    sampled_frames: list[VideoFrame],
+    *,
+    reference_name: str,
+    video_name: str,
+    output_dir: Path,
+    correction_strength_percent: int,
+    lighting_shift_threshold_percent: int,
+    source_video_path: str | Path | None = None,
+    render_video_exports: bool = False,
 ) -> tuple[AnalysisReport, dict[str, Path]]:
-    output_dir = Path(out_dir)
-    reference_candidates, reference_profile = _reference_candidates(reference_path, sample_count)
-    sampled_frames = sample_video_frames(video_path, sample_count=sample_count)
+    reference_profile = _aggregate_lighting_profiles(
+        [candidate[0].profile for candidate in reference_candidates]
+    )
     frame_results = []
     for frame in sampled_frames:
-        target_profile = profile_image(frame.rgb)
-        reference_rgb, matched_reference = _best_reference_for_target(
+        prepared_target = prepare_image(frame.rgb)
+        reference, matched_reference = _best_reference_for_target(
             reference_candidates,
-            target_profile,
+            prepared_target.profile,
         )
-        frame_result = compare_frame(reference_rgb, frame)
+        frame_result = compare_prepared_frame(reference, frame, prepared_target)
         if len(reference_candidates) > 1:
             frame_result = frame_result.__class__(
                 **{
                     **frame_result.__dict__,
                     "notes": [f"matched {matched_reference}", *frame_result.notes],
                 }
-        )
+            )
         frame_results.append(frame_result)
+    if not frame_results:
+        raise ValueError("No usable target samples were supplied.")
+
     aggregate_target = aggregate_profile(frame_results)
     full_correction = recommend_correction(reference_profile, aggregate_target, frame_results)
     strength = clamp_percent(correction_strength_percent)
@@ -195,14 +205,17 @@ def analyze_video(
             lighting_shift.preserves_lighting_setup,
         ),
     )
-    corrected_video_filename = "corrected_preview.mp4" if strength > 0 else None
-    corrected_master_filename = "corrected_master.mov" if strength > 0 else None
+
+    corrected_video_filename = None
+    corrected_master_filename = None
     corrected_video = None
     corrected_master = None
     audio_status = "not_exported"
-    if corrected_video_filename and corrected_master_filename:
+    if render_video_exports and source_video_path is not None and strength > 0:
+        corrected_video_filename = "corrected_preview.mp4"
+        corrected_master_filename = "corrected_master.mov"
         corrected_exports = write_corrected_exports(
-            video_path,
+            source_video_path,
             output_dir / corrected_video_filename,
             output_dir / corrected_master_filename,
             correction,
@@ -210,9 +223,10 @@ def analyze_video(
         corrected_video = corrected_exports.preview
         corrected_master = corrected_exports.master
         audio_status = corrected_video.audio_status
+
     report = AnalysisReport(
-        reference_path=Path(reference_path).name,
-        video_path=Path(video_path).name,
+        reference_path=reference_name,
+        video_path=video_name,
         reference_profile=reference_profile,
         aggregate_target_profile=aggregate_target,
         frames=frame_results,
@@ -234,3 +248,60 @@ def analyze_video(
     if corrected_master:
         written["corrected_master"] = corrected_master.path
     return report, written
+
+
+def analyze_sample_images(
+    reference_paths: list[str | Path],
+    target_samples: list[tuple[str | Path, float]],
+    out_dir: str | Path,
+    correction_strength_percent: int = 50,
+    lighting_shift_threshold_percent: int = 60,
+) -> tuple[AnalysisReport, dict[str, Path]]:
+    if not reference_paths:
+        raise ValueError("At least one reference sample is required.")
+    reference_candidates = [
+        (prepare_image(load_image_rgb(path)), f"reference sample {index + 1}")
+        for index, path in enumerate(reference_paths)
+    ]
+    sampled_frames = [
+        VideoFrame(
+            frame_index=index,
+            timestamp_sec=float(timestamp),
+            rgb=load_image_rgb(path),
+        )
+        for index, (path, timestamp) in enumerate(target_samples)
+    ]
+    return _analyze_frames(
+        reference_candidates,
+        sampled_frames,
+        reference_name="local reference samples",
+        video_name="local target samples",
+        output_dir=Path(out_dir),
+        correction_strength_percent=correction_strength_percent,
+        lighting_shift_threshold_percent=lighting_shift_threshold_percent,
+    )
+
+
+def analyze_video(
+    reference_path: str | Path,
+    video_path: str | Path,
+    out_dir: str | Path,
+    sample_count: int = 24,
+    correction_strength_percent: int = 50,
+    lighting_shift_threshold_percent: int = 60,
+    render_video_exports: bool = True,
+) -> tuple[AnalysisReport, dict[str, Path]]:
+    output_dir = Path(out_dir)
+    reference_candidates, _reference_profile = _reference_candidates(reference_path, sample_count)
+    sampled_frames = sample_video_frames(video_path, sample_count=sample_count)
+    return _analyze_frames(
+        reference_candidates,
+        sampled_frames,
+        reference_name=Path(reference_path).name,
+        video_name=Path(video_path).name,
+        output_dir=output_dir,
+        correction_strength_percent=correction_strength_percent,
+        lighting_shift_threshold_percent=lighting_shift_threshold_percent,
+        source_video_path=video_path,
+        render_video_exports=render_video_exports,
+    )

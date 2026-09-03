@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import json
+import logging
 import platform
 import shutil
 import subprocess
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from colorcheck.edits import EditPlan, retained_segments
 from colorcheck.exports.lut import write_cube_lut
 from colorcheck.models import CorrectionPlan
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -49,6 +54,13 @@ class CorrectedExportsResult:
 
 
 @dataclass(frozen=True)
+class StreamingExport:
+    filename: str
+    media_type: str
+    chunks: Iterator[bytes]
+
+
+@dataclass(frozen=True)
 class _EncoderPlan:
     name: str
     codec_name: str
@@ -74,6 +86,26 @@ def _available_video_encoders() -> frozenset[str]:
         fields[1]
         for line in result.stdout.splitlines()
         if len(fields := line.split()) >= 2 and fields[0].startswith("V")
+    )
+
+
+@lru_cache(maxsize=1)
+def _available_filters() -> frozenset[str]:
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        return frozenset()
+    result = subprocess.run(
+        [ffmpeg, "-hide_banner", "-filters"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return frozenset()
+    return frozenset(
+        fields[1]
+        for line in result.stdout.splitlines()
+        if len(fields := line.split()) >= 2 and fields[0][0] in {"T", "."}
     )
 
 
@@ -525,3 +557,292 @@ def write_corrected_video(
     correction: CorrectionPlan,
 ) -> VideoExportResult:
     return write_corrected_preview(video_path, output_path, correction)
+
+
+def probe_source_duration(video_path: str | Path) -> float:
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe is None:
+        raise ValueError("ffprobe is required to inspect the source duration.")
+    result = subprocess.run(
+        [
+            ffprobe,
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+            str(video_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        duration = float(result.stdout.strip())
+    except ValueError as exc:
+        raise ValueError("Could not inspect the source duration.") from exc
+    if result.returncode != 0 or duration <= 0:
+        raise ValueError("Could not inspect the source duration.")
+    return duration
+
+
+def _lighting_balance(plan: EditPlan) -> tuple[float, float, float]:
+    presets = {
+        "neutral": (0.0, 0.0, 0.0),
+        "warm": (0.04, 0.01, -0.04),
+        "cool": (-0.04, 0.0, 0.05),
+        "golden_hour": (0.07, 0.025, -0.055),
+        "moonlight": (-0.045, 0.0, 0.08),
+        "fluorescent": (-0.03, 0.045, 0.01),
+        "candlelight": (0.09, 0.025, -0.075),
+    }
+    intensity = plan.color.intensity / 100.0
+    red = int(plan.color.tint[1:3], 16) / 255.0
+    green = int(plan.color.tint[3:5], 16) / 255.0
+    blue = int(plan.color.tint[5:7], 16) / 255.0
+    mean = (red + green + blue) / 3.0
+    tint = ((red - mean) * 0.16, (green - mean) * 0.16, (blue - mean) * 0.16)
+    preset = presets[plan.color.mode]
+    return tuple((preset[index] + tint[index]) * intensity for index in range(3))
+
+
+def _write_overlay_text(work_dir: Path, index: int, text: str) -> Path:
+    path = work_dir / f"overlay-{index}.txt"
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o600)
+    return path
+
+
+def _edit_filters(
+    settings: SourceVideoSettings,
+    plan: EditPlan,
+    correction: CorrectionPlan | None,
+    work_dir: Path,
+    *,
+    segment_start: float,
+    segment_end: float,
+    preview: bool,
+) -> list[str]:
+    filters: list[str] = []
+    crop = plan.crop
+    if (crop.x, crop.y, crop.width, crop.height) != (0.0, 0.0, 1.0, 1.0):
+        filters.append(
+            "crop="
+            f"w='max(2,trunc(iw*{crop.width:.8f}/2)*2)':"
+            f"h='max(2,trunc(ih*{crop.height:.8f}/2)*2)':"
+            f"x='trunc(iw*{crop.x:.8f}/2)*2':"
+            f"y='trunc(ih*{crop.y:.8f}/2)*2'"
+        )
+    if correction is not None:
+        lut_path = work_dir / "correction.cube"
+        if not lut_path.exists():
+            write_cube_lut(lut_path, correction, size=33)
+        filters.append(f"lut3d=file='{_escaped_filter_path(lut_path)}':interp=tetrahedral")
+
+    red, green, blue = _lighting_balance(plan)
+    if max(abs(red), abs(green), abs(blue)) > 0.0001:
+        values = f"rs={red:.6f}:gs={green:.6f}:bs={blue:.6f}"
+        values += f":rm={red:.6f}:gm={green:.6f}:bm={blue:.6f}"
+        values += f":rh={red:.6f}:gh={green:.6f}:bh={blue:.6f}"
+        filters.append(f"colorbalance={values}:pl=1")
+    if plan.color.black_and_white:
+        filters.append("hue=s=0")
+
+    for index, overlay in enumerate(plan.text_overlays):
+        visible_start = max(segment_start, overlay.start)
+        visible_end = min(segment_end, overlay.end)
+        if visible_end <= visible_start:
+            continue
+        text_path = _write_overlay_text(work_dir, index, overlay.text)
+        local_start = visible_start - segment_start
+        local_end = visible_end - segment_start
+        box = ":box=1:boxcolor=black@0.48:boxborderw=10" if overlay.background else ""
+        filters.append(
+            "drawtext="
+            f"textfile='{_escaped_filter_path(text_path)}':reload=0:"
+            f"fontcolor=0x{overlay.color[1:]}:fontsize=h*{overlay.size / 100.0:.6f}:"
+            f"x=(w-text_w)*{overlay.x:.6f}:y=(h-text_h)*{overlay.y:.6f}:"
+            f"enable='between(t,{local_start:.6f},{local_end:.6f})'{box}"
+        )
+
+    if preview:
+        filters.append(
+            "scale=w='min(1920,iw)':h='min(1080,ih)':"
+            "force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos"
+        )
+        pixel_format = "yuv420p"
+    else:
+        pixel_format = _software_master_plan(settings).pixel_format
+    filters.append(f"format={pixel_format}{_color_setparams(settings)}")
+    return filters
+
+
+def _stream_filter_arguments(
+    settings: SourceVideoSettings,
+    plan: EditPlan,
+    correction: CorrectionPlan | None,
+    work_dir: Path,
+    duration: float,
+    *,
+    preview: bool,
+    source_has_audio: bool,
+) -> tuple[list[str], list[str], bool]:
+    segments = retained_segments(plan, duration)
+    full_timeline = len(segments) == 1 and segments[0][0] <= 0.001 and segments[0][1] >= duration - 0.001
+    if full_timeline:
+        filters = _edit_filters(
+            settings,
+            plan,
+            correction,
+            work_dir,
+            segment_start=0.0,
+            segment_end=duration,
+            preview=preview,
+        )
+        return ["-vf", ",".join(filters)], ["-map", "0:v:0", "-map", "0:a:0?"], True
+
+    video_sources = [f"vsrc{index}" for index in range(len(segments))]
+    audio_sources = [f"asrc{index}" for index in range(len(segments))]
+    graph: list[str] = []
+    if len(segments) > 1:
+        graph.append(
+            f"[0:v:0]split={len(segments)}" + "".join(f"[{name}]" for name in video_sources)
+        )
+        if source_has_audio:
+            graph.append(
+                f"[0:a:0]asplit={len(segments)}" + "".join(f"[{name}]" for name in audio_sources)
+            )
+    else:
+        video_sources = ["0:v:0"]
+        audio_sources = ["0:a:0"]
+
+    for index, (start, end) in enumerate(segments):
+        filters = _edit_filters(
+            settings,
+            plan,
+            correction,
+            work_dir,
+            segment_start=start,
+            segment_end=end,
+            preview=preview,
+        )
+        graph.append(
+            f"[{video_sources[index]}]trim=start={start:.6f}:end={end:.6f},"
+            f"setpts=PTS-STARTPTS,{','.join(filters)}[v{index}]"
+        )
+        if source_has_audio:
+            graph.append(
+                f"[{audio_sources[index]}]atrim=start={start:.6f}:end={end:.6f},"
+                f"asetpts=PTS-STARTPTS[a{index}]"
+            )
+
+    if source_has_audio:
+        concat_inputs = "".join(f"[v{index}][a{index}]" for index in range(len(segments)))
+        graph.append(f"{concat_inputs}concat=n={len(segments)}:v=1:a=1[vout][aout]")
+        mapping = ["-map", "[vout]", "-map", "[aout]"]
+    else:
+        concat_inputs = "".join(f"[v{index}]" for index in range(len(segments)))
+        graph.append(f"{concat_inputs}concat=n={len(segments)}:v=1:a=0[vout]")
+        mapping = ["-map", "[vout]"]
+    return ["-filter_complex", ";".join(graph)], mapping, False
+
+
+def stream_edited_video(
+    video_path: str | Path,
+    work_dir: str | Path,
+    edit_plan: EditPlan,
+    correction: CorrectionPlan | None,
+    *,
+    preview: bool = False,
+) -> StreamingExport:
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg is None:
+        raise ValueError("ffmpeg is required to stream an edited export.")
+    if edit_plan.text_overlays and "drawtext" not in _available_filters():
+        raise ValueError("This FFmpeg build does not include the text-overlay filter.")
+    source = Path(video_path)
+    temporary_dir = Path(work_dir)
+    temporary_dir.mkdir(parents=True, exist_ok=True)
+    settings = probe_source_video_settings(source)
+    duration = probe_source_duration(source)
+    source_has_audio = has_audio_stream(source) is True
+    filter_arguments, mapping, full_timeline = _stream_filter_arguments(
+        settings,
+        edit_plan,
+        correction,
+        temporary_dir,
+        duration,
+        preview=preview,
+        source_has_audio=source_has_audio,
+    )
+
+    if preview:
+        encoder = _preview_encoder_plans()[-1]
+        filename = "colorcheck-preview.mp4"
+        media_type = "video/mp4"
+        muxer = "mp4"
+        audio_arguments = ["-c:a", "aac", "-b:a", "192k"]
+    else:
+        encoder = _software_master_plan(settings)
+        filename = "colorcheck-master.mov"
+        media_type = "video/quicktime"
+        muxer = "mov"
+        audio_arguments = (
+            ["-c:a", "copy"]
+            if full_timeline
+            else ["-c:a", "aac", "-b:a", "256k"]
+        )
+
+    command = [
+        ffmpeg,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(source),
+        *filter_arguments,
+        *mapping,
+        "-map_metadata",
+        "0",
+        *encoder.arguments,
+        *_color_metadata_args(settings),
+        "-fps_mode",
+        "passthrough",
+        *audio_arguments,
+        "-movflags",
+        "frag_keyframe+empty_moov+default_base_moof",
+        "-f",
+        muxer,
+        "pipe:1",
+    ]
+
+    def chunks() -> Iterator[bytes]:
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        try:
+            while chunk := process.stdout.read(1024 * 1024):
+                yield chunk
+            return_code = process.wait()
+            if return_code != 0:
+                stderr = process.stderr.read().decode("utf-8", errors="replace") if process.stderr else ""
+                LOGGER.error("Streaming FFmpeg export failed: %s", stderr.strip())
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=3)
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+
+    return StreamingExport(filename=filename, media_type=media_type, chunks=chunks())

@@ -15,7 +15,6 @@ dependencies = [
   "opencv-python-headless>=4.10.0.84",
   "pillow>=10.4.0",
   "python-multipart>=0.0.9",
-  "torch>=2.3.0",
   "uvicorn[standard]>=0.30.6"
 ]
 
@@ -32,7 +31,7 @@ colorcheck = "colorcheck.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"colorcheck.web" = ["assets/*.svg"]
+"colorcheck.web" = ["assets/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

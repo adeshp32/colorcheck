@@ -29,8 +29,18 @@ spec:
               value: /app/storage
             - name: VCC_MAX_UPLOAD_MB
               value: "250"
+            - name: VCC_MAX_SOURCE_UPLOAD_MB
+              value: "1024"
+            - name: VCC_UPLOAD_CHUNK_MB
+              value: "16"
+            - name: VCC_UPLOAD_TTL_HOURS
+              value: "2"
+            - name: VCC_MIN_FREE_DISK_MB
+              value: "4096"
+            - name: VCC_MAX_QUEUED_JOBS
+              value: "2"
             - name: VCC_MAX_VIDEO_SECONDS
-              value: "120"
+              value: "1800"
             - name: VCC_MAX_VIDEO_MEGAPIXELS
               value: "8.3"
             - name: VCC_JOB_TTL_HOURS

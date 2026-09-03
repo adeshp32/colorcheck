@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 
 LINKEDIN_URL = "https://www.linkedin.com/in/aditya-deshpande-127218205/"
 
@@ -12,7 +13,7 @@ def page_shell(title: str, body: str) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
-  <link rel="icon" href="/assets/colorcheck-mark.svg" type="image/svg+xml">
+  <link rel="icon" href="/assets/colorcheck-wordmark.svg" type="image/svg+xml">
   <style>
     :root {{
       --bg: #f9f8ff;
@@ -484,6 +485,202 @@ def page_shell(title: str, body: str) -> str:
       border-radius: 14px;
       background: #080912;
     }}
+    .processing-note {{
+      min-height: 22px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+      font-weight: 650;
+    }}
+    .processing-note[data-state="error"] {{ color: #a12f4d; }}
+    .processing-progress {{ width: 100%; height: 8px; accent-color: var(--accent); }}
+    .preflight-editor {{
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      padding: 4px 0 14px;
+    }}
+    .preflight-editor summary {{
+      cursor: pointer;
+      color: var(--accent-strong);
+      font-weight: 850;
+      padding: 10px 0;
+    }}
+    .editor-shell {{ display: grid; gap: 18px; }}
+    .editor-source {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: end;
+      gap: 12px;
+    }}
+    .preview-stage {{
+      position: relative;
+      width: 100%;
+      aspect-ratio: var(--source-ratio, 16 / 9);
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #080912;
+      isolation: isolate;
+      touch-action: none;
+    }}
+    .preview-stage video {{
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      filter: var(--preview-filter, none);
+    }}
+    .preview-tint {{
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: var(--preview-tint, transparent);
+      opacity: var(--preview-tint-strength, 0);
+      mix-blend-mode: soft-light;
+    }}
+    .crop-box {{
+      position: absolute;
+      left: calc(var(--crop-x, 0) * 100%);
+      top: calc(var(--crop-y, 0) * 100%);
+      width: calc(var(--crop-width, 1) * 100%);
+      height: calc(var(--crop-height, 1) * 100%);
+      border: 2px solid rgba(255,255,255,0.96);
+      box-shadow: 0 0 0 9999px rgba(5, 6, 18, 0.58), inset 0 0 0 1px rgba(23,23,43,0.45);
+      cursor: move;
+      z-index: 2;
+    }}
+    .crop-handle {{
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--accent);
+    }}
+    .crop-handle[data-corner="nw"] {{ left: -10px; top: -10px; cursor: nwse-resize; }}
+    .crop-handle[data-corner="ne"] {{ right: -10px; top: -10px; cursor: nesw-resize; }}
+    .crop-handle[data-corner="sw"] {{ left: -10px; bottom: -10px; cursor: nesw-resize; }}
+    .crop-handle[data-corner="se"] {{ right: -10px; bottom: -10px; cursor: nwse-resize; }}
+    .text-preview {{
+      position: absolute;
+      z-index: 3;
+      transform: translate(-50%, -50%);
+      max-width: 86%;
+      padding: 0.12em 0.28em;
+      color: var(--overlay-color, #fff);
+      font-size: var(--overlay-size, 5%);
+      font-weight: 750;
+      line-height: 1.15;
+      text-align: center;
+      white-space: pre-wrap;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.62);
+      pointer-events: none;
+    }}
+    .text-preview[data-background="true"] {{ background: rgba(0,0,0,0.52); }}
+    .editor-controls {{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--line);
+    }}
+    .editor-control {{
+      min-width: 0;
+      padding: 16px;
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+    }}
+    .editor-control h3 {{ margin: 0 0 12px; font-size: 1rem; }}
+    .control-row {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      align-items: end;
+    }}
+    .control-row + .control-row {{ margin-top: 10px; }}
+    .control-row label {{ font-size: 0.78rem; }}
+    .control-row input,
+    .control-row select {{
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--cream);
+      color: var(--ink);
+      padding: 8px 10px;
+    }}
+    .control-row input[type="color"] {{ padding: 4px; }}
+    .segmented {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      margin-bottom: 10px;
+    }}
+    .segmented label {{
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 9px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }}
+    .segmented input {{ position: absolute; opacity: 0; pointer-events: none; }}
+    .segmented label:has(input:checked) {{
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+    }}
+    .timeline-selection {{ display: grid; gap: 7px; }}
+    .timeline-selection input[type="range"] {{ margin: 0; }}
+    .timeline-values {{
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }}
+    .editor-button {{
+      min-height: 42px;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      cursor: pointer;
+      font-weight: 800;
+      padding: 9px 12px;
+    }}
+    .editor-button:hover {{ background: var(--accent-soft); }}
+    .editor-button.primary {{ background: var(--accent); color: #fff; }}
+    .editor-button:disabled {{ cursor: wait; opacity: 0.58; }}
+    .edit-list {{ display: grid; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }}
+    .edit-list li {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-top: 1px solid var(--line);
+      padding-top: 7px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }}
+    .edit-list button {{ border: 0; background: transparent; color: var(--accent-strong); cursor: pointer; }}
+    .editor-actions {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding-top: 4px;
+    }}
+    .render-actions {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }}
+    .privacy-line {{ margin: 12px 0 0; color: var(--muted); font-size: 0.82rem; }}
+    .job-progress {{ max-width: 720px; margin: 12vh auto 0; padding: 28px; }}
+    .job-progress progress {{ width: 100%; height: 12px; accent-color: var(--accent); }}
     @media (max-width: 860px) {{
       .hero {{ grid-template-columns: 1fr; min-height: auto; }}
       .analysis-form {{ grid-template-columns: 1fr; }}
@@ -493,6 +690,21 @@ def page_shell(title: str, body: str) -> str:
       .tool-head {{ align-items: flex-start; }}
       .tool-head-actions {{ align-items: flex-end; flex-direction: column-reverse; }}
       nav a {{ display: none; }}
+      .editor-controls {{ grid-template-columns: 1fr; }}
+      .render-actions {{ grid-template-columns: 1fr; }}
+      .editor-source {{ grid-template-columns: 1fr; }}
+    }}
+    @media (max-width: 520px) {{
+      .tool-head {{ flex-direction: column; gap: 12px; }}
+      .tool-head-actions {{
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        flex-direction: row-reverse;
+      }}
+      .a11y {{ position: static; transform: none; margin: 14px; justify-content: center; }}
+      .a11y button {{ flex: 1 1 96px; }}
+      .control-row {{ grid-template-columns: 1fr; }}
     }}
     @media (prefers-reduced-motion: reduce) {{
       html {{ scroll-behavior: auto; }}
@@ -554,42 +766,45 @@ def page_shell(title: str, body: str) -> str:
       input.addEventListener("input", sync);
       sync();
     }});
-    const analysisForm = document.querySelector(".analysis-form");
-    analysisForm?.addEventListener("submit", (event) => {{
-      const form = event.currentTarget;
-      if (form.dataset.submitting === "true") {{
-        event.preventDefault();
-        return;
-      }}
-      if (!form.checkValidity()) return;
-      const submitButton = form.querySelector(".submit");
-      if (!submitButton) return;
-      form.dataset.submitting = "true";
-      form.setAttribute("aria-busy", "true");
-      submitButton.disabled = true;
-      submitButton.setAttribute("aria-busy", "true");
-      submitButton.textContent = "Mapping report & video...";
-    }});
-    window.addEventListener("pageshow", () => {{
-      if (!analysisForm) return;
-      const submitButton = analysisForm.querySelector(".submit");
-      analysisForm.dataset.submitting = "false";
-      analysisForm.removeAttribute("aria-busy");
-      if (!submitButton) return;
-      submitButton.disabled = false;
-      submitButton.removeAttribute("aria-busy");
-      submitButton.textContent = submitButton.dataset.defaultLabel;
-    }});
     apply();
   </script>
+  <script src="/assets/editor.js" defer></script>
+  <script src="/assets/uploads.js" defer></script>
+  <script src="/assets/analysis.js" defer></script>
+  <script src="/assets/results.js" defer></script>
 </body>
 </html>"""
 
 
+def _preflight_editor() -> str:
+    return """<details class="preflight-editor" data-preflight-editor>
+          <summary>Prepare trim before analysis</summary>
+          <div class="editor-control" data-trim-editor>
+            <div class="segmented" aria-label="Trim behavior">
+              <label><input type="radio" name="preflight_trim_mode" value="keep" checked>Preserve selected area</label>
+              <label><input type="radio" name="preflight_trim_mode" value="remove">Trim within selected area</label>
+            </div>
+            <div class="timeline-selection">
+              <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
+              <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
+              <div class="timeline-values"><span data-trim-start-label>0:00.00</span><span data-trim-end-label>0:00.00</span></div>
+            </div>
+            <div class="editor-actions">
+              <button class="editor-button" type="button" data-add-trim>Add selection</button>
+              <button class="editor-button" type="button" data-undo>Undo last</button>
+              <button class="editor-button" type="button" data-clear>Clear edits</button>
+            </div>
+            <ul class="edit-list" data-trim-list></ul>
+          </div>
+        </details>"""
+
+
 def home_page(
     max_upload_mb: int = 250,
+    max_source_upload_mb: int = 1024,
     max_request_mb: int = 504,
-    max_video_seconds: int = 120,
+    max_video_seconds: int = 1800,
+    upload_chunk_mb: int = 16,
 ) -> str:
     body = f"""<div class="page">
   <section class="hero" id="tool" aria-labelledby="hero-title">
@@ -604,7 +819,7 @@ def home_page(
         <div>
           <strong>Analyze footage</strong>
           <div class="hint">Image or video reference accepted</div>
-          <div class="hint">Up to {max_upload_mb} MB per file, {max_request_mb} MB combined, and {max_video_seconds}-second clips</div>
+          <div class="hint">Local sampling supports source clips up to {max_source_upload_mb} MB and {max_video_seconds // 60} minutes</div>
         </div>
         <div class="tool-head-actions">
           <div class="palette-swatches" role="img" aria-label="Reference palette: violet, rose, mint, and amber">
@@ -616,7 +831,7 @@ def home_page(
           <div class="status-pill">Preview + report</div>
         </div>
       </div>
-      <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data">
+      <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
         <label class="field-reference">
           Reference image or video
           <input name="reference" type="file" accept="image/*,video/*" required>
@@ -624,9 +839,10 @@ def home_page(
         </label>
         <label class="field-target">
           Target video
-          <input name="video" type="file" accept="video/*" required>
-          <span class="hint">This is the footage ColorCheck compares against your reference look.</span>
+          <input name="video" type="file" accept="video/*" required data-editor-source>
+          <span class="hint">The browser samples this clip locally; the original stays on the device until an export is requested.</span>
         </label>
+        {_preflight_editor()}
         <label class="field-samples">
           Frame samples
           <input name="samples" type="number" min="4" max="96" value="24">
@@ -651,13 +867,15 @@ def home_page(
         <div class="field-action">
           <label class="consent">
             <input name="rights_confirmed" type="checkbox" required>
-            <span>Confirm that you have permission to process this media. Source uploads are deleted after processing. Generated results are retained temporarily and removed during routine cleanup.</span>
+            <span>Permission to process this media is confirmed. Browser samples and temporary source uploads are deleted immediately after analysis. Corrected video is never stored.</span>
           </label>
           <button class="submit" type="submit" data-default-label="Generate Mapped Report &amp; Video">Generate Mapped Report &amp; Video</button>
+          <progress class="processing-progress" value="0" max="100" hidden></progress>
+          <p class="processing-note" role="status" aria-live="polite">Analysis uses local decoding before a compact sample upload.</p>
         </div>
       </form>
       <div class="mini-grid" aria-label="Outputs">
-        <div><span>Exports</span><strong>Preview + master + LUT/CDL</strong></div>
+        <div><span>Exports</span><strong>Local preview + streamed master</strong></div>
         <div><span>Editors</span><strong>Resolve, Premiere, Avid, iMovie</strong></div>
         <div><span>Safety</span><strong>Strength threshold</strong></div>
       </div>
@@ -676,7 +894,7 @@ def home_page(
   <footer class="footer">
     <div>
       <strong>ColorCheck by Aditya Deshpande</strong>
-      <div class="hint">PyTorch, OpenCV, FastAPI, Docker, and Kubernetes.</div>
+      <div class="hint">OpenCV, NumPy, FastAPI, FFmpeg, and Docker.</div>
     </div>
     <a class="social-icon" href="https://www.linkedin.com/in/aditya-deshpande-127218205/" target="_blank" rel="noreferrer" aria-label="Aditya Deshpande on LinkedIn">
       <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -688,7 +906,152 @@ def home_page(
     return page_shell("ColorCheck", body)
 
 
-def job_page(job_id: str, report: dict[str, object]) -> str:
+def _safe_json(payload: object) -> str:
+    return json.dumps(payload, separators=(",", ":")).replace("<", "\\u003c")
+
+
+def _result_editor(
+    job_id: str,
+    report: dict[str, object],
+    edit_plan: dict[str, object],
+    source_metadata: dict[str, object],
+    max_source_upload_mb: int,
+    upload_chunk_mb: int,
+) -> str:
+    correction = report.get("correction", {})
+    return f"""<section class="panel" style="padding:18px; margin-bottom:18px;" data-video-editor data-job-id="{job_id}" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
+    <h2>Edit and preview locally</h2>
+    <p class="hint">Load the original clip to preview trims, crop, text, lighting, tint, monochrome, and the mapped correction on this device.</p>
+    <script type="application/json" data-initial-plan>{_safe_json(edit_plan)}</script>
+    <script type="application/json" data-source-metadata>{_safe_json(source_metadata)}</script>
+    <script type="application/json" data-correction>{_safe_json(correction)}</script>
+    <div class="editor-shell">
+      <div class="editor-source">
+        <label>Original target clip
+          <input type="file" accept="video/*" data-editor-source>
+        </label>
+        <label class="consent"><input type="checkbox" data-preview-correction checked><span>Preview mapped correction</span></label>
+      </div>
+      <div class="preview-stage" data-preview-stage hidden>
+        <video controls playsinline preload="metadata" data-preview-video></video>
+        <div class="preview-tint" aria-hidden="true"></div>
+        <div data-text-preview-layer></div>
+        <div class="crop-box" data-crop-box>
+          <span class="crop-handle" data-corner="nw"></span>
+          <span class="crop-handle" data-corner="ne"></span>
+          <span class="crop-handle" data-corner="sw"></span>
+          <span class="crop-handle" data-corner="se"></span>
+        </div>
+      </div>
+      <div class="editor-controls">
+        <section class="editor-control" data-trim-editor>
+          <h3>Timeline selections</h3>
+          <div class="segmented" aria-label="Trim behavior">
+            <label><input type="radio" name="result_trim_mode" value="keep" checked>Preserve selected area</label>
+            <label><input type="radio" name="result_trim_mode" value="remove">Trim within selected area</label>
+          </div>
+          <div class="timeline-selection">
+            <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
+            <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
+            <div class="timeline-values"><span data-trim-start-label>0:00.00</span><span data-trim-end-label>0:00.00</span></div>
+          </div>
+          <div class="editor-actions">
+            <button class="editor-button" type="button" data-add-trim>Add selection</button>
+            <button class="editor-button" type="button" data-undo>Undo last</button>
+            <button class="editor-button" type="button" data-clear>Undo all edits</button>
+          </div>
+          <ul class="edit-list" data-trim-list></ul>
+        </section>
+        <section class="editor-control">
+          <h3>Precision crop</h3>
+          <div class="control-row">
+            <label>Aspect
+              <select data-crop-aspect>
+                <option value="free">Free</option>
+                <option value="source">Original</option>
+                <option value="1.7777778">16:9</option>
+                <option value="0.5625">9:16</option>
+                <option value="1">1:1</option>
+                <option value="1.3333333">4:3</option>
+                <option value="2.35">2.35:1</option>
+              </select>
+            </label>
+            <button class="editor-button" type="button" data-reset-crop>Reset crop</button>
+          </div>
+          <div class="control-row">
+            <label>X %<input type="number" min="0" max="95" step="0.1" value="0" data-crop-x></label>
+            <label>Y %<input type="number" min="0" max="95" step="0.1" value="0" data-crop-y></label>
+            <label>Width %<input type="number" min="5" max="100" step="0.1" value="100" data-crop-width></label>
+            <label>Height %<input type="number" min="5" max="100" step="0.1" value="100" data-crop-height></label>
+          </div>
+        </section>
+        <section class="editor-control">
+          <h3>Lighting and color</h3>
+          <div class="control-row">
+            <label>Lighting mode
+              <select data-lighting-mode>
+                <option value="neutral">Neutral</option>
+                <option value="warm">Warm interior</option>
+                <option value="cool">Cool shade</option>
+                <option value="golden_hour">Golden hour</option>
+                <option value="moonlight">Moonlight</option>
+                <option value="fluorescent">Fluorescent</option>
+                <option value="candlelight">Candlelight</option>
+              </select>
+            </label>
+            <label>Color wheel<input type="color" value="#ffffff" data-color-wheel></label>
+            <label>Intensity<input type="range" min="0" max="100" value="0" data-color-intensity></label>
+            <label class="consent"><input type="checkbox" data-black-white><span>Black &amp; white</span></label>
+          </div>
+        </section>
+        <section class="editor-control">
+          <h3>Text overlays</h3>
+          <div class="control-row">
+            <label>Text<input type="text" maxlength="200" placeholder="Title or caption" data-text-value></label>
+            <label>Position
+              <select data-text-position>
+                <option value="0.5,0.15">Top</option>
+                <option value="0.5,0.5">Center</option>
+                <option value="0.5,0.85" selected>Lower third</option>
+                <option value="0.15,0.85">Lower left</option>
+                <option value="0.85,0.85">Lower right</option>
+              </select>
+            </label>
+          </div>
+          <div class="control-row">
+            <label>Start<input type="number" min="0" step="0.01" value="0" data-text-start></label>
+            <label>End<input type="number" min="0" step="0.01" value="5" data-text-end></label>
+            <label>Size %<input type="number" min="1" max="20" step="0.5" value="5" data-text-size></label>
+            <label>Color<input type="color" value="#ffffff" data-text-color></label>
+            <label class="consent"><input type="checkbox" data-text-background><span>Background</span></label>
+          </div>
+          <div class="editor-actions"><button class="editor-button" type="button" data-add-text>Add text</button></div>
+          <ul class="edit-list" data-text-list></ul>
+        </section>
+      </div>
+      <div>
+        <div class="render-actions">
+          <button class="editor-button" type="button" data-render="preview" data-correction="true">Download review MP4</button>
+          <button class="editor-button" type="button" data-render="master" data-correction="false">Full resolution, edits only</button>
+          <button class="editor-button primary" type="button" data-render="master" data-correction="true">Full resolution + correction</button>
+        </div>
+        <progress class="processing-progress" value="0" max="100" hidden data-render-progress></progress>
+        <p class="processing-note" role="status" aria-live="polite" data-render-status>Exports are encoded once and streamed directly to the browser.</p>
+        <p class="privacy-line">The corrected video is never written to server storage. Temporary source chunks are erased when streaming ends or if the upload expires.</p>
+      </div>
+    </div>
+  </section>"""
+
+
+def job_page(
+    job_id: str,
+    report: dict[str, object],
+    *,
+    edit_plan: dict[str, object] | None = None,
+    source_metadata: dict[str, object] | None = None,
+    max_source_upload_mb: int = 1024,
+    upload_chunk_mb: int = 16,
+) -> str:
     summary = report["summary"]
     guardrails = report["guardrails"]
     correction = report["correction"]
@@ -756,6 +1119,14 @@ def job_page(job_id: str, report: dict[str, object]) -> str:
       Your browser could not play this preview. Download the MP4 below instead.
     </video>
   </section>"""
+    editor_section = _result_editor(
+        job_id,
+        report,
+        edit_plan or {},
+        source_metadata or {},
+        max_source_upload_mb,
+        upload_chunk_mb,
+    )
     body = f"""<div class="page result-page">
   <p class="eyebrow">Analysis complete</p>
   <h1>Match score {summary["overall_score"]}/100</h1>
@@ -776,10 +1147,30 @@ def job_page(job_id: str, report: dict[str, object]) -> str:
     <ul>{warning_items}</ul>
   </section>
   {preview_section}
+  {editor_section}
   <section class="panel" style="padding:18px;">
     <h2>Downloads</h2>
-    <p class="hint">The master retains the source codec family, resolution, timing, bit depth, color metadata, and original audio when supported.</p>
+    <p class="hint">Reports and correction files remain available temporarily. Video exports are generated only when requested and are never stored.</p>
     <ul class="file-list">{file_links}</ul>
   </section>
 </div>"""
     return page_shell("ColorCheck Results", body)
+
+
+def job_progress_page(job_id: str, state: dict[str, object]) -> str:
+    status = str(state.get("status", "queued"))
+    stage = html.escape(str(state.get("stage", "Waiting for the processor")))
+    progress = max(0, min(100, int(state.get("progress", 0))))
+    error = html.escape(str(state.get("error") or ""))
+    error_html = f'<p class="processing-note" data-state="error">{error}</p>' if error else ""
+    body = f"""<div class="page result-page" data-job-progress data-job-id="{job_id}">
+  <section class="panel job-progress">
+    <p class="eyebrow">{html.escape(status.title())}</p>
+    <h1 style="font-size:clamp(2rem,5vw,4rem);">Building the mapped report</h1>
+    <p class="descriptor" data-job-stage>{stage}</p>
+    <progress value="{progress}" max="100" data-job-progress-bar>{progress}%</progress>
+    {error_html}
+    <p class="hint">This page can be refreshed safely. Temporary media is removed as soon as analysis finishes.</p>
+  </section>
+</div>"""
+    return page_shell("ColorCheck Processing", body)

@@ -1,17 +1,17 @@
 # Export Performance
 
-ColorCheck applies color corrections through a 33-point 3D LUT in FFmpeg. The quality-preserved master is encoded first, and the browser preview is derived from that completed master. This removes the former Python frame loop, MPEG-4 intermediate, redundant H.264 transcode, and second application of the correction.
+ColorCheck uses local browser decoding to choose visually diverse analysis frames, caches reference features, and applies final edits through FFmpeg. Trim regions, crop, text, lighting mode, color-wheel tint, B&W, and the 33-point correction LUT share one filter graph and one encode. Requested video streams directly to the browser instead of being rendered to server storage first.
 
 ## Encoder Selection
 
-- Native macOS runs use VideoToolbox automatically for supported H.264 and HEVC sources.
+- Legacy CLI exports on macOS use VideoToolbox automatically for supported H.264 and HEVC sources.
 - HEVC Main 10 sources remain HEVC Main 10 with their 10-bit pixel format and HDR color tags.
 - H.264 sources remain H.264 when their pixel format is supported.
-- Linux containers, including the planned Oracle deployment, and unsupported formats use the
+- Linux containers, including the Oracle deployment, and unsupported formats use the
   optimized high-quality `libx265` or `libx264` software path.
 - The browser preview is H.264 and is bounded to 1080p. It is not the archival output.
 
-If a hardware encoder is advertised but cannot open the requested source profile, ColorCheck removes the partial file and retries through the software path.
+On-demand web masters retain full source resolution, supported codec family, pixel format, and color metadata. Audio is copied bit-for-bit when the timeline is unchanged; temporal edits require an audio re-encode to build the new timeline.
 
 ## Reference Benchmark
 

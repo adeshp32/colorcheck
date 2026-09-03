@@ -17,16 +17,16 @@ The analysis and export layers do not import the web application. This keeps the
 
 ## Request Lifecycle
 
-1. The web boundary validates request origin, size, rate, and processing capacity.
-2. Uploaded media is renamed, written with byte limits, and validated with Pillow or FFprobe.
-3. The analysis pipeline samples frames and computes reference-aware perceptual metrics.
-4. Correction logic creates a bounded plan and evaluates clipping and lighting-shift risk.
-5. The exporter applies the correction once while producing the quality-preserved master, using supported hardware encoding when available.
-6. A browser-friendly preview is derived from the completed master without repeating the color correction.
-7. Exporters write the LUT/CDL files, reports, and editor guides.
-8. Source uploads are deleted in a `finally` block; only allowlisted generated artifacts remain.
-9. Expired job directories are removed according to the configured retention period.
+1. The browser decodes candidate frames locally and selects a compact, visually diverse sample set.
+2. The web boundary validates request origin, size, rate, disk capacity, and queue capacity.
+3. A persistent job record is written before a single background worker starts analysis.
+4. Cached reference features are compared with each selected target frame.
+5. Correction logic creates a bounded plan and evaluates clipping and lighting-shift risk.
+6. Reports, LUT/CDL files, and editor guides are retained temporarily; analysis media is deleted.
+7. Trim regions, crop, text, lighting, tint, B&W, and correction remain a browser-owned edit recipe.
+8. A requested preview or master is rendered once by FFmpeg and streamed directly to the browser.
+9. The uploaded source is deleted in the stream cleanup path; no corrected video is stored.
 
 ## Deployment Model
 
-Version 1 uses one process and one in-memory concurrency slot. This is deliberate for a portfolio deployment with CPU-heavy synchronous video work. The next scaling boundary is an object store plus a durable queue and isolated workers, not additional complexity inside the analysis modules.
+The Oracle release uses one application process, a persistent disk-backed job queue, one analysis worker, and one rendering slot. This keeps memory and CPU bounded on the free VM. A higher-traffic deployment can retain the same contracts while moving temporary upload chunks and queue state to dedicated services.

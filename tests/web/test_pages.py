@@ -7,18 +7,17 @@ def test_generate_button_has_loading_state_and_no_gradient() -> None:
     assert "Color that isn't artificial." in page
     assert 'class="palette-swatches" role="img"' in page
     assert 'src="/assets/colorcheck-wordmark.svg" alt="colorcheck."' in page
-    assert 'href="/assets/colorcheck-mark.svg" type="image/svg+xml"' in page
     assert 'class="about-text about-story"' in page
     assert 'class="submit" type="submit"' in page
     assert 'name="rights_confirmed" type="checkbox" required' in page
-    assert "Confirm that you have permission to process this media." in page
-    assert "Generated results are retained temporarily" in page
+    assert "Permission to process this media is confirmed." in page
+    assert "Corrected video is never stored." in page
     assert "Generate Mapped Report &amp; Video" in page
-    assert "Up to 90 MB per file, 95 MB combined, and 60-second clips" in page
-    assert 'if (form.dataset.submitting === "true")' in page
-    assert "event.preventDefault();" in page
-    assert 'submitButton.textContent = "Mapping report & video..."' in page
-    assert 'submitButton.setAttribute("aria-busy", "true")' in page
+    assert "Local sampling supports source clips up to 1024 MB and 1 minutes" in page
+    assert 'src="/assets/uploads.js" defer' in page
+    assert 'src="/assets/analysis.js" defer' in page
+    assert "Preserve selected area" in page
+    assert "Trim within selected area" in page
     assert ".submit {" in page
     assert "background: transparent;" in page
     assert ".submit[aria-busy=\"true\"]" in page
@@ -64,3 +63,7 @@ def test_preview_uses_browser_compatible_mp4_source() -> None:
     assert "corrected_master.mov" in page
     assert "Quality-preserved master" in page
     assert "playsinline" in page
+    assert "Color wheel" in page
+    assert "Black &amp; white" in page
+    assert "Full resolution + correction" in page
+    assert "corrected video is never written to server storage" in page

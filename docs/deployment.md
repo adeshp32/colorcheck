@@ -13,35 +13,40 @@ Browser -> Cloudflare HTTPS/WAF/DDoS protection -> Cloudflare Tunnel -> ColorChe
 creates an outbound-only connection from the VM. The application port does not need to be
 opened to the Internet, and Cloudflare maps a hostname such as `color.example.com` to the local
 service. Oracle's [Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)
-provide the CPU and memory that PyTorch and FFmpeg require, subject to regional capacity and
+provide the CPU and memory that OpenCV and FFmpeg require, subject to regional capacity and
 idle-resource reclamation.
 
 Cloudflare Pages alone cannot run this application. Pages is suitable for static files, while
-ColorCheck needs a long-running Python process, FFmpeg, PyTorch, writable temporary storage,
+ColorCheck needs a long-running Python process, FFmpeg, OpenCV, writable temporary storage,
 and substantially more memory than a Worker isolate. Cloudflare Containers can run Docker
 images, but currently requires the [$5 Workers Paid plan](https://developers.cloudflare.com/containers/pricing/).
 
 ## Public Limits
 
-Cloudflare Free accepts request bodies up to
-[100 MB](https://developers.cloudflare.com/workers/platform/limits/). The initial deployment
-keeps the entire multipart upload below that boundary:
+The browser analyzes representative frames locally and sends compact samples for the report.
+When an original is needed for export, resumable 16 MB requests allow source files up to 1 GB
+without placing the whole file in one proxy request:
 
 ```text
 VCC_STORAGE_DIR=/app/storage
-VCC_MAX_UPLOAD_MB=90
-VCC_MAX_REQUEST_MB=95
-VCC_MAX_VIDEO_SECONDS=60
-VCC_MAX_VIDEO_MEGAPIXELS=2.1
-VCC_JOB_TTL_HOURS=2
-VCC_ANALYSES_PER_HOUR=3
+VCC_MAX_UPLOAD_MB=250
+VCC_MAX_REQUEST_MB=504
+VCC_MAX_SOURCE_UPLOAD_MB=1024
+VCC_UPLOAD_CHUNK_MB=16
+VCC_UPLOAD_TTL_HOURS=2
+VCC_MIN_FREE_DISK_MB=4096
+VCC_MAX_QUEUED_JOBS=2
+VCC_MAX_VIDEO_SECONDS=1800
+VCC_MAX_VIDEO_MEGAPIXELS=8.3
+VCC_JOB_TTL_HOURS=6
+VCC_ANALYSES_PER_HOUR=6
 ```
 
-Each individual file may be up to 90 MB, but the reference and target together, including form
-data, must remain under 95 MB. Clips are limited to 60 seconds and approximately 1080p. These
-are portfolio-demo limits, not model limitations. The application rejects oversized requests,
-deletes source uploads after processing, expires generated results, and processes one correction
-at a time.
+The legacy multipart route remains bounded, but the primary browser workflow uses compact local
+samples and resumable source uploads. The application rejects oversized files, limits the queue,
+checks free disk space, expires abandoned uploads, and processes one full-resolution render at a
+time. A 1 GB ceiling is supported by the protocol; actual speed still depends on the user's upload
+connection, clip codec, and the free VM's single-CPU FFmpeg throughput.
 
 ## Domain Route
 
@@ -89,7 +94,7 @@ store. It must never be committed to GitHub.
 
 - Use Cloudflare's proxied hostname and HTTPS only.
 - Keep the origin private behind Cloudflare Tunnel.
-- Set a Cloudflare rate-limit rule for `POST /analyze-form` and `POST /analyze` when available.
+- Set Cloudflare rate limits for `/api/jobs/*` and `/api/uploads` when available.
 - Disable caching for `/jobs/*`; ColorCheck already sends `private, no-store`.
 - Retain one application worker and one in-process analysis slot.
 - Monitor disk use and keep the two-hour job expiry enabled.
@@ -98,11 +103,9 @@ store. It must never be committed to GitHub.
 
 ## Larger Uploads
 
-Do not raise the synchronous request limit past Cloudflare's plan boundary. The scalable path is
-direct browser-to-[R2](https://developers.cloudflare.com/r2/pricing/) multipart upload, followed
-by an asynchronous worker job and signed result URLs. R2 includes 10 GB-month of Standard
-storage and free Internet egress each month, but that architecture should be added only after the
-small public demo is stable.
+The included chunk protocol supports 1 GB sources without a single oversized request. At higher
+traffic, move temporary chunks to object storage and keep the same asynchronous job contract so
+the Oracle boot disk does not become the bottleneck.
 
 ## Paid Fallback
 

@@ -4,9 +4,9 @@
 
 Reference-aware, guardrail-first video color intelligence for editors.
 
-Site Link: https://colorcheck.adideshpande.dev/ 
+[Open ColorCheck](https://colorcheck.adideshpande.dev/)
 
-ColorCheck compares target footage with an image or video reference, measures perceptual color and lighting drift with PyTorch, and produces conservative corrections without modifying the source. It generates browser previews, quality-preserved editing masters, LUT/CDL files, structured reports, and workflow guidance for DaVinci Resolve, Premiere Pro, Avid Media Composer, and iMovie.
+ColorCheck compares target footage with an image or video reference, measures perceptual color and lighting drift with OpenCV and NumPy, and produces conservative corrections without modifying the source. It combines local frame selection, persistent background analysis, interactive editing, streamed video exports, LUT/CDL files, structured reports, and workflow guidance for DaVinci Resolve, Premiere Pro, Avid Media Composer, and iMovie.
 
 <sub><strong>Reference-led analysis</strong></sub><br>
 ![ColorCheck reference-led analysis interface](docs/screenshots/colorcheck-analyze.png)
@@ -85,8 +85,8 @@ docker compose up --build
 
 | File | Purpose |
 | --- | --- |
-| `corrected_preview.mp4` | Browser-compatible H.264 preview, capped at 1080p, with source audio when available |
-| `corrected_master.mov` | High-quality editing master with supported source characteristics preserved |
+| On-demand review MP4 | Browser-compatible H.264 export, capped at 1080p, with source audio when available |
+| On-demand editing master | Full-resolution export preserving the source codec family, pixel format, color metadata, and untrimmed audio where supported |
 | `recommended_correction.cube` | Portable 3D LUT |
 | `recommended_correction.cdl` | ASC CDL correction values |
 | `report.html` | Human-readable analysis |
@@ -95,7 +95,7 @@ docker compose up --build
 
 Video pixels must be re-encoded after correction, so a corrected file cannot be bit-for-bit identical to the source. ColorCheck never modifies the original upload.
 
-The optimized exporter corrects and encodes the quality-preserved master once, then derives the browser preview from that completed master. See the reproducible [performance notes](docs/performance.md) for benchmark and fidelity results.
+Trimming, crop, text, lighting mode, color-wheel tint, B&W, and mapped correction are composed into one FFmpeg render. The result streams directly to the browser and is never written to server storage. See the reproducible [performance notes](docs/performance.md) for benchmark and fidelity details.
 
 ## Safety Model
 
@@ -103,8 +103,8 @@ The optimized exporter corrects and encodes the quality-preserved master once, t
 - Contrast and saturation multipliers remain between 0.85 and 1.15.
 - Per-channel balance remains between 0.92 and 1.08.
 - Lighting-shift and clipping-risk checks warn before a correction becomes destructive.
-- Source uploads receive generic internal names and are deleted immediately after processing.
-- Generated jobs expire automatically and are reachable only through unguessable job identifiers.
+- Source uploads receive generic internal names and are deleted after analysis or as soon as an export stream ends.
+- Corrected video is never stored; temporary reports expire automatically and use unguessable job identifiers.
 - Upload size, duration, resolution, request rate, and processing concurrency are bounded.
 - The release container runs as a non-root user with a read-only filesystem and no Linux capabilities.
 
@@ -124,8 +124,9 @@ GitHub Actions runs the lint and test suite on every push and pull request. Depe
 
 The planned free public deployment runs the existing container on an Oracle Cloud Always Free
 Ampere VM and publishes the custom domain through Cloudflare Tunnel. The origin remains private,
-while Cloudflare provides HTTPS, DNS, DDoS protection, and the public hostname. The synchronous
-pipeline is intentionally limited to one analysis at a time. See the
+while Cloudflare provides HTTPS, DNS, DDoS protection, and the public hostname. Analysis is
+queued persistently and full-resolution rendering is intentionally limited to one export at a
+time on the free VM. See the
 [deployment guide](docs/deployment.md) for the public upload ceiling, domain route, and security
 checklist.
 

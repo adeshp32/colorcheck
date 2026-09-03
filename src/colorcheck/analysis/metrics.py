@@ -5,11 +5,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-import torch
 
 from colorcheck.models import FrameAnalysis, LightingProfile
 
-RGB_TO_LUMA = torch.tensor([0.2126, 0.7152, 0.0722], dtype=torch.float32)
+RGB_TO_LUMA = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 
 
 @dataclass(frozen=True)
@@ -17,6 +16,16 @@ class VideoFrame:
     frame_index: int
     timestamp_sec: float
     rgb: np.ndarray
+
+
+@dataclass(frozen=True)
+class PreparedImage:
+    rgb: np.ndarray
+    normalized: np.ndarray
+    luma: np.ndarray
+    lab: np.ndarray
+    histograms: tuple[np.ndarray, np.ndarray, np.ndarray]
+    profile: LightingProfile
 
 
 LIGHTING_ARCHETYPES = {
@@ -46,54 +55,50 @@ def resize_for_analysis(rgb: np.ndarray, max_side: int = 512) -> np.ndarray:
     return cv2.resize(rgb, new_size, interpolation=cv2.INTER_AREA)
 
 
-def to_tensor(rgb: np.ndarray) -> torch.Tensor:
-    resized = resize_for_analysis(rgb).astype(np.float32) / 255.0
-    return torch.from_numpy(resized).permute(2, 0, 1).contiguous()
-
-
-def _match_size(reference: np.ndarray, target: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    ref = resize_for_analysis(reference)
-    target_resized = cv2.resize(target, (ref.shape[1], ref.shape[0]), interpolation=cv2.INTER_AREA)
-    return ref, target_resized
-
-
-def _saturation_mean(rgb: np.ndarray) -> float:
-    hsv = cv2.cvtColor(resize_for_analysis(rgb), cv2.COLOR_RGB2HSV).astype(np.float32)
+def _saturation_mean(resized_rgb: np.ndarray) -> float:
+    hsv = cv2.cvtColor(resized_rgb, cv2.COLOR_RGB2HSV).astype(np.float32)
     return float((hsv[:, :, 1] / 255.0).mean())
 
 
-def _lab_delta_e(reference: np.ndarray, target: np.ndarray) -> float:
-    ref, tgt = _match_size(reference, target)
-    ref_lab = cv2.cvtColor(ref, cv2.COLOR_RGB2LAB).astype(np.float32)
-    tgt_lab = cv2.cvtColor(tgt, cv2.COLOR_RGB2LAB).astype(np.float32)
-    delta = ref_lab - tgt_lab
+def _lab_delta_e(reference_lab: np.ndarray, target_lab: np.ndarray) -> float:
+    delta = reference_lab - target_lab
     return float(np.sqrt(np.sum(delta * delta, axis=2)).mean())
 
 
-def _global_ssim(reference_y: torch.Tensor, target_y: torch.Tensor) -> float:
+def _global_ssim(reference_y: np.ndarray, target_y: np.ndarray) -> float:
     c1 = 0.01**2
     c2 = 0.03**2
     ref = reference_y.flatten()
     tgt = target_y.flatten()
-    mu_ref = ref.mean()
-    mu_tgt = tgt.mean()
-    var_ref = ref.var(unbiased=False)
-    var_tgt = tgt.var(unbiased=False)
+    mu_ref = float(ref.mean())
+    mu_tgt = float(tgt.mean())
+    var_ref = float(ref.var())
+    var_tgt = float(tgt.var())
     cov = ((ref - mu_ref) * (tgt - mu_tgt)).mean()
     score = ((2 * mu_ref * mu_tgt + c1) * (2 * cov + c2)) / (
         (mu_ref**2 + mu_tgt**2 + c1) * (var_ref + var_tgt + c2)
     )
-    return float(torch.clamp(score, 0.0, 1.0).item())
+    return float(np.clip(score, 0.0, 1.0))
 
 
-def _histogram_similarity(reference: torch.Tensor, target: torch.Tensor) -> float:
-    similarities: list[float] = []
+def _channel_histograms(normalized: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    histograms = []
     for channel in range(3):
-        ref_hist = torch.histc(reference[channel], bins=48, min=0.0, max=1.0)
-        tgt_hist = torch.histc(target[channel], bins=48, min=0.0, max=1.0)
-        ref_hist = ref_hist / torch.clamp(ref_hist.sum(), min=1.0)
-        tgt_hist = tgt_hist / torch.clamp(tgt_hist.sum(), min=1.0)
-        similarities.append(float(torch.minimum(ref_hist, tgt_hist).sum().item()))
+        histogram = np.histogram(normalized[:, :, channel], bins=48, range=(0.0, 1.0))[0]
+        histogram = histogram.astype(np.float32)
+        histogram /= max(float(histogram.sum()), 1.0)
+        histograms.append(histogram)
+    return tuple(histograms)  # type: ignore[return-value]
+
+
+def _histogram_similarity(
+    reference: tuple[np.ndarray, np.ndarray, np.ndarray],
+    target: tuple[np.ndarray, np.ndarray, np.ndarray],
+) -> float:
+    similarities = [
+        float(np.minimum(ref_hist, target_hist).sum())
+        for ref_hist, target_hist in zip(reference, target, strict=True)
+    ]
     return float(sum(similarities) / len(similarities))
 
 
@@ -116,43 +121,68 @@ def nearest_lighting_archetype(
     return best_label, best_distance
 
 
-def profile_image(rgb: np.ndarray) -> LightingProfile:
-    tensor = to_tensor(rgb)
-    luma = (tensor.permute(1, 2, 0) * RGB_TO_LUMA).sum(dim=2)
-    rgb_mean_tensor = tensor.mean(dim=(1, 2))
-    rgb_std_tensor = tensor.std(dim=(1, 2), unbiased=False)
-    saturation = _saturation_mean(rgb)
-    temperature_proxy = float((rgb_mean_tensor[0] - rgb_mean_tensor[2]).item())
+def _profile_resized(resized_rgb: np.ndarray, normalized: np.ndarray, luma: np.ndarray) -> LightingProfile:
+    rgb_mean = normalized.mean(axis=(0, 1))
+    rgb_std = normalized.std(axis=(0, 1))
+    saturation = _saturation_mean(resized_rgb)
+    temperature_proxy = float(rgb_mean[0] - rgb_mean[2])
     label, distance = nearest_lighting_archetype(
-        float(luma.mean().item()),
-        float(luma.std(unbiased=False).item()),
+        float(luma.mean()),
+        float(luma.std()),
         saturation,
         temperature_proxy,
     )
     return LightingProfile(
-        luma_mean=float(luma.mean().item()),
-        luma_std=float(luma.std(unbiased=False).item()),
+        luma_mean=float(luma.mean()),
+        luma_std=float(luma.std()),
         saturation_mean=saturation,
         temperature_proxy=temperature_proxy,
-        rgb_mean=tuple(float(v) for v in rgb_mean_tensor.tolist()),
-        rgb_std=tuple(float(v) for v in rgb_std_tensor.tolist()),
+        rgb_mean=tuple(float(v) for v in rgb_mean.tolist()),
+        rgb_std=tuple(float(v) for v in rgb_std.tolist()),
         lighting_label=label,
         lighting_distance=distance,
     )
 
 
-def compare_frame(reference_rgb: np.ndarray, frame: VideoFrame) -> FrameAnalysis:
-    ref_rgb, target_rgb = _match_size(reference_rgb, frame.rgb)
-    reference = to_tensor(ref_rgb)
-    target = to_tensor(target_rgb)
-    reference_y = (reference.permute(1, 2, 0) * RGB_TO_LUMA).sum(dim=2)
-    target_y = (target.permute(1, 2, 0) * RGB_TO_LUMA).sum(dim=2)
+def prepare_image(rgb: np.ndarray, size: tuple[int, int] | None = None) -> PreparedImage:
+    resized = resize_for_analysis(rgb)
+    if size is not None and (resized.shape[1], resized.shape[0]) != size:
+        resized = cv2.resize(resized, size, interpolation=cv2.INTER_AREA)
+    normalized = resized.astype(np.float32) / 255.0
+    luma = (normalized * RGB_TO_LUMA).sum(axis=2)
+    return PreparedImage(
+        rgb=resized,
+        normalized=normalized,
+        luma=luma,
+        lab=cv2.cvtColor(resized, cv2.COLOR_RGB2LAB).astype(np.float32),
+        histograms=_channel_histograms(normalized),
+        profile=_profile_resized(resized, normalized, luma),
+    )
 
-    ref_profile = profile_image(ref_rgb)
-    target_profile = profile_image(target_rgb)
-    ssim = _global_ssim(reference_y, target_y)
-    histogram = _histogram_similarity(reference, target)
-    delta_e = _lab_delta_e(ref_rgb, target_rgb)
+
+def profile_image(rgb: np.ndarray) -> LightingProfile:
+    return prepare_image(rgb).profile
+
+
+def compare_prepared_frame(
+    reference: PreparedImage,
+    frame: VideoFrame,
+    target: PreparedImage | None = None,
+) -> FrameAnalysis:
+    target = target or prepare_image(
+        frame.rgb,
+        size=(reference.rgb.shape[1], reference.rgb.shape[0]),
+    )
+    if target.rgb.shape != reference.rgb.shape:
+        target = prepare_image(
+            target.rgb,
+            size=(reference.rgb.shape[1], reference.rgb.shape[0]),
+        )
+    ref_profile = reference.profile
+    target_profile = target.profile
+    ssim = _global_ssim(reference.luma, target.luma)
+    histogram = _histogram_similarity(reference.histograms, target.histograms)
+    delta_e = _lab_delta_e(reference.lab, target.lab)
 
     luma_delta = target_profile.luma_mean - ref_profile.luma_mean
     contrast_delta = target_profile.luma_std - ref_profile.luma_std
@@ -202,6 +232,10 @@ def compare_frame(reference_rgb: np.ndarray, frame: VideoFrame) -> FrameAnalysis
         target_profile=target_profile,
         notes=notes,
     )
+
+
+def compare_frame(reference_rgb: np.ndarray, frame: VideoFrame) -> FrameAnalysis:
+    return compare_prepared_frame(prepare_image(reference_rgb), frame)
 
 
 def sample_video_frames(video_path: str | Path, sample_count: int = 24) -> list[VideoFrame]:

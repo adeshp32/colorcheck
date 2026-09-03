@@ -7,7 +7,7 @@ ENV VCC_STORAGE_DIR=/app/storage
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg \
+  && apt-get install -y --no-install-recommends ffmpeg fonts-dejavu-core \
   && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
@@ -20,14 +20,7 @@ RUN python -m pip install --upgrade pip \
     "opencv-python-headless>=4.10.0.84" \
     "pillow>=10.4.0" \
     "python-multipart>=0.0.9" \
-    "uvicorn[standard]>=0.30.6" \
-    "filelock" \
-    "fsspec>=0.8.5" \
-    "networkx>=2.5.1" \
-    "setuptools>=77.0.3" \
-    "sympy>=1.13.3" \
-    "typing-extensions>=4.8.0" \
-  && python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu "torch>=2.3.0"
+    "uvicorn[standard]>=0.30.6"
 
 COPY src ./src
 

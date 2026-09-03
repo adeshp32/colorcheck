@@ -9,6 +9,11 @@ from pathlib import Path
 class AppSettings:
     storage_root: Path
     max_upload_mb: int
+    max_source_upload_mb: int
+    upload_chunk_mb: int
+    upload_ttl_hours: int
+    min_free_disk_mb: int
+    max_queued_jobs: int
     max_request_mb: int
     max_video_seconds: int
     max_video_pixels: int
@@ -24,6 +29,18 @@ class AppSettings:
     def max_request_bytes(self) -> int:
         return self.max_request_mb * 1024 * 1024
 
+    @property
+    def max_source_upload_bytes(self) -> int:
+        return self.max_source_upload_mb * 1024 * 1024
+
+    @property
+    def upload_chunk_bytes(self) -> int:
+        return self.upload_chunk_mb * 1024 * 1024
+
+    @property
+    def min_free_disk_bytes(self) -> int:
+        return self.min_free_disk_mb * 1024 * 1024
+
     @classmethod
     def from_environment(cls) -> AppSettings:
         max_upload_mb = max(10, int(os.environ.get("VCC_MAX_UPLOAD_MB", "250")))
@@ -32,11 +49,23 @@ class AppSettings:
             max_upload_mb + 4,
             int(os.environ.get("VCC_MAX_REQUEST_MB", str(default_request_mb))),
         )
+        max_source_upload_mb = max(
+            max_upload_mb,
+            int(os.environ.get("VCC_MAX_SOURCE_UPLOAD_MB", "1024")),
+        )
         return cls(
             storage_root=Path(os.environ.get("VCC_STORAGE_DIR", "storage")).resolve(),
             max_upload_mb=max_upload_mb,
+            max_source_upload_mb=max_source_upload_mb,
+            upload_chunk_mb=max(
+                1,
+                min(32, int(os.environ.get("VCC_UPLOAD_CHUNK_MB", "16"))),
+            ),
+            upload_ttl_hours=max(1, int(os.environ.get("VCC_UPLOAD_TTL_HOURS", "2"))),
+            min_free_disk_mb=max(512, int(os.environ.get("VCC_MIN_FREE_DISK_MB", "4096"))),
+            max_queued_jobs=max(1, min(5, int(os.environ.get("VCC_MAX_QUEUED_JOBS", "2")))),
             max_request_mb=max_request_mb,
-            max_video_seconds=max(10, int(os.environ.get("VCC_MAX_VIDEO_SECONDS", "120"))),
+            max_video_seconds=max(10, int(os.environ.get("VCC_MAX_VIDEO_SECONDS", "1800"))),
             max_video_pixels=max(
                 1_000_000,
                 round(
