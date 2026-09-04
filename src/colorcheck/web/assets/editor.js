@@ -104,11 +104,14 @@
       this.objectUrl = null;
       this.video = root.querySelector("[data-preview-video]");
       this.stage = root.querySelector("[data-preview-stage]");
+      this.strengthInput = root.querySelector("[data-correction-strength]");
+      this.correctionStrength = clamp(number(this.strengthInput?.value, 50), 0, 100);
       this.bindSource();
       this.bindTrim();
       this.bindCrop();
       this.bindColor();
       this.bindText();
+      this.bindPanels();
       this.render();
     }
 
@@ -120,6 +123,7 @@
     getPlan() { return copy(this.plan); }
     getSegments() { return retainedSegments(this.plan, this.duration); }
     getSourceFile() { return this.sourceInput?.files?.[0] || null; }
+    getCorrectionStrength() { return this.correctionStrength; }
 
     bindSource() {
       this.sourceInput?.addEventListener("change", () => {
@@ -128,8 +132,9 @@
         if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
         this.objectUrl = URL.createObjectURL(file);
         const media = this.video || document.createElement("video");
+        const previewStatus = this.root.querySelector("[data-preview-status]");
+        if (previewStatus) previewStatus.textContent = "Loading local preview...";
         media.preload = "metadata";
-        media.src = this.objectUrl;
         media.addEventListener("loadedmetadata", () => {
           this.duration = media.duration;
           this.width = media.videoWidth || 16;
@@ -143,10 +148,19 @@
           });
           this.render();
         }, { once: true });
-        if (this.video) {
+        media.addEventListener("canplay", () => {
+          if (previewStatus) previewStatus.textContent = "Preview ready. Press play and adjust the correction or edits below.";
+        }, { once: true });
+        media.addEventListener("error", () => {
+          if (previewStatus) previewStatus.textContent = "This browser cannot play the selected codec. The final server export can still transcode it.";
+        }, { once: true });
+        if (this.video && !this.video.dataset.timelineBound) {
+          this.video.dataset.timelineBound = "true";
           this.video.addEventListener("timeupdate", () => this.enforceTimeline());
           this.video.addEventListener("seeked", () => this.renderTextPreview());
         }
+        media.src = this.objectUrl;
+        media.load();
       });
     }
 
@@ -282,7 +296,6 @@
       const tint = this.root.querySelector("[data-color-wheel]");
       const intensity = this.root.querySelector("[data-color-intensity]");
       const monochrome = this.root.querySelector("[data-black-white]");
-      const correctionToggle = this.root.querySelector("[data-preview-correction]");
       const update = () => {
         this.snapshot();
         this.plan.color = {
@@ -303,7 +316,27 @@
       });
       intensity?.addEventListener("input", update);
       monochrome?.addEventListener("change", update);
-      correctionToggle?.addEventListener("change", () => this.renderPreviewStyle());
+      this.strengthInput?.addEventListener("input", () => {
+        this.correctionStrength = clamp(number(this.strengthInput.value, 50), 0, 100);
+        const output = this.root.querySelector("[data-correction-strength-output]");
+        if (output) output.textContent = `${Math.round(this.correctionStrength)}%`;
+        this.renderPreviewStyle();
+      });
+    }
+
+    bindPanels() {
+      this.root.querySelectorAll("[data-editor-panel]").forEach((panel) => {
+        panel.addEventListener("toggle", () => {
+          if (panel.open) {
+            this.root.querySelectorAll("[data-editor-panel]").forEach((other) => {
+              if (other !== panel) other.open = false;
+            });
+            this.root.dataset.activeTool = panel.dataset.editorPanel;
+          } else if (this.root.dataset.activeTool === panel.dataset.editorPanel) {
+            delete this.root.dataset.activeTool;
+          }
+        });
+      });
     }
 
     bindText() {
@@ -341,10 +374,10 @@
 
     renderPreviewStyle() {
       if (!this.stage) return;
-      const includeCorrection = Boolean(this.root.querySelector("[data-preview-correction]")?.checked);
-      const exposure = includeCorrection ? number(this.correction.exposure_stops, 0) : 0;
-      const contrast = includeCorrection ? number(this.correction.contrast_multiplier, 1) : 1;
-      const saturation = includeCorrection ? number(this.correction.saturation_multiplier, 1) : 1;
+      const strength = this.correctionStrength / 100;
+      const exposure = number(this.correction.exposure_stops, 0) * strength;
+      const contrast = 1 + (number(this.correction.contrast_multiplier, 1) - 1) * strength;
+      const saturation = 1 + (number(this.correction.saturation_multiplier, 1) - 1) * strength;
       const grayscale = this.plan.color.black_and_white ? " grayscale(1)" : "";
       this.stage.style.setProperty("--preview-filter", `brightness(${2 ** exposure}) contrast(${contrast}) saturate(${saturation})${grayscale}`);
       const presets = {
@@ -426,6 +459,8 @@
       if (tint) tint.value = this.plan.color.tint;
       if (intensity) intensity.value = this.plan.color.intensity;
       if (monochrome) monochrome.checked = this.plan.color.black_and_white;
+      const correctionOutput = this.root.querySelector("[data-correction-strength-output]");
+      if (correctionOutput) correctionOutput.textContent = `${Math.round(this.correctionStrength)}%`;
       this.renderPreviewStyle();
       this.renderTextPreview();
       this.root.dispatchEvent(new CustomEvent("colorcheck:plan", { detail: this.getPlan() }));
@@ -433,13 +468,6 @@
   }
 
   const editors = [];
-  const preflightRoot = document.querySelector("[data-preflight-editor]");
-  const preflightSource = document.querySelector(".analysis-form [name=video]");
-  if (preflightRoot && preflightSource) {
-    const editor = new Editor(preflightRoot, preflightSource, DEFAULT_PLAN, {});
-    editors.push(editor);
-    window.ColorCheckPreflightEditor = editor;
-  }
   document.querySelectorAll("[data-video-editor]").forEach((root) => {
     const initial = parseScript(root, "[data-initial-plan]", DEFAULT_PLAN);
     const correction = parseScript(root, "[data-correction]", {});

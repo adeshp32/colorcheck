@@ -13,6 +13,7 @@
 
   function status(message, value) {
     note.textContent = message;
+    note.hidden = false;
     progress.hidden = false;
     progress.value = value;
   }
@@ -154,9 +155,8 @@
   }
 
   async function localAnalysis(reference, target, desired) {
-    const plan = window.ColorCheckPreflightEditor?.getPlan() || {};
-    const segments = window.ColorCheckPreflightEditor?.getSegments() || [];
-    const targetResult = await videoSamples(target, desired, segments);
+    const plan = {};
+    const targetResult = await videoSamples(target, desired, []);
     let referenceBlobs;
     if (reference.type.startsWith("image/")) referenceBlobs = await imageSample(reference);
     else referenceBlobs = (await videoSamples(reference, Math.min(8, desired), null)).blobs;
@@ -200,7 +200,7 @@
           strength: Number(form.elements.strength.value),
           lighting_threshold: Number(form.elements.lighting_threshold.value),
           rights_confirmed: true,
-          edit_plan: window.ColorCheckPreflightEditor?.getPlan() || {},
+          edit_plan: {},
           source_metadata: { size: target.size, type: target.type },
         }),
       });
@@ -222,12 +222,13 @@
     if (!reference || !target) return;
     if (target.size > maxSourceBytes || reference.size > maxSourceBytes) {
       note.textContent = `Each source file must be ${Math.floor(maxSourceBytes / 1024 / 1024)} MB or smaller.`;
+      note.hidden = false;
       return;
     }
     form.dataset.submitting = "true";
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
-    button.textContent = "Mapping report & video...";
+    button.textContent = "Running ColorCheck...";
     try {
       let result;
       try {
@@ -242,6 +243,7 @@
       window.location.assign(result.job_url);
     } catch (error) {
       note.textContent = error.message || "The request could not be started.";
+      note.hidden = false;
       progress.hidden = true;
       form.dataset.submitting = "false";
       button.disabled = false;

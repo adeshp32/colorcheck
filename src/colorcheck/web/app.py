@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
 
+from colorcheck.analysis.correction import scale_correction
 from colorcheck.analysis.pipeline import analyze_sample_images, analyze_video
 from colorcheck.config import AppSettings
 from colorcheck.edits import EditPlanError, parse_edit_plan
@@ -739,6 +740,7 @@ def render_job_video(
     upload_token: Annotated[str, Form()],
     edit_plan: Annotated[str, Form()],
     apply_correction: Annotated[bool, Form()] = False,
+    correction_strength: Annotated[int, Form()] = 50,
 ) -> StreamingResponse:
     render_dir = RENDERS_ROOT / uuid.uuid4().hex
     acquired = False
@@ -767,7 +769,13 @@ def render_job_video(
         report_path = JOB_STORE.output_dir(job_id) / "report.json"
         report = json.loads(report_path.read_text(encoding="utf-8"))
         correction_data = report.get("correction", {})
-        correction = CorrectionPlan(**correction_data) if apply_correction else None
+        correction = None
+        if apply_correction:
+            full_correction = CorrectionPlan(**correction_data)
+            correction = scale_correction(
+                full_correction,
+                max(0, min(correction_strength, 100)),
+            )
         export = stream_edited_video(
             source,
             render_dir,

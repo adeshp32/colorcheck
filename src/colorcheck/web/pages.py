@@ -142,13 +142,17 @@ def page_shell(title: str, body: str) -> str:
       margin: 0 auto;
     }}
     .hero {{
-      min-height: min(720px, calc(86vh - 78px));
-      display: grid;
-      grid-template-columns: minmax(0, 0.92fr) minmax(320px, 1.08fr);
-      gap: clamp(22px, 4vw, 52px);
+      min-height: calc(100svh - 78px);
+      display: flex;
+      flex-direction: column;
       align-items: center;
-      padding: clamp(28px, 4vw, 56px) 0 48px;
+      justify-content: center;
+      gap: 22px;
+      padding: 28px 0 40px;
     }}
+    .hero-intro {{ text-align: center; }}
+    .hero-intro h1 {{ max-width: none; font-size: clamp(2.4rem, 6vw, 4.5rem); }}
+    .hero-intro .descriptor {{ margin: 10px auto 0; color: var(--muted); font-weight: 650; }}
     .eyebrow {{
       width: fit-content;
       border: 1px solid var(--line);
@@ -187,77 +191,9 @@ def page_shell(title: str, body: str) -> str:
       overflow: hidden;
     }}
     .analysis-panel {{
-      position: relative;
+      width: min(780px, 100%);
       font-family: var(--tool-font);
-      border-color: rgba(255, 255, 255, 0.62);
-      background:
-        linear-gradient(145deg, rgba(255,255,255,0.84), rgba(255,255,255,0.36)),
-        linear-gradient(160deg, rgba(92, 92, 255, 0.10), rgba(138, 200, 187, 0.10));
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.86),
-        inset 0 -1px 0 rgba(92,92,255,0.12),
-        0 28px 82px rgba(56, 56, 168, 0.22);
-      transition: border-color 180ms ease, box-shadow 180ms ease;
     }}
-    .analysis-panel::before {{
-      content: "";
-      position: absolute;
-      inset: 0 0 auto;
-      height: 5px;
-      background: linear-gradient(
-        90deg,
-        #5c5cff 0 28%,
-        #d989a0 28% 52%,
-        #8ac8bb 52% 76%,
-        #f1c879 76% 100%
-      );
-    }}
-    .analysis-panel:focus-within {{
-      border-color: color-mix(in srgb, var(--accent) 52%, white);
-      box-shadow:
-        inset 0 1px 0 rgba(255,255,255,0.86),
-        0 30px 86px rgba(56, 56, 168, 0.25);
-    }}
-    [data-theme="dark"] .analysis-panel {{
-      border-color: rgba(188, 188, 255, 0.22);
-      background:
-        linear-gradient(145deg, rgba(35, 36, 74, 0.74), rgba(18, 19, 44, 0.58)),
-        linear-gradient(160deg, rgba(92, 92, 255, 0.18), rgba(138, 200, 187, 0.08));
-    }}
-    .tool-head {{
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 22px 18px 18px;
-      border-bottom: 1px solid var(--line);
-    }}
-    .tool-head-actions {{
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 10px;
-    }}
-    .palette-swatches {{
-      display: grid;
-      grid-template-columns: repeat(4, 18px);
-      gap: 4px;
-      padding: 5px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--cream);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.72);
-    }}
-    .palette-swatches span {{
-      width: 18px;
-      height: 22px;
-      border-radius: 4px;
-      border: 1px solid rgba(23, 23, 43, 0.12);
-    }}
-    .palette-swatches span:nth-child(1) {{ background: #5c5cff; }}
-    .palette-swatches span:nth-child(2) {{ background: #d989a0; }}
-    .palette-swatches span:nth-child(3) {{ background: #8ac8bb; }}
-    .palette-swatches span:nth-child(4) {{ background: #f1c879; }}
     .status-pill {{
       border-radius: 999px;
       background: linear-gradient(135deg, var(--accent-soft), var(--third-soft));
@@ -270,8 +206,9 @@ def page_shell(title: str, body: str) -> str:
     .analysis-form {{
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       gap: 18px;
-      padding: 20px;
+      padding: 0;
     }}
+    .analysis-form .field-action {{ grid-column: 1 / -1; }}
     label {{ display: grid; gap: 8px; font-weight: 800; }}
     .field-reference, .field-target {{ min-width: 0; }}
     .field-samples {{ min-width: 0; }}
@@ -354,19 +291,6 @@ def page_shell(title: str, body: str) -> str:
       transform: translateY(0);
     }}
     .submit:disabled {{ cursor: wait; opacity: 1; }}
-    .mini-grid {{
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-top: 1px solid var(--line);
-      background: color-mix(in srgb, var(--glass-strong) 74%, transparent);
-    }}
-    .mini-grid div {{ padding: 14px 18px; border-right: 1px solid var(--line); }}
-    .mini-grid div:nth-child(1) {{ box-shadow: inset 0 3px #d989a0; }}
-    .mini-grid div:nth-child(2) {{ box-shadow: inset 0 3px var(--accent); }}
-    .mini-grid div:nth-child(3) {{ box-shadow: inset 0 3px var(--third); }}
-    .mini-grid div:last-child {{ border-right: 0; }}
-    .mini-grid span {{ display: block; color: var(--muted); font-size: 0.82rem; }}
-    .mini-grid strong {{ display: block; margin-top: 2px; }}
     section.info {{
       display: grid;
       align-content: center;
@@ -440,6 +364,7 @@ def page_shell(title: str, body: str) -> str:
       min-height: calc(100vh - 78px);
       padding: clamp(34px, 6vw, 76px) 0;
     }}
+    .result-title {{ max-width: none; font-size: clamp(2.25rem, 5vw, 4rem); line-height: 0.96; margin: 8px 0 12px; }}
     .result-grid {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -494,25 +419,31 @@ def page_shell(title: str, body: str) -> str:
     }}
     .processing-note[data-state="error"] {{ color: #a12f4d; }}
     .processing-progress {{ width: 100%; height: 8px; accent-color: var(--accent); }}
-    .preflight-editor {{
-      grid-column: 1 / -1;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      padding: 4px 0 14px;
-    }}
-    .preflight-editor summary {{
-      cursor: pointer;
-      color: var(--accent-strong);
-      font-weight: 850;
-      padding: 10px 0;
-    }}
+    [hidden] {{ display: none !important; }}
     .editor-shell {{ display: grid; gap: 18px; }}
     .editor-source {{
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, 0.55fr);
       align-items: end;
       gap: 12px;
     }}
+    .strength-control {{
+      display: grid;
+      gap: 8px;
+      min-height: 54px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--cream);
+    }}
+    .strength-control label {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 0.8rem;
+    }}
+    .strength-control output {{ color: var(--accent-strong); font-weight: 950; }}
     .preview-stage {{
       position: relative;
       width: 100%;
@@ -528,7 +459,7 @@ def page_shell(title: str, body: str) -> str:
       display: block;
       width: 100%;
       height: 100%;
-      object-fit: fill;
+      object-fit: contain;
       filter: var(--preview-filter, none);
     }}
     .preview-tint {{
@@ -549,7 +480,11 @@ def page_shell(title: str, body: str) -> str:
       box-shadow: 0 0 0 9999px rgba(5, 6, 18, 0.58), inset 0 0 0 1px rgba(23,23,43,0.45);
       cursor: move;
       z-index: 2;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease;
     }}
+    [data-video-editor][data-active-tool="crop"] .crop-box {{ opacity: 1; pointer-events: auto; }}
     .crop-handle {{
       position: absolute;
       width: 18px;
@@ -578,21 +513,34 @@ def page_shell(title: str, body: str) -> str:
       pointer-events: none;
     }}
     .text-preview[data-background="true"] {{ background: rgba(0,0,0,0.52); }}
-    .editor-controls {{
+    .timeline-dock {{
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1px;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: color-mix(in srgb, var(--bg) 86%, transparent);
+    }}
+    .timeline-dock .segmented {{ margin: 0; min-width: 250px; }}
+    .timeline-actions {{ display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }}
+    .editor-tools {{
+      display: grid;
       border: 1px solid var(--line);
       border-radius: 8px;
       overflow: hidden;
-      background: var(--line);
     }}
-    .editor-control {{
-      min-width: 0;
-      padding: 16px;
-      background: color-mix(in srgb, var(--bg) 86%, transparent);
+    .editor-control {{ min-width: 0; background: color-mix(in srgb, var(--bg) 86%, transparent); }}
+    .editor-control + .editor-control {{ border-top: 1px solid var(--line); }}
+    .editor-control summary {{
+      cursor: pointer;
+      font-weight: 850;
+      padding: 13px 15px;
+      list-style-position: inside;
     }}
-    .editor-control h3 {{ margin: 0 0 12px; font-size: 1rem; }}
+    .editor-control[open] summary {{ color: var(--accent-strong); background: var(--accent-soft); }}
+    .editor-control-body {{ padding: 14px 15px 16px; border-top: 1px solid var(--line); }}
     .control-row {{
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -674,34 +622,51 @@ def page_shell(title: str, body: str) -> str:
     }}
     .render-actions {{
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1fr) auto;
       gap: 10px;
       margin-top: 16px;
+      align-items: end;
     }}
+    .output-options {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }}
+    .output-options label {{
+      display: block;
+      min-height: 48px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      text-align: center;
+    }}
+    .output-options input {{ position: absolute; opacity: 0; pointer-events: none; }}
+    .output-options label:has(input:checked) {{
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+    }}
+    .finalize-button {{ min-width: 190px; }}
+    .analysis-disclosure {{ margin-top: 18px; }}
+    .analysis-disclosure > summary {{ cursor: pointer; font-weight: 900; padding: 18px; }}
+    .analysis-details {{ padding: 0 18px 18px; }}
     .privacy-line {{ margin: 12px 0 0; color: var(--muted); font-size: 0.82rem; }}
     .job-progress {{ max-width: 720px; margin: 12vh auto 0; padding: 28px; }}
     .job-progress progress {{ width: 100%; height: 12px; accent-color: var(--accent); }}
     @media (max-width: 860px) {{
-      .hero {{ grid-template-columns: 1fr; min-height: auto; }}
+      .hero {{ min-height: calc(100svh - 72px); }}
       .analysis-form {{ grid-template-columns: 1fr; }}
-      .mini-grid {{ grid-template-columns: 1fr; }}
-      .mini-grid div {{ border-right: 0; border-bottom: 1px solid var(--line); }}
-      .mini-grid div:last-child {{ border-bottom: 0; }}
-      .tool-head {{ align-items: flex-start; }}
-      .tool-head-actions {{ align-items: flex-end; flex-direction: column-reverse; }}
       nav a {{ display: none; }}
-      .editor-controls {{ grid-template-columns: 1fr; }}
       .render-actions {{ grid-template-columns: 1fr; }}
       .editor-source {{ grid-template-columns: 1fr; }}
+      .timeline-dock {{ grid-template-columns: 1fr; }}
+      .timeline-dock .segmented {{ min-width: 0; }}
+      .output-options {{ grid-template-columns: 1fr; }}
+      .finalize-button {{ width: 100%; }}
     }}
     @media (max-width: 520px) {{
-      .tool-head {{ flex-direction: column; gap: 12px; }}
-      .tool-head-actions {{
-        width: 100%;
-        align-items: center;
-        justify-content: space-between;
-        flex-direction: row-reverse;
-      }}
       .a11y {{ position: static; transform: none; margin: 14px; justify-content: center; }}
       .a11y button {{ flex: 1 1 96px; }}
       .control-row {{ grid-template-columns: 1fr; }}
@@ -776,29 +741,6 @@ def page_shell(title: str, body: str) -> str:
 </html>"""
 
 
-def _preflight_editor() -> str:
-    return """<details class="preflight-editor" data-preflight-editor>
-          <summary>Prepare trim before analysis</summary>
-          <div class="editor-control" data-trim-editor>
-            <div class="segmented" aria-label="Trim behavior">
-              <label><input type="radio" name="preflight_trim_mode" value="keep" checked>Preserve selected area</label>
-              <label><input type="radio" name="preflight_trim_mode" value="remove">Trim within selected area</label>
-            </div>
-            <div class="timeline-selection">
-              <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
-              <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
-              <div class="timeline-values"><span data-trim-start-label>0:00.00</span><span data-trim-end-label>0:00.00</span></div>
-            </div>
-            <div class="editor-actions">
-              <button class="editor-button" type="button" data-add-trim>Add selection</button>
-              <button class="editor-button" type="button" data-undo>Undo last</button>
-              <button class="editor-button" type="button" data-clear>Clear edits</button>
-            </div>
-            <ul class="edit-list" data-trim-list></ul>
-          </div>
-        </details>"""
-
-
 def home_page(
     max_upload_mb: int = 250,
     max_source_upload_mb: int = 1024,
@@ -808,83 +750,39 @@ def home_page(
 ) -> str:
     body = f"""<div class="page">
   <section class="hero" id="tool" aria-labelledby="hero-title">
-    <div>
-      <p class="eyebrow">Reference-led color review</p>
+    <div class="hero-intro">
       <h1 id="hero-title">Color that isn't artificial.</h1>
-      <p class="descriptor">Compares a video to a reference look, then exports a guarded corrected preview and editor-ready color guidance.</p>
-      <p class="lede">Upload a reference image or reference video, then add the clip you want checked. ColorCheck samples the footage, finds matching lighting moments, flags drift, and lets you choose how strongly the correction should be applied.</p>
+      <p class="descriptor">Match a target clip to a reference look.</p>
     </div>
-    <div class="panel analysis-panel" aria-label="Upload analyzer">
-      <div class="tool-head">
-        <div>
-          <strong>Analyze footage</strong>
-          <div class="hint">Image or video reference accepted</div>
-          <div class="hint">Local sampling supports source clips up to {max_source_upload_mb} MB and {max_video_seconds // 60} minutes</div>
-        </div>
-        <div class="tool-head-actions">
-          <div class="palette-swatches" role="img" aria-label="Reference palette: violet, rose, mint, and amber">
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-            <span aria-hidden="true"></span>
-          </div>
-          <div class="status-pill">Preview + report</div>
-        </div>
-      </div>
+    <div class="analysis-panel" aria-label="Upload analyzer">
       <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
         <label class="field-reference">
-          Reference image or video
+          Reference look
           <input name="reference" type="file" accept="image/*,video/*" required>
-          <span class="hint">Use the frame, still, or clip whose look you want to preserve.</span>
         </label>
         <label class="field-target">
-          Target video
+          Target clip
           <input name="video" type="file" accept="video/*" required data-editor-source>
-          <span class="hint">The browser samples this clip locally; the original stays on the device until an export is requested.</span>
         </label>
-        {_preflight_editor()}
-        <label class="field-samples">
-          Frame samples
-          <input name="samples" type="number" min="4" max="96" value="24">
-          <span class="hint">More samples give a steadier read on longer clips.</span>
-        </label>
-        <label class="field-strength">
-          Correction strength
-          <span class="range-box">
-            <input name="strength" type="range" min="0" max="100" value="50" data-output="strength-output">
-            <span class="range-meta"><span>Report only</span><output id="strength-output">50%</output><span>Full correction</span></span>
-          </span>
-          <span class="hint">Controls how strongly the preview video and exported LUT/CDL apply the recommendation.</span>
-        </label>
-        <label class="field-threshold">
-          Lighting safety threshold
-          <span class="range-box">
-            <input name="lighting_threshold" type="range" min="25" max="90" value="60" data-output="threshold-output">
-            <span class="range-meta"><span>Strict</span><output id="threshold-output">60%</output><span>Flexible</span></span>
-          </span>
-          <span class="hint">Warnings appear when the selected strength risks changing the original lighting setup.</span>
-        </label>
+        <input name="samples" type="hidden" value="24">
+        <input name="strength" type="hidden" value="100">
+        <input name="lighting_threshold" type="hidden" value="60">
         <div class="field-action">
           <label class="consent">
             <input name="rights_confirmed" type="checkbox" required>
-            <span>Permission to process this media is confirmed. Browser samples and temporary source uploads are deleted immediately after analysis. Corrected video is never stored.</span>
+            <span>Authorized media only. Temporary uploads are deleted.</span>
           </label>
-          <button class="submit" type="submit" data-default-label="Generate Mapped Report &amp; Video">Generate Mapped Report &amp; Video</button>
+          <button class="submit" type="submit" data-default-label="Run ColorCheck">Run ColorCheck</button>
           <progress class="processing-progress" value="0" max="100" hidden></progress>
-          <p class="processing-note" role="status" aria-live="polite">Analysis uses local decoding before a compact sample upload.</p>
+          <p class="processing-note" role="status" aria-live="polite" hidden></p>
         </div>
       </form>
-      <div class="mini-grid" aria-label="Outputs">
-        <div><span>Exports</span><strong>Local preview + streamed master</strong></div>
-        <div><span>Editors</span><strong>Resolve, Premiere, Avid, iMovie</strong></div>
-        <div><span>Safety</span><strong>Strength threshold</strong></div>
-      </div>
     </div>
   </section>
   <section class="info" aria-labelledby="output-title">
     <p class="eyebrow">What you get</p>
     <h2 class="section-title" id="output-title">A clean report, not a mystery filter.</h2>
-    <p class="about-text">The output tells you whether the target clip is brighter, flatter, warmer, cooler, more saturated, or less saturated than the reference. It also gives individual downloads for the corrected preview, full report, JSON data, LUT, CDL, and editor-specific instructions.</p>
+    <p class="about-text">ColorCheck samples the footage locally, measures color and lighting drift, and opens a playable editor where correction strength, trims, crop, color, and text remain under your control. Final output can be a report, a corrected video, or both.</p>
   </section>
   <section class="info" id="about" aria-labelledby="about-title">
     <p class="eyebrow">About the project</p>
@@ -920,18 +818,22 @@ def _result_editor(
 ) -> str:
     correction = report.get("correction", {})
     return f"""<section class="panel" style="padding:18px; margin-bottom:18px;" data-video-editor data-job-id="{job_id}" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
-    <h2>Edit and preview locally</h2>
-    <p class="hint">Load the original clip to preview trims, crop, text, lighting, tint, monochrome, and the mapped correction on this device.</p>
+    <h2>Preview and edit</h2>
+    <p class="hint">Choose the target clip again to open a private, playable preview. It stays on this device until a final video is requested.</p>
     <script type="application/json" data-initial-plan>{_safe_json(edit_plan)}</script>
     <script type="application/json" data-source-metadata>{_safe_json(source_metadata)}</script>
     <script type="application/json" data-correction>{_safe_json(correction)}</script>
     <div class="editor-shell">
       <div class="editor-source">
-        <label>Original target clip
+        <label>Target clip for local preview
           <input type="file" accept="video/*" data-editor-source>
         </label>
-        <label class="consent"><input type="checkbox" data-preview-correction checked><span>Preview mapped correction</span></label>
+        <div class="strength-control">
+          <label for="correction-strength-{job_id}"><span>Mapped correction</span><output data-correction-strength-output>50%</output></label>
+          <input id="correction-strength-{job_id}" type="range" min="0" max="100" value="50" data-correction-strength aria-label="Mapped correction strength">
+        </div>
       </div>
+      <p class="processing-note" role="status" aria-live="polite" data-preview-status>Select the same target clip used for analysis.</p>
       <div class="preview-stage" data-preview-stage hidden>
         <video controls playsinline preload="metadata" data-preview-video></video>
         <div class="preview-tint" aria-hidden="true"></div>
@@ -943,27 +845,31 @@ def _result_editor(
           <span class="crop-handle" data-corner="se"></span>
         </div>
       </div>
-      <div class="editor-controls">
-        <section class="editor-control" data-trim-editor>
-          <h3>Timeline selections</h3>
-          <div class="segmented" aria-label="Trim behavior">
-            <label><input type="radio" name="result_trim_mode" value="keep" checked>Preserve selected area</label>
-            <label><input type="radio" name="result_trim_mode" value="remove">Trim within selected area</label>
-          </div>
+      <section class="timeline-dock" data-trim-editor aria-label="Timeline trimmer">
+        <div>
           <div class="timeline-selection">
             <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
             <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
             <div class="timeline-values"><span data-trim-start-label>0:00.00</span><span data-trim-end-label>0:00.00</span></div>
           </div>
-          <div class="editor-actions">
+          <div class="timeline-actions">
             <button class="editor-button" type="button" data-add-trim>Add selection</button>
-            <button class="editor-button" type="button" data-undo>Undo last</button>
-            <button class="editor-button" type="button" data-clear>Undo all edits</button>
+            <button class="editor-button" type="button" data-undo>Undo</button>
+            <button class="editor-button" type="button" data-clear>Clear edits</button>
           </div>
           <ul class="edit-list" data-trim-list></ul>
-        </section>
-        <section class="editor-control">
-          <h3>Precision crop</h3>
+        </div>
+        <div>
+          <div class="segmented" aria-label="Trim behavior">
+            <label><input type="radio" name="result_trim_mode" value="keep" checked>Preserve selected area</label>
+            <label><input type="radio" name="result_trim_mode" value="remove">Trim within selected area</label>
+          </div>
+        </div>
+      </section>
+      <div class="editor-tools" aria-label="Editing tools">
+        <details class="editor-control" data-editor-panel="crop">
+          <summary>Precision crop</summary>
+          <div class="editor-control-body">
           <div class="control-row">
             <label>Aspect
               <select data-crop-aspect>
@@ -984,9 +890,11 @@ def _result_editor(
             <label>Width %<input type="number" min="5" max="100" step="0.1" value="100" data-crop-width></label>
             <label>Height %<input type="number" min="5" max="100" step="0.1" value="100" data-crop-height></label>
           </div>
-        </section>
-        <section class="editor-control">
-          <h3>Lighting and color</h3>
+          </div>
+        </details>
+        <details class="editor-control" data-editor-panel="color">
+          <summary>Lighting and color</summary>
+          <div class="editor-control-body">
           <div class="control-row">
             <label>Lighting mode
               <select data-lighting-mode>
@@ -1003,9 +911,11 @@ def _result_editor(
             <label>Intensity<input type="range" min="0" max="100" value="0" data-color-intensity></label>
             <label class="consent"><input type="checkbox" data-black-white><span>Black &amp; white</span></label>
           </div>
-        </section>
-        <section class="editor-control">
-          <h3>Text overlays</h3>
+          </div>
+        </details>
+        <details class="editor-control" data-editor-panel="text">
+          <summary>Text overlays</summary>
+          <div class="editor-control-body">
           <div class="control-row">
             <label>Text<input type="text" maxlength="200" placeholder="Title or caption" data-text-value></label>
             <label>Position
@@ -1027,16 +937,20 @@ def _result_editor(
           </div>
           <div class="editor-actions"><button class="editor-button" type="button" data-add-text>Add text</button></div>
           <ul class="edit-list" data-text-list></ul>
-        </section>
+          </div>
+        </details>
       </div>
       <div>
         <div class="render-actions">
-          <button class="editor-button" type="button" data-render="preview" data-correction="true">Download review MP4</button>
-          <button class="editor-button" type="button" data-render="master" data-correction="false">Full resolution, edits only</button>
-          <button class="editor-button primary" type="button" data-render="master" data-correction="true">Full resolution + correction</button>
+          <div class="output-options" aria-label="Final output">
+            <label><input type="radio" name="final_output" value="both" checked>Report + corrected video</label>
+            <label><input type="radio" name="final_output" value="report">Report only</label>
+            <label><input type="radio" name="final_output" value="video">Corrected video only</label>
+          </div>
+          <button class="editor-button primary finalize-button" type="button" data-finalize>Prepare final output</button>
         </div>
         <progress class="processing-progress" value="0" max="100" hidden data-render-progress></progress>
-        <p class="processing-note" role="status" aria-live="polite" data-render-status>Exports are encoded once and streamed directly to the browser.</p>
+        <p class="processing-note" role="status" aria-live="polite" data-render-status>Final video is encoded once and streamed directly to the browser.</p>
         <p class="privacy-line">The corrected video is never written to server storage. Temporary source chunks are erased when streaming ends or if the upload expires.</p>
       </div>
     </div>
@@ -1055,14 +969,6 @@ def job_page(
     summary = report["summary"]
     guardrails = report["guardrails"]
     correction = report["correction"]
-    export_settings = report.get(
-        "export_settings",
-        {
-            "correction_strength_percent": 0,
-            "lighting_shift_threshold_percent": 60,
-            "audio_status": "unknown",
-        },
-    )
     lighting_shift = report.get(
         "lighting_shift",
         {
@@ -1072,8 +978,6 @@ def job_page(
             "warnings": [],
         },
     )
-    corrected_video_filename = report.get("corrected_video_filename")
-    corrected_master_filename = report.get("corrected_master_filename")
     outputs = [
         ("Full report", "report.html", "HTML"),
         ("Raw analysis", "report.json", "JSON"),
@@ -1084,10 +988,6 @@ def job_page(
         ("Recommended LUT", "recommended_correction.cube", "CUBE"),
         ("ASC CDL", "recommended_correction.cdl", "CDL"),
     ]
-    if corrected_video_filename:
-        outputs.insert(0, ("Corrected preview", str(corrected_video_filename), "MP4"))
-    if corrected_master_filename:
-        outputs.insert(0, ("Quality-preserved master", str(corrected_master_filename), "MOV"))
     file_links = "\n".join(
         f'<li><a href="/jobs/{job_id}/{filename}">{label}<span>{kind}</span></a></li>'
         for label, filename, kind in outputs
@@ -1099,26 +999,6 @@ def job_page(
     warning_items = "".join(f"<li>{html.escape(str(warning))}</li>" for warning in warnings)
     preserves_lighting = bool(lighting_shift.get("preserves_lighting_setup", True))
     safe_label = "Preserves lighting setup" if preserves_lighting else "Lighting threshold crossed"
-    preview_section = ""
-    if corrected_video_filename:
-        audio_messages = {
-            "preserved": "The source video's audio is included in this corrected preview.",
-            "source_has_no_audio": "The uploaded source has no audio track, so this preview is silent.",
-            "unavailable": "Audio could not be included in this export, so this preview is silent.",
-            "unknown": "Audio status was not recorded for this export.",
-        }
-        audio_status = str(export_settings.get("audio_status", "unknown"))
-        audio_message = audio_messages.get(audio_status, audio_messages["unknown"])
-        preview_section = f"""
-  <section class="panel" style="padding:18px; margin-bottom:18px;">
-    <h2>Corrected preview</h2>
-    <p class="hint">{html.escape(audio_message)}</p>
-    <p class="hint">The browser preview is capped at 1080p for responsive playback. Download the quality-preserved master for the source resolution and bit depth.</p>
-    <video class="preview-video" controls playsinline preload="metadata">
-      <source src="/jobs/{job_id}/{html.escape(str(corrected_video_filename))}?codec=h264" type="video/mp4">
-      Your browser could not play this preview. Download the MP4 below instead.
-    </video>
-  </section>"""
     editor_section = _result_editor(
         job_id,
         report,
@@ -1128,29 +1008,30 @@ def job_page(
         upload_chunk_mb,
     )
     body = f"""<div class="page result-page">
-  <p class="eyebrow">Analysis complete</p>
-  <h1>Match score {summary["overall_score"]}/100</h1>
+  <p class="eyebrow">Color check complete</p>
+  <h1 class="result-title">Match score {summary["overall_score"]}/100</h1>
   <p class="descriptor">{html.escape(str(summary["recommendation"]))}</p>
-  <div class="result-grid">
-    <div class="metric"><span>Drift level</span><strong>{html.escape(str(summary["drift_level"]))}</strong></div>
-    <div class="metric"><span>Reference lighting</span><strong>{html.escape(str(summary["reference_lighting"]))}</strong></div>
-    <div class="metric"><span>Target lighting</span><strong>{html.escape(str(summary["target_lighting"]))}</strong></div>
-    <div class="metric"><span>Risky frames</span><strong>{summary["risky_frame_count"]}</strong></div>
-    <div class="metric"><span>Correction strength</span><strong>{export_settings["correction_strength_percent"]}%</strong></div>
-    <div class="metric"><span>Lighting shift</span><strong>{lighting_shift["shift_percent"]}%</strong></div>
-  </div>
-  <section class="panel" style="padding:18px; margin-bottom:18px;">
-    <h2>{safe_label}</h2>
-    <p>Exposure {correction["exposure_stops"]:+.3f} stops, contrast {correction["contrast_multiplier"]:.3f}x, saturation {correction["saturation_multiplier"]:.3f}x.</p>
-    <p>Lighting setup shift: {lighting_shift["shift_percent"]}% / threshold {lighting_shift["threshold_percent"]}%.</p>
-    <p>Estimated clipping risk: {guardrails["clipping_risk_percent"]:.3f}%</p>
-    <ul>{warning_items}</ul>
-  </section>
-  {preview_section}
   {editor_section}
-  <section class="panel" style="padding:18px;">
-    <h2>Downloads</h2>
-    <p class="hint">Reports and correction files remain available temporarily. Video exports are generated only when requested and are never stored.</p>
+  <details class="panel analysis-disclosure">
+    <summary>View color analysis</summary>
+    <div class="analysis-details">
+      <div class="result-grid">
+        <div class="metric"><span>Drift level</span><strong>{html.escape(str(summary["drift_level"]))}</strong></div>
+        <div class="metric"><span>Reference lighting</span><strong>{html.escape(str(summary["reference_lighting"]))}</strong></div>
+        <div class="metric"><span>Target lighting</span><strong>{html.escape(str(summary["target_lighting"]))}</strong></div>
+        <div class="metric"><span>Risky frames</span><strong>{summary["risky_frame_count"]}</strong></div>
+        <div class="metric"><span>Lighting shift</span><strong>{lighting_shift["shift_percent"]}%</strong></div>
+      </div>
+      <h2>{safe_label}</h2>
+      <p>Exposure {correction["exposure_stops"]:+.3f} stops, contrast {correction["contrast_multiplier"]:.3f}x, saturation {correction["saturation_multiplier"]:.3f}x.</p>
+      <p>Lighting setup shift: {lighting_shift["shift_percent"]}% / threshold {lighting_shift["threshold_percent"]}%.</p>
+      <p>Estimated clipping risk: {guardrails["clipping_risk_percent"]:.3f}%</p>
+      <ul>{warning_items}</ul>
+    </div>
+  </details>
+  <section class="panel" style="padding:18px; margin-top:18px;" data-report-downloads hidden>
+    <h2>Report files</h2>
+    <p class="hint">Reports and correction files remain available temporarily. Corrected video is generated only when requested and is never stored.</p>
     <ul class="file-list">{file_links}</ul>
   </section>
 </div>"""
