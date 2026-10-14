@@ -560,8 +560,8 @@ async function renderPreview(interactive = false) {
     drawTransformedPhoto(
       preview,
       canvas,
-      base.width,
-      base.height,
+      previewPixels.width,
+      previewPixels.height,
       settings,
       panel !== "crop",
     );
