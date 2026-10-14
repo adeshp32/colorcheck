@@ -32,6 +32,16 @@ body {
   color: var(--accent);
   font-size: 14px;
   text-underline-offset: 3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+}
+.social-footer svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
 }
 button,
 input,
@@ -104,10 +114,12 @@ main {
 }
 .workspace {
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 .file-bar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -162,10 +174,10 @@ main {
   touch-action: pan-y;
 }
 #preview {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   object-fit: contain;
 }
 .empty {
@@ -195,6 +207,7 @@ main {
   color: var(--muted);
 }
 .transport {
+  flex-shrink: 0;
   padding: 14px 20px;
   display: flex;
   align-items: center;
@@ -213,8 +226,103 @@ aside {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  min-width: 0;
+  position: sticky;
+  top: 8px;
+  align-self: start;
+  height: calc(100dvh - 80px);
+  max-height: calc(100dvh - 16px);
+  z-index: 3;
+}
+@media (min-width: 761px) {
+  main[data-dock="right"] aside {
+    position: fixed;
+    right: 0;
+    top: 64px;
+    width: 340px;
+  }
+  main[data-dock="bottom"] aside {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    height: max(180px, calc((100dvh - 64px) * 0.38));
+  }
+}
+.panel-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.panel-bar button {
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 7px;
+  background: transparent;
+  border-color: transparent;
+}
+.panel-docks {
+  display: flex;
+  margin-left: auto;
+  gap: 2px;
+}
+.panel-docks [aria-pressed="true"] {
+  border-color: var(--accent);
+}
+#panel-grip {
+  cursor: grab;
+  touch-action: none;
+}
+#panel-grip:active {
+  cursor: grabbing;
+}
+main[data-dock="bottom"] {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(180px, 38%);
+}
+main[data-dock="bottom"] aside {
+  border-left: 0;
+  border-top: 1px solid var(--line);
+  align-self: stretch;
+}
+main[data-dock="bottom"] .tools {
+  max-width: 540px;
+  width: 100%;
+  align-self: center;
+}
+main[data-dock="bottom"] .inspector section {
+  max-width: 960px;
+  margin: 0 auto;
+}
+main[data-dock="bottom"] .inspector section > div[id$="-controls"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  column-gap: 24px;
+}
+main[data-dock="floating"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+main[data-dock="floating"] aside {
+  position: fixed;
+  width: min(340px, calc(100vw - 16px));
+  height: min(600px, calc(100dvh - 16px));
+  min-width: min(280px, calc(100vw - 16px));
+  min-height: min(200px, calc(100dvh - 16px));
+  max-width: calc(100vw - 16px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px #0003;
+  resize: both;
+  overflow: hidden;
 }
 .tools {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(6, 1fr);
   padding: 8px;
@@ -238,6 +346,8 @@ aside {
   background: #f0f0ff;
 }
 .inspector {
+  min-height: 0;
+  flex: 1;
   overflow: auto;
   padding: 20px;
 }
@@ -492,6 +602,16 @@ dialog::backdrop {
   aside {
     border-left: 0;
     border-top: 1px solid var(--line);
+    height: 55dvh;
+    flex-shrink: 0;
+    top: 0;
+  }
+  main[data-dock="bottom"] aside {
+    height: 55dvh;
+    align-self: auto;
+  }
+  main[data-dock="floating"] aside {
+    height: 55dvh;
   }
   .tools {
     position: sticky;
@@ -503,7 +623,7 @@ dialog::backdrop {
     min-height: 50px;
   }
   .inspector {
-    overflow: visible;
+    overflow: auto;
     padding: 18px 20px;
   }
   .control {

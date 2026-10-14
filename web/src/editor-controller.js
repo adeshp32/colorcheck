@@ -7,6 +7,7 @@ import {
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
 import { createEnhancementClient } from "./learned-enhancement.js";
+import { initializeWorkspaceLayout } from "./workspace-layout.js";
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
@@ -793,7 +794,7 @@ $("#crop-box").onkeydown = (e) => {
     boundCrop();
   });
 };
-new ResizeObserver(positionCrop).observe($("#viewer"));
+initializeWorkspaceLayout(positionCrop);
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob),
     a = document.createElement("a");

@@ -16,6 +16,13 @@ or a build pipeline. The static `web/` directory is the production artifact.
 responsive layout, not image processing. `tools/serve.mjs` only serves local
 development files and does not accept uploads.
 
+`workspace-layout.js` owns display-only photo fitting and the right, bottom,
+and floating tool-panel positions. Viewer resize and canvas geometry changes
+recalculate the fitted dimensions without changing image or export resolution.
+Floating tools support pointer dragging, keyboard movement, and resizing;
+positions stay within the viewport. Docking does not recreate controls or reset
+edit state. On narrow screens, right docking resolves to the bottom layout.
+
 Optional ML has three additional boundaries: `learned-enhancement.js` owns the
 lazy worker/cancellation interface, `enhancement-worker.js` owns model loading
 and inference, and `enhancement-lut.js` owns interpolation and clipping assessment.

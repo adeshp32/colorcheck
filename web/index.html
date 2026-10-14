@@ -17,7 +17,7 @@
       ><span class="edition">Photos</span
       ><span class="privacy">On-device editing</span>
     </header>
-    <main>
+    <main id="editor-layout" data-dock="right">
       <section class="workspace" aria-label="Photo workspace">
         <div class="file-bar">
           <label class="file-button"
@@ -88,7 +88,59 @@
           >
         </div>
       </section>
-      <aside aria-label="Editing tools">
+      <aside id="editing-tools" aria-label="Editing tools">
+        <div class="panel-bar">
+          <button
+            id="panel-grip"
+            title="Detach and move tools; arrow keys move the floating panel"
+            aria-label="Move editing tools"
+          >
+            <img class="icon" src="./assets/icons/icon-grip.svg" alt="" />
+          </button>
+          <span>Tools</span>
+          <div
+            class="panel-docks"
+            role="group"
+            aria-label="Tool panel position"
+          >
+            <button
+              data-dock-mode="right"
+              aria-label="Dock tools right"
+              title="Dock right"
+              aria-pressed="true"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panel-right.svg"
+                alt=""
+              />
+            </button>
+            <button
+              data-dock-mode="bottom"
+              aria-label="Dock tools bottom"
+              title="Dock bottom"
+              aria-pressed="false"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panel-bottom.svg"
+                alt=""
+              />
+            </button>
+            <button
+              data-dock-mode="floating"
+              aria-label="Detach tools"
+              title="Float and resize"
+              aria-pressed="false"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panels-top-left.svg"
+                alt=""
+              />
+            </button>
+          </div>
+        </div>
         <nav class="tools" aria-label="Tools">
           <button
             data-panel="match"
@@ -269,8 +321,13 @@
         href="https://www.linkedin.com/in/aditya-deshpande-127218205/"
         target="_blank"
         rel="noreferrer"
-        >LinkedIn</a
-      >
+        aria-label="Aditya Deshpande on LinkedIn"
+        title="LinkedIn"
+        ><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path
+            d="M6.94 8.98H3.56v10.8h3.38V8.98ZM5.25 4.22c-1.08 0-1.95.8-1.95 1.82 0 1.03.87 1.84 1.95 1.84s1.95-.81 1.95-1.84c0-1.02-.87-1.82-1.95-1.82Zm14.5 9.5c0-3.06-1.63-4.48-3.81-4.48-1.75 0-2.54.96-2.98 1.64h-.04v-1.4H9.68v10.8h3.38v-5.34c0-1.4.26-2.76 2-2.76 1.72 0 1.74 1.6 1.74 2.85v5.25h3.38v-5.92c0-.29-.01-.51-.03-.64Z"
+          /></svg
+      ></a>
     </footer>
     <dialog id="export-dialog">
       <h2>Export photo</h2>

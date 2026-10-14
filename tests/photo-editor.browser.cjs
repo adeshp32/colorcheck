@@ -241,6 +241,117 @@ const { join } = require("node:path");
       );
     }
     assert.deepEqual(errors, []);
+    const layoutPage = await browser.newPage({
+      viewport: { width: 1280, height: 720 },
+    });
+    layoutPage.on("pageerror", (error) => errors.push(error.message));
+    await layoutPage.goto(url);
+    assert.equal(await layoutPage.locator(".social-footer a svg").count(), 1);
+    async function assertPreviewFits() {
+      await layoutPage.waitForFunction(() => {
+        const image = document
+          .querySelector("#preview")
+          .getBoundingClientRect();
+        const viewer = document
+          .querySelector("#viewer")
+          .getBoundingClientRect();
+        return (
+          image.width > 0 &&
+          image.height > 0 &&
+          image.left >= viewer.left &&
+          image.top >= viewer.top &&
+          image.right <= viewer.right &&
+          image.bottom <= viewer.bottom
+        );
+      });
+    }
+    for (const [width, height] of [
+      [600, 2400],
+      [2400, 600],
+    ]) {
+      const fixture = await layoutPage.evaluate(
+        ({ width, height }) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext("2d").fillRect(0, 0, width, height);
+          return canvas.toDataURL("image/png").split(",")[1];
+        },
+        { width, height },
+      );
+      await layoutPage.locator("#target").setInputFiles({
+        name: "large-photo.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(fixture, "base64"),
+      });
+      await layoutPage.waitForFunction(
+        ({ width, height }) => {
+          const canvas = document.querySelector("#preview");
+          return canvas.width / canvas.height === width / height;
+        },
+        { width, height },
+      );
+      for (const mode of ["right", "bottom", "floating"]) {
+        await layoutPage.locator(`[data-dock-mode=${mode}]`).click();
+        await assertPreviewFits();
+      }
+    }
+    const beforeDrag = await layoutPage.locator("#editing-tools").boundingBox();
+    await layoutPage.locator("#panel-grip").focus();
+    await layoutPage.keyboard.press("ArrowLeft");
+    const afterKey = await layoutPage.locator("#editing-tools").boundingBox();
+    assert.equal(Math.round(beforeDrag.x - afterKey.x), 10);
+    const grip = await layoutPage.locator("#panel-grip").boundingBox();
+    await layoutPage.mouse.move(grip.x + 18, grip.y + 18);
+    await layoutPage.mouse.down();
+    await layoutPage.mouse.move(grip.x - 82, grip.y + 58, { steps: 5 });
+    await layoutPage.mouse.up();
+    const afterDrag = await layoutPage.locator("#editing-tools").boundingBox();
+    assert.ok(
+      afterDrag.x < afterKey.x - 80,
+      "Floating tools must be draggable",
+    );
+    await layoutPage.screenshot({
+      path: join(artifacts, "floating-tools.png"),
+    });
+    await layoutPage.locator("[data-dock-mode=right]").click();
+    await layoutPage.evaluate(() => scrollTo(0, 150));
+    await layoutPage.waitForFunction(
+      () =>
+        document.querySelector("#editing-tools").getBoundingClientRect().top >=
+          0 &&
+        document.querySelector("#editing-tools").getBoundingClientRect().top <=
+          64,
+    );
+    await layoutPage.evaluate(() => scrollTo(0, 0));
+    await layoutPage.locator("[data-dock-mode=bottom]").click();
+    await layoutPage.screenshot({ path: join(artifacts, "bottom-tools.png") });
+    await layoutPage.setViewportSize({ width: 390, height: 844 });
+    await assertPreviewFits();
+    await layoutPage.locator("[data-dock-mode=floating]").click();
+    await layoutPage.setViewportSize({ width: 320, height: 568 });
+    await assertPreviewFits();
+    assert.ok(
+      await layoutPage.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    const mobilePanel = await layoutPage
+      .locator("#editing-tools")
+      .boundingBox();
+    assert.ok(
+      mobilePanel.x >= 0 &&
+        mobilePanel.y >= 0 &&
+        mobilePanel.x + mobilePanel.width <= 320 &&
+        mobilePanel.y + mobilePanel.height <= 568,
+    );
+    await layoutPage.locator("[data-dock-mode=bottom]").click();
+    await layoutPage.screenshot({
+      path: join(artifacts, "mobile-tools.png"),
+      fullPage: true,
+    });
+    await layoutPage.close();
+    assert.deepEqual(errors, []);
     const fallback = await browser.newPage();
     await fallback.route("**/assets/models/**", (route) =>
       route.fulfill({ status: 503, body: "Unavailable" }),
