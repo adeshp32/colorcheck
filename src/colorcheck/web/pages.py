@@ -3,10 +3,12 @@ from __future__ import annotations
 import html
 import json
 
+from colorcheck.config import MEGABYTE
+
 LINKEDIN_URL = "https://www.linkedin.com/in/aditya-deshpande-127218205/"
 
 
-def page_shell(title: str, body: str) -> str:
+def page_shell(title: str, body: str, *, body_class: str = "") -> str:
     return f"""<!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -14,6 +16,7 @@ def page_shell(title: str, body: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
   <link rel="icon" href="/assets/colorcheck-wordmark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/assets/upload.css">
   <style>
     :root {{
       --bg: #f9f8ff;
@@ -678,7 +681,7 @@ def page_shell(title: str, body: str) -> str:
     [data-motion="reduced"] {{ scroll-behavior: auto; }}
   </style>
 </head>
-<body>
+<body class="{html.escape(body_class, quote=True)}">
   <a class="skip" href="#main">Skip to main content</a>
   <header class="topbar">
     <a class="brand" href="/" aria-label="ColorCheck home"><img class="brand-logo" src="/assets/colorcheck-wordmark.svg" alt="colorcheck."></a>
@@ -735,6 +738,7 @@ def page_shell(title: str, body: str) -> str:
   </script>
   <script src="/assets/editor.js" defer></script>
   <script src="/assets/uploads.js" defer></script>
+  <script src="/assets/upload-ui.js" defer></script>
   <script src="/assets/analysis.js" defer></script>
   <script src="/assets/results.js" defer></script>
 </body>
@@ -743,38 +747,64 @@ def page_shell(title: str, body: str) -> str:
 
 def home_page(
     max_upload_mb: int = 250,
-    max_source_upload_mb: int = 1024,
+    max_source_upload_mb: int = 1000,
     max_request_mb: int = 504,
     max_video_seconds: int = 1800,
     upload_chunk_mb: int = 16,
 ) -> str:
+    source_limit = (
+        f"{max_source_upload_mb / 1000:g} GB"
+        if max_source_upload_mb >= 1000
+        else f"{max_source_upload_mb} MB"
+    )
     body = f"""<div class="page">
   <section class="hero" id="tool" aria-labelledby="hero-title">
     <div class="hero-intro">
+      <img class="workspace-logo" src="/assets/colorcheck-wordmark.svg" alt="colorcheck.">
       <h1 id="hero-title">Color that isn't artificial.</h1>
       <p class="descriptor">Match a target clip to a reference look.</p>
     </div>
     <div class="analysis-panel" aria-label="Upload analyzer">
-      <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
-        <label class="field-reference">
-          Reference look
-          <input name="reference" type="file" accept="image/*,video/*" required>
-        </label>
-        <label class="field-target">
-          Target clip
-          <input name="video" type="file" accept="video/*" required data-editor-source>
-        </label>
+      <form class="analysis-form" action="/analyze-form" method="post" enctype="multipart/form-data" data-max-source-bytes="{max_source_upload_mb * MEGABYTE}" data-max-image-bytes="{max_upload_mb * MEGABYTE}" data-chunk-bytes="{upload_chunk_mb * MEGABYTE}">
+        <div class="upload-step field-reference" data-file-step>
+          <div class="step-heading"><span class="step-number">01</span><span>Reference look</span><button class="file-remove" type="button" data-file-remove aria-label="Remove reference file" title="Remove reference file" hidden><svg class="ui-icon" aria-hidden="true"><use href="/assets/upload-icons.svg#x"></use></svg></button></div>
+          <label class="file-picker" for="reference-file" data-file-drop>
+            <span class="file-symbol"><svg class="ui-icon" aria-hidden="true"><use href="/assets/upload-icons.svg#image-plus"></use></svg></span>
+            <span class="file-name" data-file-name>Select reference</span>
+            <span class="file-meta" id="reference-file-meta" data-file-meta>Image or video</span>
+            <input id="reference-file" name="reference" type="file" accept=".jpg,.jpeg,.png,.webp,.tif,.tiff,.mp4,.mov,.m4v,.avi,.mkv,.webm" aria-label="Reference look" aria-describedby="reference-file-meta" required>
+          </label>
+        </div>
+        <div class="upload-step field-target" data-file-step>
+          <div class="step-heading"><span class="step-number">02</span><span>Target clip</span><button class="file-remove" type="button" data-file-remove aria-label="Remove target file" title="Remove target file" hidden><svg class="ui-icon" aria-hidden="true"><use href="/assets/upload-icons.svg#x"></use></svg></button></div>
+          <label class="file-picker" for="target-file" data-file-drop>
+            <span class="file-symbol"><svg class="ui-icon" aria-hidden="true"><use href="/assets/upload-icons.svg#clapperboard"></use></svg></span>
+            <span class="file-name" data-file-name>Select video</span>
+            <span class="file-meta" id="target-file-meta" data-file-meta>Up to {source_limit}</span>
+            <input id="target-file" name="video" type="file" accept=".mp4,.mov,.m4v,.avi,.mkv,.webm" aria-label="Target clip" aria-describedby="target-file-meta" required data-editor-source>
+          </label>
+        </div>
         <input name="samples" type="hidden" value="24">
         <input name="strength" type="hidden" value="100">
         <input name="lighting_threshold" type="hidden" value="60">
-        <div class="field-action">
+        <div class="field-action upload-step run-step">
+          <div class="step-heading"><span class="step-number">03</span><span>Color check</span></div>
+          <div class="run-symbol"><svg class="ui-icon" aria-hidden="true"><use href="/assets/upload-icons.svg#scan-line"></use></svg></div>
+          <p class="upload-readiness" data-upload-readiness aria-live="polite">Awaiting files</p>
+          <button class="submit" type="submit" data-default-label="Run ColorCheck">Run ColorCheck</button>
+          <progress class="processing-progress" value="0" max="100" aria-label="Analysis progress" hidden></progress>
+          <p class="processing-note" role="status" aria-live="polite" hidden></p>
+        </div>
+        <div class="upload-footer">
           <label class="consent">
             <input name="rights_confirmed" type="checkbox" required>
             <span>Authorized media only. Temporary uploads are deleted.</span>
           </label>
-          <button class="submit" type="submit" data-default-label="Run ColorCheck">Run ColorCheck</button>
-          <progress class="processing-progress" value="0" max="100" hidden></progress>
-          <p class="processing-note" role="status" aria-live="polite" hidden></p>
+          <details class="upload-privacy">
+            <summary>File privacy</summary>
+            <p>Files are used only for the requested processing, never for model training. Analysis inputs are deleted after processing; export inputs are deleted when streaming ends. Abandoned uploads and generated reports expire automatically.</p>
+            <p>Reference images: up to {max_upload_mb} MB. Videos: up to {source_limit} and {max_video_seconds // 60} minutes. No account required.</p>
+          </details>
         </div>
       </form>
     </div>
@@ -801,7 +831,7 @@ def home_page(
     </a>
   </footer>
 </div>"""
-    return page_shell("ColorCheck", body)
+    return page_shell("ColorCheck", body, body_class="upload-page")
 
 
 def _safe_json(payload: object) -> str:
@@ -817,7 +847,7 @@ def _result_editor(
     upload_chunk_mb: int,
 ) -> str:
     correction = report.get("correction", {})
-    return f"""<section class="panel" style="padding:18px; margin-bottom:18px;" data-video-editor data-job-id="{job_id}" data-max-source-bytes="{max_source_upload_mb * 1024 * 1024}" data-chunk-bytes="{upload_chunk_mb * 1024 * 1024}">
+    return f"""<section class="panel" style="padding:18px; margin-bottom:18px;" data-video-editor data-job-id="{job_id}" data-max-source-bytes="{max_source_upload_mb * MEGABYTE}" data-chunk-bytes="{upload_chunk_mb * MEGABYTE}">
     <h2>Preview and edit</h2>
     <p class="hint">Choose the target clip again to open a private, playable preview. It stays on this device until a final video is requested.</p>
     <script type="application/json" data-initial-plan>{_safe_json(edit_plan)}</script>
@@ -963,7 +993,7 @@ def job_page(
     *,
     edit_plan: dict[str, object] | None = None,
     source_metadata: dict[str, object] | None = None,
-    max_source_upload_mb: int = 1024,
+    max_source_upload_mb: int = 1000,
     upload_chunk_mb: int = 16,
 ) -> str:
     summary = report["summary"]

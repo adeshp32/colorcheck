@@ -30,7 +30,7 @@
     const finalize = root.querySelector("[data-finalize]");
     const reportDownloads = document.querySelector("[data-report-downloads]");
     const maxBytes = Number(root.dataset.maxSourceBytes || 0);
-    const chunkBytes = Number(root.dataset.chunkBytes || 16 * 1024 * 1024);
+    const chunkBytes = Number(root.dataset.chunkBytes || 16 * 1_000_000);
     const sourceMetadata = (() => {
       try { return JSON.parse(root.querySelector("[data-source-metadata]")?.textContent || "{}"); }
       catch (_error) { return {}; }
@@ -61,7 +61,7 @@
       }
       const file = input.files[0];
       if (!file) { status.textContent = "Select the original target clip first."; return; }
-      if (file.size > maxBytes) { status.textContent = `The source must be ${Math.floor(maxBytes / 1024 / 1024)} MB or smaller.`; return; }
+      if (file.size > maxBytes) { status.textContent = `The source must be ${Math.floor(maxBytes / 1_000_000)} MB or smaller.`; return; }
       if (sourceMetadata.size && Number(sourceMetadata.size) !== file.size) {
         status.textContent = "This does not appear to be the target clip used for the report.";
         return;

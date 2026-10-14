@@ -132,7 +132,7 @@ class UploadStore:
         limit = self.max_image_bytes if suffix in IMAGE_EXTENSIONS else self.max_source_bytes
         if expected_bytes > limit:
             raise PublicInputError(
-                f"This file must be {limit // (1024 * 1024)} MB or smaller.",
+                f"This file must be {limit // 1_000_000} MB or smaller.",
                 status_code=413,
             )
 
@@ -186,7 +186,7 @@ class UploadStore:
             raise PublicInputError("Upload chunks cannot be empty.")
         if chunk_size > self.chunk_bytes:
             raise PublicInputError(
-                f"Upload chunks must be {self.chunk_bytes // (1024 * 1024)} MB or smaller.",
+                f"Upload chunks must be {self.chunk_bytes // 1_000_000} MB or smaller.",
                 status_code=413,
             )
 

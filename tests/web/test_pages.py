@@ -1,6 +1,18 @@
 from colorcheck.web.pages import home_page
 
 
+def test_upload_limits_display_decimal_units_and_matching_bytes() -> None:
+    page = home_page(max_source_upload_mb=1500, max_upload_mb=250, upload_chunk_mb=16)
+
+    assert "Up to 1.5 GB" in page
+    assert "Reference images: up to 250 MB" in page
+    assert 'data-max-source-bytes="1500000000"' in page
+    assert 'data-max-image-bytes="250000000"' in page
+    assert 'data-chunk-bytes="16000000"' in page
+    assert "GiB" not in page
+    assert "MiB" not in page
+
+
 def test_home_keeps_analysis_form_focused() -> None:
     page = home_page(max_upload_mb=90, max_request_mb=95, max_video_seconds=60)
 

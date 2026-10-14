@@ -132,7 +132,7 @@ def save_upload_limited(file_object: BinaryIO, destination: Path, max_bytes: int
                 total += len(chunk)
                 if total > max_bytes:
                     raise PublicInputError(
-                        f"Each upload must be {max_bytes // (1024 * 1024)} MB or smaller.",
+                        f"Each upload must be {max_bytes // 1_000_000} MB or smaller.",
                         status_code=413,
                     )
                 handle.write(chunk)

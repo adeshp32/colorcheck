@@ -12,6 +12,7 @@
   const maxSourceBytes = Number(form.dataset.maxSourceBytes || 0);
 
   function status(message, value) {
+    delete note.dataset.state;
     note.textContent = message;
     note.hidden = false;
     progress.hidden = false;
@@ -184,7 +185,7 @@
   }
 
   async function serverFallback(reference, target, desired) {
-    const chunkBytes = Number(form.dataset.chunkBytes || 16 * 1024 * 1024);
+    const chunkBytes = Number(form.dataset.chunkBytes || 16 * 1_000_000);
     status("Uploading reference for server-side fallback", 8);
     const referenceUpload = await window.ColorCheckUploads.uploadFile(reference, "reference", chunkBytes, (ratio) => status("Uploading reference", 8 + ratio * 18));
     let targetUpload;
@@ -221,14 +222,16 @@
     const target = targetInput.files[0];
     if (!reference || !target) return;
     if (target.size > maxSourceBytes || reference.size > maxSourceBytes) {
-      note.textContent = `Each source file must be ${Math.floor(maxSourceBytes / 1024 / 1024)} MB or smaller.`;
+      note.textContent = `Each source file must be ${Math.floor(maxSourceBytes / 1_000_000)} MB or smaller.`;
       note.hidden = false;
+      note.dataset.state = "error";
       return;
     }
     form.dataset.submitting = "true";
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
     button.textContent = "Running ColorCheck...";
+    form.querySelectorAll("input, [data-file-remove]").forEach((input) => { input.disabled = true; });
     try {
       let result;
       try {
@@ -243,12 +246,14 @@
       window.location.assign(result.job_url);
     } catch (error) {
       note.textContent = error.message || "The request could not be started.";
+      note.dataset.state = "error";
       note.hidden = false;
       progress.hidden = true;
       form.dataset.submitting = "false";
       button.disabled = false;
       button.removeAttribute("aria-busy");
       button.textContent = button.dataset.defaultLabel;
+      form.querySelectorAll("input, [data-file-remove]").forEach((input) => { input.disabled = false; });
     }
   });
 })();

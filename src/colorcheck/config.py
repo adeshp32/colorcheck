@@ -4,6 +4,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+MEGABYTE = 1_000_000
+
 
 @dataclass(frozen=True)
 class AppSettings:
@@ -23,23 +25,23 @@ class AppSettings:
 
     @property
     def max_upload_bytes(self) -> int:
-        return self.max_upload_mb * 1024 * 1024
+        return self.max_upload_mb * MEGABYTE
 
     @property
     def max_request_bytes(self) -> int:
-        return self.max_request_mb * 1024 * 1024
+        return self.max_request_mb * MEGABYTE
 
     @property
     def max_source_upload_bytes(self) -> int:
-        return self.max_source_upload_mb * 1024 * 1024
+        return self.max_source_upload_mb * MEGABYTE
 
     @property
     def upload_chunk_bytes(self) -> int:
-        return self.upload_chunk_mb * 1024 * 1024
+        return self.upload_chunk_mb * MEGABYTE
 
     @property
     def min_free_disk_bytes(self) -> int:
-        return self.min_free_disk_mb * 1024 * 1024
+        return self.min_free_disk_mb * MEGABYTE
 
     @classmethod
     def from_environment(cls) -> AppSettings:
@@ -51,7 +53,7 @@ class AppSettings:
         )
         max_source_upload_mb = max(
             max_upload_mb,
-            int(os.environ.get("VCC_MAX_SOURCE_UPLOAD_MB", "1024")),
+            int(os.environ.get("VCC_MAX_SOURCE_UPLOAD_MB", "1000")),
         )
         return cls(
             storage_root=Path(os.environ.get("VCC_STORAGE_DIR", "storage")).resolve(),
@@ -62,7 +64,7 @@ class AppSettings:
                 min(32, int(os.environ.get("VCC_UPLOAD_CHUNK_MB", "16"))),
             ),
             upload_ttl_hours=max(1, int(os.environ.get("VCC_UPLOAD_TTL_HOURS", "2"))),
-            min_free_disk_mb=max(512, int(os.environ.get("VCC_MIN_FREE_DISK_MB", "4096"))),
+            min_free_disk_mb=max(512, int(os.environ.get("VCC_MIN_FREE_DISK_MB", "4000"))),
             max_queued_jobs=max(1, min(5, int(os.environ.get("VCC_MAX_QUEUED_JOBS", "2")))),
             max_request_mb=max_request_mb,
             max_video_seconds=max(10, int(os.environ.get("VCC_MAX_VIDEO_SECONDS", "1800"))),

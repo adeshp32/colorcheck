@@ -23,6 +23,10 @@ images, but currently requires the [$5 Workers Paid plan](https://developers.clo
 
 ## Public Limits
 
+File sizes and all `_MB` settings use decimal units: 1 MB = 1,000,000 bytes and
+1 GB = 1,000 MB. Existing environment overrides still determine the configured
+limits; for example, a value of 1024 means 1.024 GB.
+
 The browser analyzes representative frames locally and sends compact samples for the report.
 When an original is needed for export, resumable 16 MB requests allow source files up to 1 GB
 without placing the whole file in one proxy request:
@@ -31,10 +35,10 @@ without placing the whole file in one proxy request:
 VCC_STORAGE_DIR=/app/storage
 VCC_MAX_UPLOAD_MB=250
 VCC_MAX_REQUEST_MB=504
-VCC_MAX_SOURCE_UPLOAD_MB=1024
+VCC_MAX_SOURCE_UPLOAD_MB=1000
 VCC_UPLOAD_CHUNK_MB=16
 VCC_UPLOAD_TTL_HOURS=2
-VCC_MIN_FREE_DISK_MB=4096
+VCC_MIN_FREE_DISK_MB=4000
 VCC_MAX_QUEUED_JOBS=2
 VCC_MAX_VIDEO_SECONDS=1800
 VCC_MAX_VIDEO_MEGAPIXELS=8.3

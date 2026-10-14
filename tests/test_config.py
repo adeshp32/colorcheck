@@ -31,8 +31,17 @@ def test_settings_apply_public_resource_bounds(monkeypatch, tmp_path: Path) -> N
     assert settings.max_video_pixels == 1_000_000
     assert settings.job_ttl_hours == 1
     assert settings.analyses_per_hour == 1
-    assert settings.max_upload_bytes == 10 * 1024 * 1024
-    assert settings.max_source_upload_bytes == 10 * 1024 * 1024
-    assert settings.upload_chunk_bytes == 32 * 1024 * 1024
-    assert settings.min_free_disk_bytes == 512 * 1024 * 1024
-    assert settings.max_request_bytes == 14 * 1024 * 1024
+    assert settings.max_upload_bytes == 10_000_000
+    assert settings.max_source_upload_bytes == 10_000_000
+    assert settings.upload_chunk_bytes == 32_000_000
+    assert settings.min_free_disk_bytes == 512_000_000
+    assert settings.max_request_bytes == 14_000_000
+
+
+def test_default_source_limit_is_one_decimal_gigabyte(monkeypatch) -> None:
+    monkeypatch.delenv("VCC_MAX_UPLOAD_MB", raising=False)
+    monkeypatch.delenv("VCC_MAX_SOURCE_UPLOAD_MB", raising=False)
+
+    settings = AppSettings.from_environment()
+
+    assert settings.max_source_upload_bytes == 1_000_000_000
