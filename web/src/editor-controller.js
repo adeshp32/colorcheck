@@ -15,11 +15,11 @@ let edits = createDefaultEditSettings(),
   source = null,
   reference = null,
   previewPixels = null,
+  interactionPixels = null,
   referenceStats = null,
   range = "global",
   panel = "match",
   original = false,
-  revision = 0,
   requestId = 0,
   exporting = false;
 const editHistory = createEditHistory(edits);
@@ -29,7 +29,9 @@ let activeEnhancement = null,
 let worker,
   requests = new Map(),
   rendering = false,
-  rerender = false;
+  rerender = false,
+  queuedInteractive = false,
+  refineTimer;
 const preview = $("#preview"),
   controls = new Map();
 function showStatus(message) {
@@ -129,7 +131,7 @@ function createAdjustmentControl(
         : key === "quality"
           ? quality
           : edits[key];
-  const set = (v) => {
+  const set = (v, interactive = false) => {
     v = clamp(v, min, max);
     if (key.startsWith("grade-")) edits.grades[range][key.slice(6)] = v;
     else if (key.startsWith("crop-")) {
@@ -139,12 +141,13 @@ function createAdjustmentControl(
     else edits[key] = v;
     slider.value = get();
     number.value = get();
-    renderPreview();
+    if (key === "quality") synchronizeControls();
+    else renderPreview(interactive);
   };
-  slider.addEventListener("input", () => set(Number(slider.value)));
+  slider.addEventListener("input", () => set(Number(slider.value), true));
   number.addEventListener("input", () => {
     if (number.value !== "" && Number.isFinite(number.valueAsNumber))
-      set(number.valueAsNumber);
+      set(number.valueAsNumber, true);
   });
   for (const input of [slider, number])
     input.addEventListener("change", () => {
@@ -343,6 +346,7 @@ async function openTargetPhoto(file) {
     };
     activeEnhancement = null;
     previewPixels = pixels;
+    interactionPixels = createPreviewPixels(bitmap, 640);
     edits = createDefaultEditSettings();
     editHistory.reset(edits);
     $("#empty").hidden = true;
@@ -519,18 +523,20 @@ function drawCurve() {
   }
   c.stroke();
 }
-async function renderPreview() {
-  revision++;
+async function renderPreview(interactive = false) {
+  clearTimeout(refineTimer);
+  if (interactive) refineTimer = setTimeout(() => renderPreview(), 160);
   synchronizeControls();
   if (!source) return;
   if (rendering) {
     rerender = true;
+    queuedInteractive = interactive;
     return;
   }
   rendering = true;
-  const version = revision,
+  const selectedSource = source,
     settings = clone(edits),
-    base = previewPixels;
+    base = interactive ? interactionPixels : previewPixels;
   try {
     const result = original
       ? { data: base.data }
@@ -540,7 +546,8 @@ async function renderPreview() {
           base.height,
           settings,
         );
-    if (version !== revision) {
+    // A completed frame may be slightly behind a drag, but never from another photo.
+    if (selectedSource !== source) {
       rerender = true;
       return;
     }
@@ -566,7 +573,7 @@ async function renderPreview() {
     rendering = false;
     if (rerender) {
       rerender = false;
-      renderPreview();
+      renderPreview(queuedInteractive);
     }
   }
 }
@@ -605,12 +612,14 @@ $("#curve").onchange = (e) =>
   });
 for (const button of document.querySelectorAll("[data-panel]"))
   button.onclick = () => {
+    const cropChanged = panel === "crop" || button.dataset.panel === "crop";
     panel = button.dataset.panel;
     for (const b of document.querySelectorAll("[data-panel]"))
       b.setAttribute("aria-selected", String(b === button));
     for (const section of document.querySelectorAll("[data-section]"))
       section.hidden = section.dataset.section !== panel;
-    renderPreview();
+    if (cropChanged) renderPreview();
+    else synchronizeControls();
   };
 for (const button of document.querySelectorAll("[data-range]"))
   button.onclick = () => {
@@ -623,27 +632,47 @@ $("#reset-grade").onclick = () =>
   applyEdit(() => {
     edits.grades[range] = { hue: 0, saturation: 0, amount: 20 };
   });
+let wheelBackground;
 function drawWheel() {
   const canvas = $("#wheel"),
     c = canvas.getContext("2d"),
     size = 220,
     radius = 96;
   c.clearRect(0, 0, size, size);
-  for (let a = 0; a < 360; a++) {
-    c.beginPath();
-    c.moveTo(110, 110);
-    c.arc(110, 110, radius, (a * Math.PI) / 180, ((a + 1.5) * Math.PI) / 180);
-    c.closePath();
-    c.fillStyle = `hsl(${a} 75% 55%)`;
-    c.fill();
+  if (!wheelBackground) {
+    wheelBackground = document.createElement("canvas");
+    wheelBackground.width = wheelBackground.height = size;
+    const background = wheelBackground.getContext("2d");
+    for (let a = 0; a < 360; a++) {
+      background.beginPath();
+      background.moveTo(110, 110);
+      background.arc(
+        110,
+        110,
+        radius,
+        (a * Math.PI) / 180,
+        ((a + 1.5) * Math.PI) / 180,
+      );
+      background.closePath();
+      background.fillStyle = `hsl(${a} 75% 55%)`;
+      background.fill();
+    }
+    const gradient = background.createRadialGradient(
+      110,
+      110,
+      0,
+      110,
+      110,
+      radius,
+    );
+    gradient.addColorStop(0, "#fff");
+    gradient.addColorStop(1, "#fff0");
+    background.fillStyle = gradient;
+    background.beginPath();
+    background.arc(110, 110, radius, 0, Math.PI * 2);
+    background.fill();
   }
-  const gradient = c.createRadialGradient(110, 110, 0, 110, 110, radius);
-  gradient.addColorStop(0, "#fff");
-  gradient.addColorStop(1, "#fff0");
-  c.fillStyle = gradient;
-  c.beginPath();
-  c.arc(110, 110, radius, 0, Math.PI * 2);
-  c.fill();
+  c.drawImage(wheelBackground, 0, 0);
   const g = edits.grades[range],
     a = (g.hue * Math.PI) / 180,
     x = 110 + (Math.cos(a) * radius * g.saturation) / 100,
@@ -669,7 +698,7 @@ function updateGradingFromPointer(e) {
     y = ((e.clientY - rect.top) / rect.height) * 220 - 110;
   edits.grades[range].hue = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
   edits.grades[range].saturation = clamp((Math.hypot(x, y) / 96) * 100, 0, 100);
-  renderPreview();
+  renderPreview(true);
 }
 $("#wheel").onpointerdown = (e) => {
   wheelDragging = true;
@@ -684,6 +713,7 @@ for (const event of ["pointerup", "pointercancel"])
     if (wheelDragging) {
       wheelDragging = false;
       commitEditHistory();
+      renderPreview();
     }
   });
 $("#wheel").onkeydown = (e) => {

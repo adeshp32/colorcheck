@@ -31,6 +31,36 @@ export function blendEnhancement(rgb, lut, strength) {
   );
 }
 
+/** Allocation-free equivalent used by the full-image rendering loop. */
+export function blendEnhancementInto(r, g, b, lut, strength, out) {
+  const scale = 32 / 1.0001,
+    size = 33,
+    plane = size ** 3;
+  const x = Math.max(0, Math.min(1, r)) * scale,
+    y = Math.max(0, Math.min(1, g)) * scale,
+    z = Math.max(0, Math.min(1, b)) * scale,
+    ix = Math.floor(x),
+    iy = Math.floor(y),
+    iz = Math.floor(z),
+    fx = x - ix,
+    fy = y - iy,
+    fz = z - iz;
+  out[0] = out[1] = out[2] = 0;
+  for (let dz = 0; dz < 2; dz++)
+    for (let dy = 0; dy < 2; dy++)
+      for (let dx = 0; dx < 2; dx++) {
+        const weight =
+          (dx ? fx : 1 - fx) * (dy ? fy : 1 - fy) * (dz ? fz : 1 - fz);
+        const offset = (iz + dz) * size * size + (iy + dy) * size + ix + dx;
+        for (let channel = 0; channel < 3; channel++)
+          out[channel] += lut[channel * plane + offset] * weight;
+      }
+  const amount = Math.max(0, Math.min(100, strength)) / 100;
+  out[0] = r + Math.max(-0.25, Math.min(0.25, out[0] - r)) * amount;
+  out[1] = g + Math.max(-0.25, Math.min(0.25, out[1] - g)) * amount;
+  out[2] = b + Math.max(-0.25, Math.min(0.25, out[2] - b)) * amount;
+}
+
 export function validateEnhancementLut(lut) {
   if (
     !(lut instanceof Float32Array) ||

@@ -1,4 +1,4 @@
-import { blendEnhancement } from "./enhancement-lut.js";
+import { blendEnhancementInto } from "./enhancement-lut.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
 export function createDefaultEditSettings() {
@@ -92,35 +92,65 @@ export function applyPhotoAdjustments(
   enhancementLut = null,
 ) {
   const out = new Uint8ClampedArray(data.length),
-    grades = Object.entries(edits.grades).map(([range, g]) => {
-      const rgb = hueToRgb(g.hue),
-        mean = rgb.reduce((a, b) => a + b, 0) / 3;
-      return {
-        range,
-        rgb: rgb.map(
-          (v) =>
-            (((((v - mean) * g.saturation) / 100) * g.amount) / 100) * 0.35,
-        ),
-      };
-    });
+    grades = Object.entries(edits.grades)
+      .filter(([, g]) => g.amount && g.saturation)
+      .map(([range, g]) => {
+        const rgb = hueToRgb(g.hue),
+          mean = rgb.reduce((a, b) => a + b, 0) / 3;
+        return {
+          range,
+          rgb: rgb.map(
+            (v) =>
+              (((((v - mean) * g.saturation) / 100) * g.amount) / 100) * 0.35,
+          ),
+        };
+      });
   const histogram = new Uint32Array(64);
+  const exposure = 2 ** edits.exposure,
+    contrast = 1 + edits.contrast / 100,
+    temperature = (edits.temperature / 100) * 0.08,
+    tintRed = (edits.tint / 100) * 0.03,
+    tintGreen = (edits.tint / 100) * 0.06,
+    matchColor = edits.matchColor / 100,
+    matchTone = edits.matchTone / 100,
+    enhanced = new Float64Array(3);
+  // Scalars avoid allocating multiple RGB arrays and callbacks for every pixel.
   for (let i = 0; i < data.length; i += 4) {
-    let rgb = [data[i] / 255, data[i + 1] / 255, data[i + 2] / 255];
-    if (enhancementLut && edits.enhanceStrength > 0)
-      rgb = blendEnhancement(rgb, enhancementLut, edits.enhanceStrength);
-    if (edits.match) {
-      const m = edits.match,
-        a = edits.matchColor / 100,
-        b = edits.matchTone / 100;
-      rgb = rgb.map(
-        (v, c) =>
-          v +
-          (m.reference[c] - m.source[c]) * a +
-          (v - m.source[c]) * (m.gain[c] - 1) * b,
+    let r = data[i] / 255,
+      g = data[i + 1] / 255,
+      b = data[i + 2] / 255;
+    if (enhancementLut && edits.enhanceStrength > 0) {
+      blendEnhancementInto(
+        r,
+        g,
+        b,
+        enhancementLut,
+        edits.enhanceStrength,
+        enhanced,
       );
+      r = enhanced[0];
+      g = enhanced[1];
+      b = enhanced[2];
     }
-    rgb = rgb.map((v) => v * 2 ** edits.exposure);
-    const l = clamp(0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]);
+    if (edits.match) {
+      const m = edits.match;
+      r =
+        r +
+        (m.reference[0] - m.source[0]) * matchColor +
+        (r - m.source[0]) * (m.gain[0] - 1) * matchTone;
+      g =
+        g +
+        (m.reference[1] - m.source[1]) * matchColor +
+        (g - m.source[1]) * (m.gain[1] - 1) * matchTone;
+      b =
+        b +
+        (m.reference[2] - m.source[2]) * matchColor +
+        (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
+    }
+    r *= exposure;
+    g *= exposure;
+    b *= exposure;
+    const l = clamp(0.2126 * r + 0.7152 * g + 0.0722 * b);
     const shadow = (1 - l) ** 2,
       highlight = l * l;
     const lift =
@@ -128,30 +158,29 @@ export function applyPhotoAdjustments(
       (edits.highlights / 100) * highlight * 0.25 +
       (edits.blacks / 100) * (1 - l) ** 4 * 0.15 +
       (edits.whites / 100) * l ** 4 * 0.15;
-    rgb = rgb.map((v) =>
-      applyToneCurve(
-        (v - 0.5) * (1 + edits.contrast / 100) + 0.5 + lift,
-        edits.curve,
-      ),
-    );
-    rgb[0] += (edits.temperature / 100) * 0.08;
-    rgb[2] -= (edits.temperature / 100) * 0.08;
-    rgb[1] -= (edits.tint / 100) * 0.06;
-    rgb[0] += (edits.tint / 100) * 0.03;
-    rgb[2] += (edits.tint / 100) * 0.03;
-    for (const g of grades) {
+    r = applyToneCurve((r - 0.5) * contrast + 0.5 + lift, edits.curve);
+    g = applyToneCurve((g - 0.5) * contrast + 0.5 + lift, edits.curve);
+    b = applyToneCurve((b - 0.5) * contrast + 0.5 + lift, edits.curve);
+    r += temperature;
+    b -= temperature;
+    g -= tintGreen;
+    r += tintRed;
+    b += tintRed;
+    for (const grade of grades) {
       const weight =
-        g.range === "global"
+        grade.range === "global"
           ? 1
-          : g.range === "shadows"
+          : grade.range === "shadows"
             ? shadow
-            : g.range === "highlights"
+            : grade.range === "highlights"
               ? highlight
               : 4 * l * (1 - l);
-      rgb = rgb.map((v, c) => v + g.rgb[c] * weight);
+      r += grade.rgb[0] * weight;
+      g += grade.rgb[1] * weight;
+      b += grade.rgb[2] * weight;
     }
-    const gray = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
-    const chroma = Math.max(...rgb) - Math.min(...rgb),
+    const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b),
       sat = edits.bw
         ? 0
         : Math.max(
@@ -162,10 +191,11 @@ export function applyPhotoAdjustments(
           );
     const px = (i / 4) % width,
       py = Math.floor(i / 4 / width),
-      r = ((px / width - 0.5) ** 2 + (py / height - 0.5) ** 2) * 2;
-    const vignette = 1 - (edits.vignette / 100) * r * 0.65;
-    for (let c = 0; c < 3; c++)
-      out[i + c] = clamp((gray + (rgb[c] - gray) * sat) * vignette) * 255;
+      radius = ((px / width - 0.5) ** 2 + (py / height - 0.5) ** 2) * 2;
+    const vignette = 1 - (edits.vignette / 100) * radius * 0.65;
+    out[i] = clamp((gray + (r - gray) * sat) * vignette) * 255;
+    out[i + 1] = clamp((gray + (g - gray) * sat) * vignette) * 255;
+    out[i + 2] = clamp((gray + (b - gray) * sat) * vignette) * 255;
     out[i + 3] = data[i + 3];
     histogram[Math.min(63, Math.floor(clamp(gray) * 64))]++;
   }

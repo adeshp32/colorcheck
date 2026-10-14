@@ -60,9 +60,12 @@ original bitmap. Slider interactions update the preview continuously and commit
 one undo entry on change. Undo/redo restores settings, not full image copies.
 History is bounded to 60 entries.
 
-Worker messages have request IDs to pair responses with promises. Preview
-revisions prevent an older render from replacing newer edits. Repeated preview
-requests coalesce while processing is active. Export disables duplicate requests.
+Worker messages have request IDs to pair responses with promises. Repeated preview
+requests coalesce while processing is active. During a drag, the latest completed
+frame remains visible while newer settings render; a source identity check prevents
+an older photo from replacing a new selection. Interactive previews use a 640-pixel
+longest edge, then refine to the standard 1200-pixel preview after input settles.
+Export disables duplicate requests and always starts from original-resolution pixels.
 Cancellation terminates the processing worker and creates a fresh worker.
 
 Reference and target loads also use revision counters so a slower earlier decode

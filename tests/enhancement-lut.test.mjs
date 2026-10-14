@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   interpolateEnhancement,
   blendEnhancement,
+  blendEnhancementInto,
   assessEnhancement,
   validateEnhancementLut,
 } from "../web/src/enhancement-lut.js";
@@ -23,6 +24,19 @@ function identityLut() {
       }
   return lut;
 }
+test("allocation-free LUT interpolation matches the reference implementation", () => {
+  const lut = Float32Array.from({ length: 3 * 33 ** 3 }, (_, i) =>
+    Math.sin(i * 0.01),
+  );
+  const output = new Float64Array(3);
+  for (let i = 0; i < 100; i++) {
+    const rgb = [i / 99, (i % 17) / 16, (i % 23) / 22];
+    for (const strength of [0, 35, 100]) {
+      blendEnhancementInto(...rgb, lut, strength, output);
+      assert.deepEqual([...output], blendEnhancement(rgb, lut, strength));
+    }
+  }
+});
 test("LUT axes are correct and zero strength is exactly neutral", () => {
   const lut = identityLut(),
     rgb = [0.2, 0.5, 0.8],
