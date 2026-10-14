@@ -75,6 +75,9 @@ def test_result_has_playable_editor_and_final_output_gate() -> None:
 
     assert '<video controls playsinline preload="metadata" data-preview-video>' in page
     assert 'data-correction-strength aria-label="Mapped correction strength"' in page
+    assert 'class="timeline-track" data-trim-track' in page
+    assert "Drag anywhere to select" in page
+    assert "data-trim-saved" in page
     assert 'data-editor-panel="crop"' in page
     assert 'data-report-downloads hidden' in page
     assert "Report + corrected video" in page

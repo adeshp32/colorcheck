@@ -584,13 +584,109 @@ def page_shell(title: str, body: str, *, body_class: str = "") -> str:
       background: var(--accent-soft);
       color: var(--accent-strong);
     }}
-    .timeline-selection {{ display: grid; gap: 7px; }}
-    .timeline-selection input[type="range"] {{ margin: 0; }}
-    .timeline-values {{
+    .timeline-selection {{ display: grid; gap: 8px; }}
+    .timeline-readout {{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }}
+    .timeline-readout strong {{ color: var(--ink); margin-left: 4px; }}
+    .timeline-track {{
+      --trim-start: 0%;
+      --trim-end: 100%;
+      --trim-playhead: 0%;
+      position: relative;
+      height: 42px;
+      cursor: crosshair;
+      touch-action: none;
+    }}
+    .timeline-rail,
+    .timeline-highlight,
+    .timeline-saved {{
+      position: absolute;
+      top: 15px;
+      right: 0;
+      left: 0;
+      height: 12px;
+      border-radius: 4px;
+    }}
+    .timeline-rail {{ border: 1px solid var(--line); background: var(--cream); }}
+    .timeline-highlight {{
+      right: auto;
+      left: var(--trim-start);
+      width: calc(var(--trim-end) - var(--trim-start));
+      border: 1px solid color-mix(in srgb, var(--accent) 74%, black);
+      background: color-mix(in srgb, var(--accent) 72%, white);
+      box-shadow: 0 2px 10px rgba(92, 92, 255, 0.24);
+      pointer-events: none;
+      z-index: 2;
+    }}
+    .timeline-saved {{ overflow: hidden; pointer-events: none; z-index: 1; }}
+    .timeline-saved span {{
+      position: absolute;
+      top: 2px;
+      height: 8px;
+      border-radius: 3px;
+      background: #8ac8bb;
+      opacity: 0.82;
+    }}
+    .timeline-saved span[data-mode="remove"] {{ background: #d989a0; }}
+    .timeline-playhead {{
+      position: absolute;
+      top: 8px;
+      bottom: 8px;
+      left: var(--trim-playhead);
+      width: 2px;
+      border-radius: 2px;
+      background: var(--ink);
+      transform: translateX(-1px);
+      pointer-events: none;
+      z-index: 3;
+    }}
+    .timeline-track input[type="range"] {{
+      position: absolute;
+      inset: 0;
+      z-index: 4;
+      width: 100%;
+      height: 42px;
+      margin: 0;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      pointer-events: none;
+    }}
+    .timeline-track input[type="range"]::-webkit-slider-runnable-track {{ height: 12px; background: transparent; }}
+    .timeline-track input[type="range"]::-moz-range-track {{ height: 12px; background: transparent; }}
+    .timeline-track input[type="range"]::-webkit-slider-thumb {{
+      width: 20px;
+      height: 30px;
+      margin-top: -9px;
+      appearance: none;
+      -webkit-appearance: none;
+      border: 2px solid #ffffff;
+      border-radius: 6px;
+      background: var(--accent);
+      box-shadow: 0 1px 6px rgba(23, 23, 43, 0.34);
+      cursor: ew-resize;
+      pointer-events: auto;
+    }}
+    .timeline-track input[type="range"]::-moz-range-thumb {{
+      width: 18px;
+      height: 28px;
+      border: 2px solid #ffffff;
+      border-radius: 6px;
+      background: var(--accent);
+      box-shadow: 0 1px 6px rgba(23, 23, 43, 0.34);
+      cursor: ew-resize;
+      pointer-events: auto;
+    }}
+    .timeline-scale {{
       display: flex;
       justify-content: space-between;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.7rem;
     }}
     .editor-button {{
       min-height: 42px;
@@ -878,9 +974,20 @@ def _result_editor(
       <section class="timeline-dock" data-trim-editor aria-label="Timeline trimmer">
         <div>
           <div class="timeline-selection">
-            <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
-            <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
-            <div class="timeline-values"><span data-trim-start-label>0:00.00</span><span data-trim-end-label>0:00.00</span></div>
+            <div class="timeline-readout">
+              <span>Start <strong data-trim-start-label>0:00.00</strong></span>
+              <span>Drag anywhere to select</span>
+              <span>End <strong data-trim-end-label>0:00.00</strong></span>
+            </div>
+            <div class="timeline-track" data-trim-track>
+              <div class="timeline-rail" aria-hidden="true"></div>
+              <div class="timeline-saved" data-trim-saved aria-hidden="true"></div>
+              <div class="timeline-highlight" aria-hidden="true"></div>
+              <div class="timeline-playhead" aria-hidden="true"></div>
+              <input type="range" min="0" max="1000" value="0" data-trim-start aria-label="Selection start">
+              <input type="range" min="0" max="1000" value="1000" data-trim-end aria-label="Selection end">
+            </div>
+            <div class="timeline-scale"><span>0:00.00</span><span data-trim-duration>0:00.00</span></div>
           </div>
           <div class="timeline-actions">
             <button class="editor-button" type="button" data-add-trim>Add selection</button>

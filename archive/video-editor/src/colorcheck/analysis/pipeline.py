@@ -12,6 +12,7 @@ from colorcheck.analysis.correction import (
     recommend_correction,
     scale_correction,
 )
+from colorcheck.analysis.learned import experimental_correction
 from colorcheck.analysis.metrics import (
     PreparedImage,
     VideoFrame,
@@ -182,6 +183,13 @@ def _analyze_frames(
 
     aggregate_target = aggregate_profile(frame_results)
     full_correction = recommend_correction(reference_profile, aggregate_target, frame_results)
+    learned_correction = experimental_correction(reference_profile, aggregate_target, full_correction)
+    if learned_correction is not None:
+        samples = [frame.rgb for frame in sampled_frames]
+        rule_risk = evaluate_guardrails(samples, full_correction).clipping_risk_percent
+        learned_risk = evaluate_guardrails(samples, learned_correction).clipping_risk_percent
+        if learned_risk <= rule_risk + 0.25:
+            full_correction = learned_correction
     strength = clamp_percent(correction_strength_percent)
     threshold = clamp_percent(lighting_shift_threshold_percent, low=5, high=100)
     correction = scale_correction(full_correction, strength)

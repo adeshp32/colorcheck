@@ -1,32 +1,67 @@
 # Architecture
 
-ColorCheck uses a small layered architecture organized around responsibilities rather than frameworks.
+## Responsibility boundaries
 
-## Module Boundaries
+The active product has four browser modules, deliberately without a framework
+or a build pipeline. The static `web/` directory is the production artifact.
 
-| Module | Owns | May depend on |
-| --- | --- | --- |
-| `colorcheck.models` | Shared typed analysis and export contracts | Standard library |
-| `colorcheck.analysis` | Frame sampling, perceptual metrics, correction bounds, pipeline orchestration | Models, exporters |
-| `colorcheck.exports` | Video encoding, LUT/CDL generation, reports, editor guidance | Models, correction primitives |
-| `colorcheck.web` | HTTP routes, upload validation, rate limits, temporary job access, HTML pages | Config, analysis pipeline |
-| `colorcheck.config` | Environment-backed runtime settings | Standard library |
-| `colorcheck.cli` | Local command-line workflow | Analysis pipeline |
+| Module                 | Owns                                                                                         | Does not own                   |
+| ---------------------- | -------------------------------------------------------------------------------------------- | ------------------------------ |
+| `editor-controller.js` | File decoding, UI events, edit history, geometry, preview scheduling, download orchestration | Pixel-transform mathematics    |
+| `image-processing.js`  | Channel statistics, bounded reference match, tonal/color/detail transforms                   | DOM, file access, networking   |
+| `render-worker.js`     | Request IDs, transferable buffers, background processing, error responses                    | UI state or stored photographs |
+| `edit-history.js`      | Bounded undo/redo snapshots and redo invalidation                                            | Image buffers or DOM events    |
 
-The analysis and export layers do not import the web application. This keeps the core workflow reusable from FastAPI, the CLI, tests, and future background workers.
+`index.html` defines the editor's semantic controls. `editor.css` handles
+responsive layout, not image processing. `tools/serve.mjs` only serves local
+development files and does not accept uploads.
 
-## Request Lifecycle
+## Data flow
 
-1. The browser decodes candidate frames locally and selects a compact, visually diverse sample set.
-2. The web boundary validates request origin, size, rate, disk capacity, and queue capacity.
-3. A persistent job record is written before a single background worker starts analysis.
-4. Cached reference features are compared with each selected target frame.
-5. Correction logic creates a bounded plan and evaluates clipping and lighting-shift risk.
-6. Reports, LUT/CDL files, and editor guides are retained temporarily; analysis media is deleted.
-7. Trim regions, crop, text, lighting, tint, B&W, and correction remain a browser-owned edit recipe.
-8. A requested preview or master is rendered once by FFmpeg and streamed directly to the browser.
-9. The uploaded source is deleted in the stream cleanup path; no corrected video is stored.
+```text
+Selected File
+  -> browser ImageBitmap decode
+  -> original bitmap retained in browser memory
+  -> preview pixels (longest edge at most 1200 pixels)
+  -> edit settings + pixels transferred to module worker
+  -> shared image-processing engine
+  -> returned RGBA buffer
+  -> crop / rotation / flip applied with canvas geometry
+  -> visible preview
 
-## Deployment Model
+Export
+  -> original bitmap pixels + current settings
+  -> same worker and pixel engine
+  -> original-resolution geometry
+  -> JPEG / PNG / WebP encoding
+  -> local download, optionally followed by settings JSON
+```
 
-The Oracle release uses one application process, a persistent disk-backed job queue, one analysis worker, and one rendering slot. This keeps memory and CPU bounded on the free VM. A higher-traffic deployment can retain the same contracts while moving temporary upload chunks and queue state to dedicated services.
+The reference is sampled separately to calculate channel statistics. Only the
+derived matching settings enter the pixel pipeline. No file is sent to an API.
+
+## State and concurrency
+
+An edit settings object is the source of truth. Editing does not modify the
+original bitmap. Slider interactions update the preview continuously and commit
+one undo entry on change. Undo/redo restores settings, not full image copies.
+History is bounded to 60 entries.
+
+Worker messages have request IDs to pair responses with promises. Preview
+revisions prevent an older render from replacing newer edits. Repeated preview
+requests coalesce while processing is active. Export disables duplicate requests.
+Cancellation terminates the processing worker and creates a fresh worker.
+
+Reference and target loads also use revision counters so a slower earlier decode
+cannot replace a newer selection. Superseded bitmaps are closed.
+
+## Why this structure
+
+Pure processing functions can be tested without a browser. The worker keeps
+pixel loops off the UI thread. The controller translates user intentions into
+settings and passes them through the same engine for preview and export.
+
+The controller is currently the largest module. Extract geometry or
+export orchestration when those responsibilities gain independent complexity,
+not simply to increase the file count. Tiled processing and selective masks are
+future architectural work, not existing capabilities.

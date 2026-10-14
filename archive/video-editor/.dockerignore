@@ -1,4 +1,8 @@
 .venv
+.local
+*.npz
+*.pt
+*.pth
 .git
 .github
 .env

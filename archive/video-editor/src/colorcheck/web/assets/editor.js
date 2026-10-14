@@ -157,7 +157,10 @@
         if (this.video && !this.video.dataset.timelineBound) {
           this.video.dataset.timelineBound = "true";
           this.video.addEventListener("timeupdate", () => this.enforceTimeline());
-          this.video.addEventListener("seeked", () => this.renderTextPreview());
+          this.video.addEventListener("seeked", () => {
+            this.renderPlayhead();
+            this.renderTextPreview();
+          });
         }
         media.src = this.objectUrl;
         media.load();
@@ -167,6 +170,7 @@
     bindTrim() {
       const start = this.root.querySelector("[data-trim-start]");
       const end = this.root.querySelector("[data-trim-end]");
+      const track = this.root.querySelector("[data-trim-track]");
       if (!start || !end) return;
       const sync = (changed) => {
         if (changed === start && number(start.value, 0) >= number(end.value, 1000)) {
@@ -175,10 +179,40 @@
         if (changed === end && number(end.value, 1000) <= number(start.value, 0)) {
           end.value = String(Math.min(1000, number(start.value, 0) + 1));
         }
+        start.style.zIndex = changed === start ? "5" : "4";
+        end.style.zIndex = changed === end ? "5" : "4";
         this.renderTrimSelection();
       };
       start.addEventListener("input", () => sync(start));
       end.addEventListener("input", () => sync(end));
+      track?.addEventListener("pointerdown", (event) => {
+        if (event.target.matches("input[type=range]")) return;
+        event.preventDefault();
+        const bounds = track.getBoundingClientRect();
+        const position = (pointer) => clamp(Math.round((pointer.clientX - bounds.left) / bounds.width * 1000), 0, 1000);
+        const anchor = Math.min(position(event), 999);
+        start.value = String(anchor);
+        end.value = String(Math.min(1000, anchor + 1));
+        track.setPointerCapture(event.pointerId);
+        this.renderTrimSelection();
+        const move = (pointer) => {
+          const current = position(pointer);
+          start.value = String(Math.min(anchor, current));
+          end.value = String(Math.max(anchor + 1, current));
+          this.renderTrimSelection();
+        };
+        const up = () => {
+          track.removeEventListener("pointermove", move);
+          track.removeEventListener("pointerup", up);
+          track.removeEventListener("pointercancel", up);
+          if (this.video && this.duration) {
+            this.video.currentTime = number(start.value, 0) / 1000 * this.duration;
+          }
+        };
+        track.addEventListener("pointermove", move);
+        track.addEventListener("pointerup", up);
+        track.addEventListener("pointercancel", up);
+      });
       this.root.querySelector("[data-add-trim]")?.addEventListener("click", () => {
         if (!this.duration) return;
         const mode = this.root.querySelector("input[type=radio][name$=trim_mode]:checked")?.value || "keep";
@@ -209,8 +243,39 @@
       const end = this.root.querySelector("[data-trim-end]");
       const startLabel = this.root.querySelector("[data-trim-start-label]");
       const endLabel = this.root.querySelector("[data-trim-end-label]");
+      const durationLabel = this.root.querySelector("[data-trim-duration]");
+      const track = this.root.querySelector("[data-trim-track]");
+      const saved = this.root.querySelector("[data-trim-saved]");
+      const startValue = clamp(number(start?.value, 0), 0, 1000);
+      const endValue = clamp(number(end?.value, 1000), 0, 1000);
       if (startLabel) startLabel.textContent = formatTime(number(start?.value, 0) / 1000 * this.duration);
       if (endLabel) endLabel.textContent = formatTime(number(end?.value, 1000) / 1000 * this.duration);
+      if (durationLabel) durationLabel.textContent = formatTime(this.duration);
+      if (track) {
+        track.style.setProperty("--trim-start", `${startValue / 10}%`);
+        track.style.setProperty("--trim-end", `${endValue / 10}%`);
+      }
+      if (saved) {
+        saved.replaceChildren();
+        if (this.duration > 0) this.plan.trims.forEach((item) => {
+          const marker = document.createElement("span");
+          const markerStart = clamp(item.start / this.duration * 100, 0, 100);
+          const markerEnd = clamp(item.end / this.duration * 100, markerStart, 100);
+          marker.dataset.mode = item.mode;
+          marker.style.left = `${markerStart}%`;
+          marker.style.width = `${markerEnd - markerStart}%`;
+          saved.append(marker);
+        });
+      }
+      this.renderPlayhead();
+    }
+
+    renderPlayhead() {
+      const track = this.root.querySelector("[data-trim-track]");
+      if (!track) return;
+      const current = this.video?.currentTime || 0;
+      const position = this.duration > 0 ? clamp(current / this.duration * 100, 0, 100) : 0;
+      track.style.setProperty("--trim-playhead", `${position}%`);
     }
 
     bindCrop() {
@@ -360,6 +425,7 @@
 
     enforceTimeline() {
       if (!this.video || this.video.seeking) return;
+      this.renderPlayhead();
       const segments = this.getSegments();
       const current = this.video.currentTime;
       if (segments.some(([start, end]) => current >= start && current < end)) {

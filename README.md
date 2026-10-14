@@ -1,139 +1,87 @@
-# ColorCheck
+# ColorCheck Photos
 
-[![CI](https://github.com/adeshp32/colorcheck/actions/workflows/ci.yml/badge.svg)](https://github.com/adeshp32/colorcheck/actions/workflows/ci.yml)
+Reference-guided photo matching and editing, entirely on your device.
 
-Reference-aware, guardrail-first video color intelligence for editors.
+Open a photo, add an optional reference, adjust the match, and export at the
+original resolution. The active application is a static website: no Oracle,
+Python backend, account, or photo-upload service is required.
 
-[Open ColorCheck](https://colorcheck.adideshpande.dev/)
+## What works today
 
-ColorCheck compares target footage with an image or video reference, measures perceptual color and lighting drift with OpenCV and NumPy, and produces conservative corrections without modifying the source. It combines local frame selection, persistent background analysis, interactive editing, streamed video exports, LUT/CDL files, structured reports, and workflow guidance for DaVinci Resolve, Premiere Pro, Avid Media Composer, and iMovie.
+- Independent palette and tone matching strengths.
+- Exposure, contrast, highlights, shadows, whites, blacks, and tone-curve presets.
+- Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
+- Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
+- Numeric controls, individual resets, before/after comparison, and undo/redo.
+- Full-resolution JPEG, PNG, or WebP export and optional JSON settings report.
 
-<sub><strong>Reference-led analysis</strong></sub><br>
-![ColorCheck reference-led analysis interface](docs/screenshots/colorcheck-analyze.png)
+JPEG/PNG/WebP input is limited to 50 MB and 24 megapixels. This baseline is an
+8-bit sRGB editor, not a RAW developer or a trained image-restoration system.
+Reference matching is statistical and adjustable; it does not guarantee an exact
+match between unrelated scenes. Read [quality and compatibility](docs/quality-and-compatibility.md).
 
-<sub><strong>Guardrail summary</strong></sub><br>
-![ColorCheck completed analysis and safety metrics](docs/screenshots/colorcheck-analysis-summary.png)
+## Run locally
 
-<sub><strong>Corrected preview</strong></sub><br>
-![ColorCheck corrected video preview](docs/screenshots/colorcheck-corrected-preview.png)
+Node.js 22 or newer:
 
-<sub><strong>Editor-ready exports</strong></sub><br>
-![ColorCheck editor-ready exports](docs/screenshots/colorcheck-exports.png)
+```sh
+npm ci
+npm run dev
+```
 
-## Capabilities
+Open `http://127.0.0.1:8012/`. Node is needed for development tooling, not for
+production image processing. The browser executes the photo editor.
 
-- Match target frames against a still or lighting-similar moments from a reference clip.
-- Measure structural similarity, perceptual color distance, luminance, contrast, saturation, and temperature drift.
-- Recommend bounded exposure, contrast, saturation, and channel-balance adjustments.
-- Let editors control correction strength and define a lighting-preservation threshold.
-- Preserve source audio in the H.264 preview when an audio stream is present.
-- Preserve supported codec, resolution, timing, bit depth, color metadata, and audio characteristics in the editing master.
-- Use Apple VideoToolbox automatically on native macOS for high-fidelity hardware encoding, with portable software fallbacks.
-- Export individual CUBE, CDL, JSON, HTML, MP4, MOV, and editor-guide files.
+```sh
+npm test
+npx playwright install chromium
+npm run test:browser
+npm run format:check
+```
 
-## Architecture
+## Repository map
 
 ```text
-src/colorcheck/
-|-- analysis/   # Perceptual metrics, correction logic, and orchestration
-|-- exports/    # Video, LUT, report, and editor-guide generation
-|-- web/        # FastAPI routes, browser pages, and upload security
-|-- config.py   # Environment-backed runtime limits
-|-- models.py   # Shared typed domain models
-`-- cli.py      # Command-line entry point
+web/                         Deploy this directory as a static website
+  index.html                 Accessible editor layout and tool controls
+  src/
+    editor-controller.js     Files, edit history, controls, preview, and export
+    image-processing.js      Pure pixel transforms and reference statistics
+    edit-history.js          Bounded, isolated undo/redo settings snapshots
+    render-worker.js         Background-thread processing message boundary
+  styles/editor.css          Mobile-first layout and desktop inspector
+  assets/icons/              Locally served Lucide icons and license
+  assets/brand/              Original ColorCheck wordmark, unchanged
+  _headers                   Cloudflare Pages security headers
+tests/
+  image-processing.test.mjs   Pixel invariants and correction bounds
+  edit-history.test.mjs       Undo/redo, isolation, and history limits
+  photo-editor.browser.cjs   End-to-end editing, export, and mobile checks
+tools/serve.mjs               Local static development server
+docs/                        Architecture, algorithms, quality, and deployment
+archive/video-editor/        Former Python/video product, retained for history
 ```
 
-The dependency direction is intentionally simple: interfaces call the analysis pipeline, the pipeline coordinates domain logic and exporters, and lower-level modules never depend on the web layer. See [Architecture](docs/architecture.md) for the complete request and data lifecycle.
+## Understand the implementation
 
-## Quick Start
+Start with [architecture](docs/architecture.md), then
+[image processing](docs/image-processing.md) and
+[development conventions](docs/development.md). These describe what the code does,
+why responsibilities are separated, and which trade-offs remain.
 
-Requirements: Python 3.11 or newer and FFmpeg.
+The production app has no third-party runtime packages or remote analytics.
+Prettier and Playwright are development dependencies. Icons are from Lucide;
+their license is included alongside the assets.
 
-```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
+## Publish
 
-Start the web application:
+Deploy `web/` to a static host. For Cloudflare Pages, use no build command and
+`web` as the output directory. See [deployment](docs/deployment.md) for the
+domain transition and security checks. Repository changes do not themselves
+replace the currently running video website.
 
-```bash
-uvicorn colorcheck.web.app:app --reload --host 127.0.0.1 --port 8000
-```
+## Historical video application
 
-Open `http://127.0.0.1:8000`.
-
-Run the CLI:
-
-```bash
-colorcheck \
-  --reference path/to/reference.jpg \
-  --video path/to/video.mp4 \
-  --out reports/demo \
-  --strength 50 \
-  --lighting-threshold 60
-```
-
-Run with Docker:
-
-```bash
-docker compose up --build
-```
-
-## Output Contract
-
-| File | Purpose |
-| --- | --- |
-| On-demand review MP4 | Browser-compatible H.264 export, capped at 1080p, with source audio when available |
-| On-demand editing master | Full-resolution export preserving the source codec family, pixel format, color metadata, and untrimmed audio where supported |
-| `recommended_correction.cube` | Portable 3D LUT |
-| `recommended_correction.cdl` | ASC CDL correction values |
-| `report.html` | Human-readable analysis |
-| `report.json` | Structured analysis data |
-| `*_steps.md` | Editor-specific application guidance |
-
-Video pixels must be re-encoded after correction, so a corrected file cannot be bit-for-bit identical to the source. ColorCheck never modifies the original upload.
-
-Trimming, crop, text, lighting mode, color-wheel tint, B&W, and mapped correction are composed into one FFmpeg render. The result streams directly to the browser and is never written to server storage. See the reproducible [performance notes](docs/performance.md) for benchmark and fidelity details.
-
-## Safety Model
-
-- Exposure is capped at approximately 0.35 stops.
-- Contrast and saturation multipliers remain between 0.85 and 1.15.
-- Per-channel balance remains between 0.92 and 1.08.
-- Lighting-shift and clipping-risk checks warn before a correction becomes destructive.
-- Source uploads receive generic internal names and are deleted after analysis or as soon as an export stream ends.
-- Corrected video is never stored; temporary reports expire automatically and use unguessable job identifiers.
-- Upload size, duration, resolution, request rate, and processing concurrency are bounded.
-- The release container runs as a non-root user with a read-only filesystem and no Linux capabilities.
-
-Read the [security policy](.github/SECURITY.md) and [privacy notes](docs/privacy.md) before operating a public instance.
-
-## Verification
-
-```bash
-ruff check src tests
-pytest -q
-docker build -t colorcheck:local .
-```
-
-GitHub Actions runs the lint and test suite on every push and pull request. Dependabot checks Python, Docker, and GitHub Actions dependencies weekly.
-
-## Deployment
-
-The planned free public deployment runs the existing container on an Oracle Cloud Always Free
-Ampere VM and publishes the custom domain through Cloudflare Tunnel. The origin remains private,
-while Cloudflare provides HTTPS, DNS, DDoS protection, and the public hostname. Analysis is
-queued persistently and full-resolution rendering is intentionally limited to one export at a
-time on the free VM. See the
-[deployment guide](docs/deployment.md) for the public upload ceiling, domain route, and security
-checklist.
-
-Kubernetes manifests are available in [`deploy/kubernetes`](deploy/kubernetes):
-
-```bash
-docker build -t colorcheck:local .
-kubectl apply -f deploy/kubernetes/
-kubectl port-forward service/colorcheck 8000:80
-```
+The previous FastAPI/FFmpeg application, tests, deployment files, documentation,
+and experimental training code live under [archive/video-editor](archive/video-editor/ARCHIVE.md).
+They are not dependencies of the photo editor and are excluded from its CI.

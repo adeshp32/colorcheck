@@ -1,23 +1,21 @@
 # Security Policy
 
-## Supported Version
+The active, supported product is the static photo editor in `web/`.
+The video application in `archive/video-editor/` is historical and unsupported.
 
-The latest commit on `main` is the supported public-demo version.
+Report vulnerabilities through GitHub private vulnerability reporting. Include
+reproduction steps, but do not attach private photographs or credentials.
 
-## Reporting a Vulnerability
+## Data boundaries
 
-Please use GitHub's private vulnerability reporting feature instead of opening a public issue. Include the affected endpoint, reproduction steps, and expected impact. Do not include uploaded media or personal information in a report.
+- Reference and target images are decoded and processed on the user's device.
+- There is no photo-upload API, account system, database, or third-party analytics.
+- Static scripts, icons, and styles are served by the hosting provider.
+- The optional JSON report and edited image are downloaded locally.
+- Original location metadata is not copied into exported images.
+- The browser still needs enough memory to decode and render the selected photo.
+- Development serving binds to localhost; production needs HTTPS and security headers.
 
-## Public Demo Boundaries
-
-- Uploaded filenames are replaced with generic internal names.
-- Analysis inputs are deleted after processing, including failed jobs.
-- Export sources are deleted as soon as streaming ends; abandoned upload sessions expire after two hours.
-- Corrected video is never stored. Reports and correction files expire after six hours by default.
-- Upload size, duration, resolution, rate, and processing concurrency are limited.
-- Job identifiers and downloadable filenames are strictly validated.
-- Analysis errors returned to visitors do not expose stack traces or local paths.
-- Security headers restrict framing, cross-origin resources, browser permissions, and content sources.
-- The container runs as an unprivileged user, and the supplied Docker/Kubernetes configurations remove Linux capabilities.
-
-This is a portfolio demo, not a confidential-media service. Visitors should not upload sensitive, regulated, or irreplaceable footage.
+The app does not erase a user's original photo or their downloaded exports.
+It does not guarantee protection against compromised browsers, devices, or hosting
+accounts. Hosting request logs may contain ordinary connection information.

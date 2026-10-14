@@ -4,6 +4,10 @@
 !.env.example
 .secrets/
 .deploy-state/
+.local/
+*.npz
+*.pt
+*.pth
 .DS_Store
 *.log
 .coverage
@@ -30,3 +34,8 @@ reports/
 *.webp
 !docs/assets/*.png
 !docs/screenshots/*.png
+!archive/video-editor/docs/assets/*.png
+!archive/video-editor/docs/screenshots/*.png
+node_modules/
+test-results/
+playwright-report/

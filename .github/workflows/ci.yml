@@ -1,4 +1,4 @@
-name: CI
+name: Photo Editor Checks
 
 on:
   push:
@@ -9,22 +9,17 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  photo-editor:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Install project
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
-      - name: Lint
-        run: python -m ruff check .
-      - name: Test
-        run: python -m pytest
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

@@ -1,0 +1,21 @@
+{
+  "name": "colorcheck-photos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-device reference photo matching and non-destructive image editing.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:browser": "node tests/photo-editor.browser.cjs",
+    "format": "prettier --write web/src web/styles web/index.html tests tools docs README.md package.json .github",
+    "format:check": "prettier --check web/src web/styles web/index.html tests tools docs README.md package.json .github"
+  },
+  "devDependencies": {
+    "playwright": "1.64.0",
+    "prettier": "3.9.10"
+  }
+}
