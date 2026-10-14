@@ -137,6 +137,24 @@
             <p class="note" id="match-note">
               Reference matching is adjustable, not an exact recreation.
             </p>
+            <h3>Learned enhancement</h3>
+            <button id="enhance" disabled>Analyze photo</button>
+            <button id="cancel-enhance" hidden>Cancel analysis</button>
+            <div id="enhancement-controls"></div>
+            <p
+              class="note"
+              id="enhancement-status"
+              role="status"
+              aria-live="polite"
+            >
+              Experimental · on-device · pretrained
+            </p>
+            <button
+              id="clear-model-cache"
+              title="Remove cached enhancement model"
+            >
+              Clear model cache
+            </button>
           </section>
           <section data-section="light" hidden>
             <h2>Light &amp; tone</h2>
@@ -240,6 +258,12 @@
         </div>
       </aside>
     </main>
+    <footer class="product-info">
+      <p>
+        ColorCheck helps you bring a reference photo's color and tone into your
+        own image, with simple controls to make the result your own.
+      </p>
+    </footer>
     <dialog id="export-dialog">
       <h2>Export photo</h2>
       <p id="export-progress" role="status">Rendering original resolution…</p>

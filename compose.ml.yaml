@@ -1,0 +1,26 @@
+services:
+  model-export:
+    image: colorcheck-ml:local
+    build:
+      context: ./tools/ml
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2
+    mem_limit: 2g
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+    volumes:
+      - type: bind
+        source: ${ML_WEIGHTS_DIR:-./.local/adaptive-lut-weights}
+        target: /weights
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${ML_OUTPUT_DIR:-./.local/ml-container-output}
+        target: /outputs
+        bind:
+          create_host_path: false

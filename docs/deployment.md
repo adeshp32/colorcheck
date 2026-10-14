@@ -1,5 +1,24 @@
 # Static Deployment
 
+## Cloudflare Workers With GitHub
+
+Connect `adeshp32/colorcheck` through **Workers & Pages > Create application >
+Continue with GitHub**. Use these settings:
+
+- Worker name: `colorcheck-photos` (must match `wrangler.jsonc`).
+- Production branch: `main`.
+- Root directory: repository root.
+- Build command: `npm test`.
+- Deploy command: `npx wrangler deploy`.
+
+The Wrangler configuration publishes only `web/`, not the archived video backend
+or model-training tools. GitHub pushes to the production branch trigger new
+deployments. Verify the generated address before attaching the existing
+`colorcheck.adideshpande.dev` hostname in **Settings > Domains & Routes**.
+The public hostname remains unchanged; its previous tunnel DNS record must be
+replaced when switching to a Worker custom domain. Do not change the portfolio's
+apex or `www` records.
+
 ## Cloudflare Pages
 
 1. Connect this GitHub repository to a Pages project.
@@ -9,11 +28,14 @@
 5. Attach the desired custom domain through Pages custom-domain settings.
 
 No environment variables, API keys, Python runtime, database, or Oracle server
-are required. Node and development dependencies are not shipped to visitors.
+are required. Node and the development toolchain are not shipped to visitors;
+only the explicitly vendored browser ML runtime is served when enhancement is used.
 
 `web/_headers` supplies security headers for Pages, including a policy that blocks
 network connections from the editor. Other static hosts need equivalent header
 configuration; this file is not automatically interpreted by every provider.
+ML requires same-origin asset fetching and the `wasm-unsafe-eval` allowance;
+the supplied policy permits these without opening third-party script sources.
 
 ## Existing video domain
 

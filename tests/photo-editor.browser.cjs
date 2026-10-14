@@ -36,6 +36,18 @@ const { join } = require("node:path");
     const page = await browser.newPage({
       viewport: { width: 1440, height: 960 },
     });
+    if (process.env.ML_TEST_ARTIFACT_DIR) {
+      for (const name of ["manifest.json", "enhancement.onnx"]) {
+        await page.route(`**/assets/models/adaptive-lut/${name}`, (route) =>
+          route.fulfill({
+            path: join(process.env.ML_TEST_ARTIFACT_DIR, name),
+            contentType: name.endsWith(".json")
+              ? "application/json"
+              : "application/octet-stream",
+          }),
+        );
+      }
+    }
     const errors = [],
       requests = [];
     page.on("pageerror", (e) => errors.push(e.message));
@@ -112,6 +124,82 @@ const { join } = require("node:path");
       await page.locator("#slider-grade-saturation").inputValue(),
       "2",
     );
+    await page.locator("[data-panel=match]").click();
+    const beforeEnhancement = await page
+      .locator("#preview")
+      .evaluate((canvas) => canvas.toDataURL());
+    await page.locator("#enhance").click();
+    await page
+      .waitForFunction(
+        () =>
+          document
+            .querySelector("#enhancement-status")
+            .textContent.includes("Suggested strength"),
+        null,
+        { timeout: 60000 },
+      )
+      .catch(async (error) => {
+        console.error(await page.locator("#enhancement-status").innerText());
+        throw error;
+      });
+    assert.ok(
+      Number(await page.locator("#slider-enhanceStrength").inputValue()) > 0,
+    );
+    await page.waitForFunction(
+      (before) => document.querySelector("#preview").toDataURL() !== before,
+      beforeEnhancement,
+    );
+    const browserParity = await page.evaluate(async () => {
+      const ort = await import("./vendor/onnxruntime/ort.wasm.min.mjs");
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.proxy = false;
+      ort.env.wasm.wasmPaths = new URL(
+        "./vendor/onnxruntime/",
+        location.href,
+      ).href;
+      const manifest = await (
+        await fetch("./assets/models/adaptive-lut/manifest.json")
+      ).json();
+      const session = await ort.InferenceSession.create(
+        "./assets/models/adaptive-lut/enhancement.onnx",
+        { executionProviders: ["wasm"], graphOptimizationLevel: "disabled" },
+      );
+      const input = new Float32Array(3 * 256 * 256);
+      for (let y = 0; y < 256; y++)
+        for (let x = 0; x < 256; x++) {
+          const i = y * 256 + x;
+          input[i] = x / 255;
+          input[256 * 256 + i] = y / 255;
+          input[2 * 256 * 256 + i] = 0.5;
+        }
+      const start = performance.now(),
+        outputs = await session.run({
+          image: new ort.Tensor("float32", input, [1, 3, 256, 256]),
+        });
+      const error = Math.max(
+        ...manifest.browserProbe.lutSamples.map((v, i) =>
+          Math.abs(v - outputs.lut.data[i * 2000]),
+        ),
+      );
+      await session.release();
+      return {
+        modelHash: manifest.sha256,
+        maximumSampledLutError: error,
+        sampleCount: manifest.browserProbe.lutSamples.length,
+        gradientInferenceMs: performance.now() - start,
+        browser: navigator.userAgent,
+      };
+    });
+    assert.ok(
+      browserParity.maximumSampledLutError < 1e-4,
+      "Browser ONNX output must match PyTorch gradient fixture",
+    );
+    fs.writeFileSync(
+      join(artifacts, "ml-evaluation.json"),
+      JSON.stringify(browserParity, null, 2),
+    );
+    console.log("Browser ML evaluation:", browserParity);
+    await page.locator("[data-panel=color]").click();
     await page.screenshot({
       path: join(artifacts, "desktop.png"),
       fullPage: true,
@@ -153,6 +241,28 @@ const { join } = require("node:path");
       );
     }
     assert.deepEqual(errors, []);
+    const fallback = await browser.newPage();
+    await fallback.route("**/assets/models/**", (route) =>
+      route.fulfill({ status: 503, body: "Unavailable" }),
+    );
+    await fallback.goto(url);
+    await fallback.locator("#target").setInputFiles({
+      name: "fallback.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(bytes, "base64"),
+    });
+    await fallback.locator("#enhance").click();
+    await fallback.waitForFunction(() =>
+      document
+        .querySelector("#enhancement-status")
+        .textContent.includes("unavailable"),
+    );
+    assert.equal(
+      await fallback.locator("#export").isEnabled(),
+      true,
+      "Manual export must survive model failure",
+    );
+    await fallback.close();
     assert.ok(
       requests.every((r) => r.method === "GET"),
       "Photos must not be uploaded",

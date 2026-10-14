@@ -29,6 +29,10 @@ forcing the reference's contrast. Matching an image to itself is neutral.
 8. Radial vignette and bounded 8-bit output.
 9. Optional neighborhood sharpening.
 
+If learned enhancement is enabled, its bounded LUT transform is applied before
+the above sequence. It is separate from reference matching and has its own
+strength. See [learned enhancement](learned-enhancement.md).
+
 Crop, rotation, and flip are geometric canvas operations after pixel processing.
 Alpha is preserved by the pixel engine. JPEG export composites transparency onto
 white because JPEG does not carry alpha.

@@ -1,0 +1,3 @@
+services:
+  model-export:
+    network_mode: none

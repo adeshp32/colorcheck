@@ -2,7 +2,7 @@
 
 ## Responsibility boundaries
 
-The active product has four browser modules, deliberately without a framework
+The active product separates browser responsibilities, deliberately without a framework
 or a build pipeline. The static `web/` directory is the production artifact.
 
 | Module                 | Owns                                                                                         | Does not own                   |
@@ -15,6 +15,12 @@ or a build pipeline. The static `web/` directory is the production artifact.
 `index.html` defines the editor's semantic controls. `editor.css` handles
 responsive layout, not image processing. `tools/serve.mjs` only serves local
 development files and does not accept uploads.
+
+Optional ML has three additional boundaries: `learned-enhancement.js` owns the
+lazy worker/cancellation interface, `enhancement-worker.js` owns model loading
+and inference, and `enhancement-lut.js` owns interpolation and clipping assessment.
+They do not replace the reference-statistics engine. Model inference runs once
+per requested analysis; preview/export reuse the transform.
 
 ## Data flow
 

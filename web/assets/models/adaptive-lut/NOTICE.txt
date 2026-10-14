@@ -1,0 +1,11 @@
+Image-Adaptive-3DLUT
+Hui Zeng, Jianrui Cai, Lida Li, Zisheng Cao, Lei Zhang
+https://github.com/HuiZeng/Image-Adaptive-3DLUT
+Source revision: b491f6df64a588864739a157db271e5c848e1805
+License: Apache-2.0 (included as LICENSE.txt)
+
+ColorCheck uses the upstream pretrained paired sRGB weights. ColorCheck did not
+train these weights. The classifier was adapted for a reproducible ONNX export
+that returns a weighted lookup table instead of using the native interpolation
+extension. Full-resolution interpolation and adjustable safeguards are separate
+ColorCheck code. Enhancement is experimental, not reference matching.

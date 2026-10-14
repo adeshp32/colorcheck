@@ -11,6 +11,8 @@ reproduction steps, but do not attach private photographs or credentials.
 - Reference and target images are decoded and processed on the user's device.
 - There is no photo-upload API, account system, database, or third-party analytics.
 - Static scripts, icons, and styles are served by the hosting provider.
+- Optional ML fetches only same-origin runtime and model assets, never image data.
+- Model integrity is checked before inference; cached model files can be removed.
 - The optional JSON report and edited image are downloaded locally.
 - Original location metadata is not copied into exported images.
 - The browser still needs enough memory to decode and render the selected photo.

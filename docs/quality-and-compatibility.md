@@ -9,6 +9,7 @@ Use HTTPS in production so module workers load reliably.
 
 - JPEG, PNG, and WebP input; up to 50 MB compressed and 24 megapixels decoded.
 - Optional reference image with independent palette and tonal matching strength.
+- Optional pretrained enhancement, with adjustable strength and sampled clipping checks.
 - Exposure, contrast, highlights, shadows, whites, blacks, and tone-curve presets.
 - Warmth, tint, saturation, vibrance, B&W, and global/shadow/midtone/highlight grading.
 - Sharpening, vignette, crop, aspect-ratio presets, 90-degree rotation, and horizontal flip.
@@ -21,6 +22,8 @@ Use HTTPS in production so module workers load reliably.
 Matching uses bounded channel statistics, not a trained aesthetic model or semantic
 understanding. Unrelated subjects can produce an unsuitable match; adjust its two
 strength controls independently. Correction cannot recover clipped detail.
+The separate enhancement model is pretrained upstream, not trained by ColorCheck.
+Its integration is technically tested; real-photo quality improvement is not yet established.
 Preview and export share the pixel engine. Sharpening operates at each render's
 pixel scale, so its apparent detail differs between a scaled preview and a
 full-resolution export. Use exported images to judge fine detail.

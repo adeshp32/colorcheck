@@ -9,6 +9,7 @@ Python backend, account, or photo-upload service is required.
 ## What works today
 
 - Independent palette and tone matching strengths.
+- Optional learned enhancement, using an upstream PyTorch model exported to ONNX.
 - Exposure, contrast, highlights, shadows, whites, blacks, and tone-curve presets.
 - Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
 - Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
@@ -16,7 +17,7 @@ Python backend, account, or photo-upload service is required.
 - Full-resolution JPEG, PNG, or WebP export and optional JSON settings report.
 
 JPEG/PNG/WebP input is limited to 50 MB and 24 megapixels. This baseline is an
-8-bit sRGB editor, not a RAW developer or a trained image-restoration system.
+8-bit sRGB editor, not a RAW developer or an image-restoration system.
 Reference matching is statistical and adjustable; it does not guarantee an exact
 match between unrelated scenes. Read [quality and compatibility](docs/quality-and-compatibility.md).
 
@@ -69,9 +70,15 @@ Start with [architecture](docs/architecture.md), then
 [development conventions](docs/development.md). These describe what the code does,
 why responsibilities are separated, and which trade-offs remain.
 
-The production app has no third-party runtime packages or remote analytics.
-Prettier and Playwright are development dependencies. Icons are from Lucide;
-their license is included alongside the assets.
+The normal editor uses browser APIs. Optional learned enhancement lazily loads
+locally served ONNX Runtime Web and a pretrained model; there are no remote
+analytics or photo-upload services. Prettier and Playwright are development tools.
+Icons are from Lucide; licenses accompany all third-party assets.
+
+See [learned enhancement](docs/learned-enhancement.md) for the PyTorch export,
+model provenance, download sizes, numerical checks, and current quality limits.
+The export and validation job also has a separate [Docker workflow](docs/ml-container.md).
+Docker is developer tooling, not a hosting dependency for the editor.
 
 ## Publish
 

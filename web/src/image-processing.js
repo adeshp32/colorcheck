@@ -1,8 +1,11 @@
+import { blendEnhancement } from "./enhancement-lut.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
 export function createDefaultEditSettings() {
   return {
     exposure: 0,
+    enhancementId: null,
+    enhanceStrength: 0,
     contrast: 0,
     highlights: 0,
     shadows: 0,
@@ -81,7 +84,13 @@ export function applyToneCurve(v, name) {
  * Processing is gamma-encoded sRGB, not scene-linear camera RAW processing.
  * Returns an 8-bit pixel buffer and a diagnostic 64-bin luminance histogram.
  */
-export function applyPhotoAdjustments(data, width, height, edits) {
+export function applyPhotoAdjustments(
+  data,
+  width,
+  height,
+  edits,
+  enhancementLut = null,
+) {
   const out = new Uint8ClampedArray(data.length),
     grades = Object.entries(edits.grades).map(([range, g]) => {
       const rgb = hueToRgb(g.hue),
@@ -97,6 +106,8 @@ export function applyPhotoAdjustments(data, width, height, edits) {
   const histogram = new Uint32Array(64);
   for (let i = 0; i < data.length; i += 4) {
     let rgb = [data[i] / 255, data[i + 1] / 255, data[i + 2] / 255];
+    if (enhancementLut && edits.enhanceStrength > 0)
+      rgb = blendEnhancement(rgb, enhancementLut, edits.enhanceStrength);
     if (edits.match) {
       const m = edits.match,
         a = edits.matchColor / 100,

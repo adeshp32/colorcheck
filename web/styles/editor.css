@@ -13,6 +13,17 @@
 body {
   margin: 0;
 }
+.product-info {
+  padding: 24px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+}
+.product-info p {
+  max-width: 640px;
+  margin: 0 auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
 button,
 input,
 select {

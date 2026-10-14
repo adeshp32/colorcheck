@@ -6,6 +6,7 @@ import {
   clamp,
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
+import { createEnhancementClient } from "./learned-enhancement.js";
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
@@ -21,6 +22,9 @@ let edits = createDefaultEditSettings(),
   requestId = 0,
   exporting = false;
 const editHistory = createEditHistory(edits);
+const enhancementClient = createEnhancementClient();
+let activeEnhancement = null,
+  enhancing = false;
 let worker,
   requests = new Map(),
   rendering = false,
@@ -54,7 +58,17 @@ function renderInWorker(pixels, width, height, settings) {
     const id = ++requestId;
     requests.set(id, { resolve, reject });
     worker.postMessage(
-      { id, pixels: pixels.buffer, width, height, edits: settings },
+      {
+        id,
+        pixels: pixels.buffer,
+        width,
+        height,
+        edits: settings,
+        enhancementLut:
+          settings.enhancementId === activeEnhancement?.id
+            ? activeEnhancement.lut
+            : null,
+      },
       [pixels.buffer],
     );
   });
@@ -143,6 +157,13 @@ function createAdjustmentControl(
   controls.set(key, { slider, number, get });
 }
 let quality = 95;
+createAdjustmentControl(
+  "#enhancement-controls",
+  "enhanceStrength",
+  "Enhancement strength",
+  0,
+  100,
+);
 createAdjustmentControl(
   "#match-controls",
   "matchColor",
@@ -258,6 +279,13 @@ function synchronizeControls() {
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
+  $("#enhance").disabled = !source || enhancing || exporting;
+  for (const input of [
+    controls.get("enhanceStrength").slider,
+    controls.get("enhanceStrength").number,
+  ])
+    input.disabled =
+      !activeEnhancement || edits.enhancementId !== activeEnhancement.id;
   for (const id of ["export", "compare", "reset"])
     $(`#${id}`).disabled = !source;
   $("#output-size").textContent = source
@@ -295,6 +323,7 @@ let sourceLoad = 0,
   referenceLoad = 0;
 async function openTargetPhoto(file) {
   const ticket = ++sourceLoad;
+  enhancementClient.cancel();
   try {
     showStatus("Opening photo…");
     const bitmap = await decodePhoto(file);
@@ -311,6 +340,7 @@ async function openTargetPhoto(file) {
       height: bitmap.height,
       stats: calculateChannelStatistics(pixels.data),
     };
+    activeEnhancement = null;
     previewPixels = pixels;
     edits = createDefaultEditSettings();
     editHistory.reset(edits);
@@ -328,6 +358,58 @@ async function openTargetPhoto(file) {
     showStatus(error.message);
   }
 }
+
+$("#enhance").onclick = async () => {
+  if (!source || enhancing) return;
+  const ticket = sourceLoad;
+  enhancing = true;
+  synchronizeControls();
+  $("#cancel-enhance").hidden = false;
+  try {
+    if (source.stats.std.every((v) => v < 0.005))
+      throw new Error(
+        "This photo has too little tonal detail for learned enhancement.",
+      );
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(source.bitmap, 0, 0, 256, 256);
+    const pixels = context.getImageData(0, 0, 256, 256).data;
+    const result = await enhancementClient.analyze(pixels, (message) => {
+      $("#enhancement-status").textContent = message;
+    });
+    if (ticket !== sourceLoad) return;
+    const id = `${result.modelId}:${ticket}`;
+    activeEnhancement = { id, ...result };
+    applyEdit(() => {
+      edits.enhancementId = id;
+      edits.enhanceStrength = result.assessment.recommendedStrength;
+    });
+    original = false;
+    $("#compare").textContent = "Original";
+    renderPreview();
+    $("#enhancement-status").textContent =
+      `Suggested strength ${result.assessment.recommendedStrength}% · local analysis ${Math.round(result.inferenceMs)} ms`;
+  } catch (error) {
+    if (ticket === sourceLoad)
+      $("#enhancement-status").textContent = error.message;
+  } finally {
+    enhancing = false;
+    $("#cancel-enhance").hidden = true;
+    synchronizeControls();
+  }
+};
+$("#cancel-enhance").onclick = () => enhancementClient.cancel();
+$("#clear-model-cache").onclick = async () => {
+  try {
+    await enhancementClient.clearCache();
+    $("#enhancement-status").textContent =
+      "Cached model removed. Current edits are unchanged.";
+  } catch {
+    $("#enhancement-status").textContent =
+      "Browser storage could not be cleared.";
+  }
+};
 for (const id of ["target", "start-file"])
   $(`#${id}`).onchange = (e) => {
     openTargetPhoto(e.target.files[0]);
@@ -812,6 +894,15 @@ $("#export").onclick = async () => {
                   quality,
                 },
                 edits: settings,
+                enhancement:
+                  settings.enhancementId === activeEnhancement?.id
+                    ? {
+                        modelId: activeEnhancement.modelId,
+                        modelHash: activeEnhancement.modelHash,
+                        coefficients: activeEnhancement.coefficients,
+                        assessment: activeEnhancement.assessment,
+                      }
+                    : null,
               },
               null,
               2,

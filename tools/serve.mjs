@@ -6,9 +6,20 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../web/", import.meta.url));
 const port = Number(process.env.PORT || 8012);
+const policyLine = (
+  await readFile(new URL("../web/_headers", import.meta.url), "utf8")
+)
+  .split("\n")
+  .find((line) => line.trim().startsWith("Content-Security-Policy:"));
+const contentSecurityPolicy = policyLine
+  .trim()
+  .slice("Content-Security-Policy:".length)
+  .trim();
 const types = {
   ".html": "text/html",
   ".js": "text/javascript",
+  ".mjs": "text/javascript",
+  ".wasm": "application/wasm",
   ".css": "text/css",
   ".svg": "image/svg+xml",
   ".txt": "text/plain",
@@ -35,6 +46,7 @@ const server = createServer(async (request, response) => {
       "Content-Type": types[extname(path)] || "application/octet-stream",
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": contentSecurityPolicy,
     });
     response.end(request.method === "HEAD" ? undefined : content);
   } catch {

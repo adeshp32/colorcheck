@@ -7,6 +7,7 @@ self.onmessage = ({ data: m }) => {
       m.width,
       m.height,
       m.edits,
+      m.enhancementLut,
     );
     self.postMessage({ id: m.id, ...result }, [
       result.data.buffer,
