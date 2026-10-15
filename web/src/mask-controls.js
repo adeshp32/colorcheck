@@ -3,6 +3,7 @@ import {
   maskCoverage,
   sourcePoint,
   prepareMask,
+  transformMaskPinch,
 } from "./masking.js";
 import { createDefaultEditSettings } from "./image-processing.js";
 
@@ -30,6 +31,8 @@ export function createMaskControls({
     showOverlay = true,
     drag = null,
     optionKey = "";
+  const maskPointers = new Map();
+  let pinch = null;
   const geometry = [],
     refinements = [];
   const selected = () =>
@@ -319,7 +322,7 @@ export function createMaskControls({
     const mask = selected(),
       pixels = getPixels();
     overlay.hidden = !mask || !pixels || isOriginal();
-    const editingGeometry = getPanel() === "mask";
+    const editingGeometry = !["crop", "output"].includes(getPanel());
     overlay.style.pointerEvents = editingGeometry ? "auto" : "none";
     overlay.tabIndex = editingGeometry ? 0 : -1;
     if (overlay.hidden) {
@@ -407,6 +410,42 @@ export function createMaskControls({
       context.lineTo(shape.x2 * canvas.width, shape.y2 * canvas.height);
     }
     if (editingGeometry) context.stroke();
+    if (editingGeometry) {
+      const handles =
+        shape.type === "linear"
+          ? [[shape.x2, shape.y2]]
+          : [
+              [
+                shape.x + shape.rx * Math.cos((shape.angle * Math.PI) / 180),
+                shape.y + shape.rx * Math.sin((shape.angle * Math.PI) / 180),
+              ],
+              [
+                shape.x - shape.rx * Math.cos((shape.angle * Math.PI) / 180),
+                shape.y - shape.rx * Math.sin((shape.angle * Math.PI) / 180),
+              ],
+              [
+                shape.x - shape.ry * Math.sin((shape.angle * Math.PI) / 180),
+                shape.y + shape.ry * Math.cos((shape.angle * Math.PI) / 180),
+              ],
+              [
+                shape.x + shape.ry * Math.sin((shape.angle * Math.PI) / 180),
+                shape.y - shape.ry * Math.cos((shape.angle * Math.PI) / 180),
+              ],
+            ];
+      context.fillStyle = "#14d7eb";
+      for (const [x, y] of handles) {
+        context.beginPath();
+        context.arc(
+          x * canvas.width,
+          y * canvas.height,
+          Math.max(5, canvas.width / 80),
+          0,
+          Math.PI * 2,
+        );
+        context.fill();
+        context.stroke();
+      }
+    }
     context.beginPath();
     context.arc(
       shape.x * canvas.width,
@@ -442,9 +481,12 @@ export function createMaskControls({
   function point(event) {
     const rect = overlay.getBoundingClientRect(),
       source = getSource();
+    const crop = ["mask", "crop"].includes(getPanel())
+      ? { x: 0, y: 0, w: 100, h: 100 }
+      : getEdits().crop;
     return sourcePoint(
-      (event.clientX - rect.left) / rect.width,
-      (event.clientY - rect.top) / rect.height,
+      (crop.x + ((event.clientX - rect.left) / rect.width) * crop.w) / 100,
+      (crop.y + ((event.clientY - rect.top) / rect.height) * crop.h) / 100,
       source.width,
       source.height,
       getEdits(),
@@ -454,18 +496,90 @@ export function createMaskControls({
     if (document.querySelector("#viewer").dataset.navigation === "true") return;
     if (!component()) return;
     event.preventDefault();
-    drag = { start: point(event), shape: structuredClone(component()) };
+    const p = point(event);
+    maskPointers.set(event.pointerId, p);
+    if (maskPointers.size === 2) {
+      if (drag) Object.assign(component(), drag.shape);
+      pinch = {
+        start: [...maskPointers.values()],
+        shape: structuredClone(component()),
+      };
+      drag = null;
+    } else if (maskPointers.size === 1) {
+      const shape = component(),
+        rect = overlay.getBoundingClientRect(),
+        display = getDisplayPixels();
+      const near = (x, y) =>
+        (Math.hypot((p.x - x) * display.width, (p.y - y) * display.height) *
+          rect.width) /
+          overlay.width <
+        22;
+      let mode = gesture.value;
+      if (mode === "move") {
+        if (shape.type === "linear") {
+          if (near(shape.x2, shape.y2)) mode = "end";
+          else if (near(shape.x, shape.y)) mode = "start";
+        } else {
+          const angle = (shape.angle * Math.PI) / 180,
+            cos = Math.cos(angle),
+            sin = Math.sin(angle);
+          if (
+            near(shape.x + shape.rx * cos, shape.y + shape.rx * sin) ||
+            near(shape.x - shape.rx * cos, shape.y - shape.rx * sin)
+          )
+            mode = "radius-x";
+          else if (
+            near(shape.x - shape.ry * sin, shape.y + shape.ry * cos) ||
+            near(shape.x + shape.ry * sin, shape.y - shape.ry * cos)
+          )
+            mode = "radius-y";
+        }
+      }
+      drag = {
+        start: p,
+        shape: structuredClone(shape),
+        pointerId: event.pointerId,
+        mode,
+      };
+    }
     overlay.setPointerCapture(event.pointerId);
   };
   overlay.onpointermove = (event) => {
     if (document.querySelector("#viewer").dataset.navigation === "true") return;
-    if (!drag) return;
+    if (!maskPointers.has(event.pointerId) || !component()) return;
+    maskPointers.set(event.pointerId, point(event));
+    if (pinch && maskPointers.size === 2) {
+      event.preventDefault();
+      Object.assign(
+        component(),
+        transformMaskPinch(pinch.shape, pinch.start, [
+          ...maskPointers.values(),
+        ]),
+      );
+      changed();
+      return;
+    }
+    if (!drag || drag.pointerId !== event.pointerId) return;
     const p = point(event),
       shape = component(),
       old = drag.shape,
       dx = p.x - drag.start.x,
       dy = p.y - drag.start.y;
-    if (gesture.value === "draw") {
+    if (drag.mode === "start") Object.assign(shape, { x: p.x, y: p.y });
+    else if (drag.mode === "end") Object.assign(shape, { x2: p.x, y2: p.y });
+    else if (drag.mode === "radius-x" || drag.mode === "radius-y") {
+      const angle = (old.angle * Math.PI) / 180,
+        dx = p.x - old.x,
+        dy = p.y - old.y;
+      const value =
+        drag.mode === "radius-x"
+          ? dx * Math.cos(angle) + dy * Math.sin(angle)
+          : -dx * Math.sin(angle) + dy * Math.cos(angle);
+      shape[drag.mode === "radius-x" ? "rx" : "ry"] = Math.max(
+        0.005,
+        Math.min(1.5, Math.abs(value)),
+      );
+    } else if (drag.mode === "draw") {
       if (shape.type === "linear")
         Object.assign(shape, {
           x: drag.start.x,
@@ -480,14 +594,14 @@ export function createMaskControls({
           rx: Math.max(0.005, Math.abs(dx) / 2),
           ry: Math.max(0.005, Math.abs(dy) / 2),
         });
-    } else if (gesture.value === "resize") {
+    } else if (drag.mode === "resize") {
       if (shape.type === "linear") Object.assign(shape, { x2: p.x, y2: p.y });
       else
         Object.assign(shape, {
           rx: Math.max(0.005, Math.min(1.5, old.rx + dx)),
           ry: Math.max(0.005, Math.min(1.5, old.ry + dy)),
         });
-    } else if (gesture.value === "rotate")
+    } else if (drag.mode === "rotate")
       shape.angle = (Math.atan2(p.y - shape.y, p.x - shape.x) * 180) / Math.PI;
     else {
       const mx = Math.max(-old.x, Math.min(1 - old.x, dx)),
@@ -509,8 +623,11 @@ export function createMaskControls({
     }
   });
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
-    overlay.addEventListener(name, () => {
-      if (drag) {
+    window.addEventListener(name, (event) => {
+      if (!maskPointers.has(event.pointerId)) return;
+      maskPointers.delete(event.pointerId);
+      if (pinch || (drag && drag.pointerId === event.pointerId)) {
+        pinch = null;
         drag = null;
         changed(true);
       }
@@ -535,6 +652,8 @@ export function createMaskControls({
   return {
     sync,
     drawOverlay,
+    isGeometryActive: () =>
+      !!selected() && !["crop", "output"].includes(getPanel()) && !isOriginal(),
     currentAdjustments: () => selected()?.adjustments ?? getEdits(),
   };
 }

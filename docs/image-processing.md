@@ -28,7 +28,8 @@ forcing the reference's contrast. Matching an image to itself is neutral.
 7. Optional eight-range hue/saturation/lightness color mixer.
 8. Saturation, vibrance, or monochrome conversion.
 9. Radial vignette and bounded 8-bit output.
-10. Optional neighborhood sharpening, followed by enabled local mask adjustments.
+10. Optional neighborhood sharpening and deterministic film-grain overlay.
+11. Enabled local mask adjustments.
 
 If learned enhancement is enabled, its bounded LUT transform is applied before
 the above sequence. It is separate from reference matching and has its own
@@ -37,6 +38,12 @@ strength. See [learned enhancement](learned-enhancement.md).
 Crop, rotation, and flip are geometric canvas operations after pixel processing.
 Alpha is preserved by the pixel engine. JPEG export composites transparency onto
 white because JPEG does not carry alpha.
+
+Film grain provides strength (0-100) and size (1-8) controls and can be applied
+inside a mask. It adds the same noise value to R/G/B, is stable across renders,
+and uses normalized source coordinates before crop/rotation. Zero strength leaves
+pixels untouched. It is a creative effect, not recovered photographic detail;
+final clamping can clip bright/dark noise at the output bounds.
 
 ## Important trade-offs
 

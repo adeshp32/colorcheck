@@ -118,6 +118,7 @@ export function hasLocalAdjustments(edits) {
       "vibrance",
       "sharpen",
       "vignette",
+      "grain",
       "enhanceStrength",
     ].some((key) => edits[key] !== 0) ||
     edits.bw ||
@@ -127,4 +128,41 @@ export function hasLocalAdjustments(edits) {
       (grade) => grade.amount && grade.saturation,
     )
   );
+}
+
+/** Two-finger source-space transform, independent of photo zoom and screen density. */
+export function transformMaskPinch(shape, start, current) {
+  const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
+  const vector = (points) => ({
+    x: points[1].x - points[0].x,
+    y: points[1].y - points[0].y,
+  });
+  const a = vector(start),
+    b = vector(current);
+  const scale = Math.hypot(b.x, b.y) / Math.max(0.0001, Math.hypot(a.x, a.y));
+  const angle = Math.atan2(b.y, b.x) - Math.atan2(a.y, a.x);
+  const dx = (current[0].x + current[1].x - start[0].x - start[1].x) / 2;
+  const dy = (current[0].y + current[1].y - start[0].y - start[1].y) / 2;
+  if (shape.type === "radial")
+    return {
+      ...shape,
+      x: clamp(shape.x + dx),
+      y: clamp(shape.y + dy),
+      rx: clamp(shape.rx * scale, 0.005, 1.5),
+      ry: clamp(shape.ry * scale, 0.005, 1.5),
+      angle: ((shape.angle + (angle * 180) / Math.PI + 540) % 360) - 180,
+    };
+  const cx = (shape.x + shape.x2) / 2 + dx,
+    cy = (shape.y + shape.y2) / 2 + dy;
+  const vx = ((shape.x2 - shape.x) * scale) / 2,
+    vy = ((shape.y2 - shape.y) * scale) / 2;
+  const rx = vx * Math.cos(angle) - vy * Math.sin(angle),
+    ry = vx * Math.sin(angle) + vy * Math.cos(angle);
+  return {
+    ...shape,
+    x: clamp(cx - rx),
+    y: clamp(cy - ry),
+    x2: clamp(cx + rx),
+    y2: clamp(cy + ry),
+  };
 }

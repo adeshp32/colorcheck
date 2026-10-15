@@ -289,6 +289,16 @@ createAdjustmentControl(
 );
 createAdjustmentControl("#detail-controls", "sharpen", "Sharpen", 0, 100);
 createAdjustmentControl("#detail-controls", "vignette", "Vignette", 0, 100);
+createAdjustmentControl("#detail-controls", "grain", "Film grain", 0, 100);
+createAdjustmentControl(
+  "#detail-controls",
+  "grainSize",
+  "Grain size",
+  1,
+  8,
+  0.25,
+  1,
+);
 for (const [key, label, def] of [
   ["x", "Left (%)", 0],
   ["y", "Top (%)", 0],
@@ -913,6 +923,7 @@ mobileEditor = initializeMobileEditor({
     positionCrop();
   },
   hasPhoto: () => !!source,
+  maskIsActive: () => masking.isGeometryActive(),
 });
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob),

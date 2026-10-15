@@ -385,11 +385,96 @@ const { join } = require("node:path");
         };
       });
     const beforeMask = await samples();
+    const toolStripBefore = await maskPage.locator(".tools").boundingBox();
+    assert.equal(await maskPage.locator(".social-footer a").isVisible(), true);
     await maskPage.locator("[data-panel=mask]").click();
     await maskPage.locator("#add-radial").click();
     assert.equal(await maskPage.locator("#adjustment-scope option").count(), 2);
+    await maskPage.locator("#close-tools").click();
+    const touch = await maskPage.context().newCDPSession(maskPage);
+    await touch.send("Emulation.setTouchEmulationEnabled", {
+      enabled: true,
+      maxTouchPoints: 2,
+    });
+    async function pinchMask() {
+      const bounds = await maskPage.locator("#mask-overlay").boundingBox();
+      const points = (spread) =>
+        [0, 1].map((id) => ({
+          id,
+          x: bounds.x + bounds.width * (id ? 0.5 + spread : 0.5 - spread),
+          y: bounds.y + bounds.height * 0.5,
+        }));
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: points(0.1),
+      });
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: points(0.15),
+      });
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+    }
+    const radius = Number(
+      await maskPage.locator("#mask-2-radius-x").inputValue(),
+    );
+    await pinchMask();
+    assert.ok(
+      Number(await maskPage.locator("#mask-2-radius-x").inputValue()) >
+        radius * 1.3,
+      "Native two-finger touch must resize the radial mask",
+    );
+    assert.equal(
+      await maskPage
+        .locator("#viewer")
+        .evaluate((node) => node.style.getPropertyValue("--view-zoom")),
+      "1",
+      "Mask pinch must not zoom the photo",
+    );
+    await maskPage.locator("#undo").click();
+    assert.equal(
+      Number(await maskPage.locator("#mask-2-radius-x").inputValue()),
+      radius,
+      "One undo restores the complete mask pinch",
+    );
+    const edge = await maskPage.locator("#mask-overlay").boundingBox();
+    await maskPage.mouse.move(
+      edge.x + edge.width * 0.8,
+      edge.y + edge.height * 0.5,
+    );
+    await maskPage.mouse.down();
+    await maskPage.mouse.move(
+      edge.x + edge.width * 0.87,
+      edge.y + edge.height * 0.5,
+    );
+    await maskPage.mouse.up();
+    assert.ok(
+      Number(await maskPage.locator("#mask-2-radius-x").inputValue()) >
+        radius + 5,
+      "Dragging the radial edge resizes it without selecting a separate gesture mode",
+    );
+    await maskPage.locator("#undo").click();
     await maskPage.locator("[data-panel=light]").click();
     const menuViewer = await maskPage.locator("#viewer").boundingBox();
+    assert.equal(
+      (await maskPage.locator(".tools").boundingBox()).y,
+      toolStripBefore.y,
+      "Tool strip must stay at the bottom while menus open upward",
+    );
+    const menuBounds = await maskPage.locator("#editing-tools").boundingBox();
+    assert.ok(
+      menuBounds.height <= 844 * 0.41,
+      "Tool browsing must leave most of the image workspace visible",
+    );
+    await maskPage.locator("#inspector").evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+    });
+    assert.equal(await maskPage.evaluate(() => scrollY), 0);
+    await maskPage.screenshot({
+      path: join(artifacts, "mobile-upward-tools.png"),
+    });
     assert.deepEqual(
       menuViewer,
       viewerBefore,
@@ -469,6 +554,14 @@ const { join } = require("node:path");
     await maskPage.locator("#mask-operation").selectOption("subtract");
     await maskPage.locator("#append-linear").click();
     assert.equal(await maskPage.locator("#mask-component option").count(), 2);
+    const endX = Number(await maskPage.locator("#mask-5-end-x").inputValue());
+    await maskPage.locator("#close-tools").click();
+    await pinchMask();
+    assert.ok(
+      Number(await maskPage.locator("#mask-5-end-x").inputValue()) > endX,
+      "Linear mask endpoints must respond to native pinch",
+    );
+    await maskPage.locator("[data-panel=mask]").click();
     await maskPage.locator("#remove-component").click();
     const overlayBounds = await maskPage.locator("#mask-overlay").boundingBox();
     await maskPage.locator("#mask-overlay").focus();
@@ -605,6 +698,120 @@ const { join } = require("node:path");
       .getByRole("button", { name: "Fullscreen image", exact: true })
       .click();
     await maskPage.close();
+    assert.deepEqual(errors, []);
+    const grainPage = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+    });
+    grainPage.on("pageerror", (error) => errors.push(error.message));
+    await grainPage.goto(url);
+    await grainPage.locator("#target").setInputFiles({
+      name: "grain-photo.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(bytes, "base64"),
+    });
+    await grainPage.waitForFunction(
+      () => document.querySelector("#preview").width === 800,
+    );
+    await grainPage.locator("[data-panel=output]").click();
+    await grainPage.locator("#format").selectOption("image/png");
+    await grainPage.locator("[data-panel=detail]").click();
+    await grainPage
+      .getByRole("button", { name: "Film grain", exact: true })
+      .click();
+    await grainPage.locator("#slider-grain").evaluate((input) => {
+      input.value = "80";
+      input.dispatchEvent(new Event("change"));
+    });
+    await grainPage
+      .getByRole("button", { name: "Back to tools", exact: true })
+      .click();
+    await grainPage
+      .getByRole("button", { name: "Grain size", exact: true })
+      .click();
+    await grainPage.locator("#slider-grainSize").evaluate((input) => {
+      input.value = "2";
+      input.dispatchEvent(new Event("change"));
+    });
+    const expectedGrain = await grainPage.evaluate(async (base64) => {
+      const { applyPhotoAdjustments, createDefaultEditSettings } =
+        await import("./src/image-processing.js");
+      const bitmap = await createImageBitmap(
+        new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], {
+          type: "image/png",
+        }),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const settings = {
+        ...createDefaultEditSettings(),
+        grain: 80,
+        grainSize: 2,
+      };
+      const result = applyPhotoAdjustments(
+        context.getImageData(0, 0, 800, 600).data,
+        800,
+        600,
+        settings,
+      ).data;
+      return [
+        ...new Uint8Array(await crypto.subtle.digest("SHA-256", result)),
+      ].join(",");
+    }, bytes);
+    await grainPage.waitForFunction(async (expected) => {
+      const canvas = document.querySelector("#preview");
+      const data = canvas
+        .getContext("2d")
+        .getImageData(0, 0, canvas.width, canvas.height).data;
+      return (
+        [...new Uint8Array(await crypto.subtle.digest("SHA-256", data))].join(
+          ",",
+        ) === expected
+      );
+    }, expectedGrain);
+    await grainPage.screenshot({
+      path: join(artifacts, "mobile-film-grain.png"),
+    });
+    const grainDownload = grainPage.waitForEvent("download");
+    await grainPage.locator("#export").click();
+    const grainPath = join(artifacts, "grain-export.png");
+    await (await grainDownload).saveAs(grainPath);
+    const grainExport = await grainPage.evaluate(async (base64) => {
+      const bitmap = await createImageBitmap(
+        new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))], {
+          type: "image/png",
+        }),
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const context = canvas.getContext("2d");
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      return {
+        width: canvas.width,
+        height: canvas.height,
+        hash: [
+          ...new Uint8Array(
+            await crypto.subtle.digest(
+              "SHA-256",
+              context.getImageData(0, 0, canvas.width, canvas.height).data,
+            ),
+          ),
+        ].join(","),
+      };
+    }, fs.readFileSync(grainPath).toString("base64"));
+    assert.equal(grainExport.width, 800);
+    assert.equal(grainExport.height, 600);
+    assert.equal(
+      grainExport.hash,
+      expectedGrain,
+      "Grain PNG export must exactly match full-resolution processing",
+    );
+    await grainPage.close();
     assert.deepEqual(errors, []);
     const fallback = await browser.newPage();
     await fallback.route("**/assets/models/**", (route) =>

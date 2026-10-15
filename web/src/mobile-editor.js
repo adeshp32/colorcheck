@@ -1,5 +1,9 @@
 /** Presentation only: portals retain the original controls and their event handlers. */
-export function initializeMobileEditor({ onViewChange, hasPhoto }) {
+export function initializeMobileEditor({
+  onViewChange,
+  hasPhoto,
+  maskIsActive = () => false,
+}) {
   const $ = (selector) => document.querySelector(selector),
     make = (tag, className) => {
       const node = document.createElement(tag);
@@ -269,6 +273,7 @@ export function initializeMobileEditor({ onViewChange, hasPhoto }) {
     "pointerdown",
     (event) => {
       if (event.target.closest("button") || !hasPhoto()) return;
+      if (maskIsActive()) return;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       const values = [...pointers.values()];
       if (values.length === 2) {
@@ -355,6 +360,7 @@ export function initializeMobileEditor({ onViewChange, hasPhoto }) {
     (event) => {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
+      if (maskIsActive()) return;
       setZoom(zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1));
     },
     { passive: false },

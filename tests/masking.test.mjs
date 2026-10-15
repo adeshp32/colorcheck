@@ -4,6 +4,7 @@ import {
   createMaskComponent,
   maskCoverage,
   sourcePoint,
+  transformMaskPinch,
 } from "../web/src/masking.js";
 import {
   createDefaultEditSettings,
@@ -17,6 +18,31 @@ const makeMask = () => ({
   components: [createMaskComponent()],
   refinement: "none",
   adjustments: createDefaultEditSettings(),
+});
+test("two-finger gestures resize radial masks and linear endpoints without viewport state", () => {
+  const start = [
+      { x: 0.3, y: 0.5 },
+      { x: 0.7, y: 0.5 },
+    ],
+    end = [
+      { x: 0.1, y: 0.5 },
+      { x: 0.9, y: 0.5 },
+    ];
+  const radial = transformMaskPinch(createMaskComponent(), start, end);
+  assert.ok(
+    Math.abs(radial.rx - 0.6) < 1e-10 && Math.abs(radial.ry - 0.6) < 1e-10,
+  );
+  assert.equal(radial.x, 0.5);
+  const linear = createMaskComponent("linear"),
+    changed = transformMaskPinch(linear, start, end);
+  assert.ok(
+    Math.abs(changed.x2 - changed.x - (linear.x2 - linear.x) * 2) < 1e-10,
+  );
+  const rotated = transformMaskPinch(createMaskComponent(), start, [
+    { x: 0.5, y: 0.3 },
+    { x: 0.5, y: 0.7 },
+  ]);
+  assert.ok(Math.abs(rotated.angle - 90) < 1e-10);
 });
 test("radial feather, outside selection, and opacity have bounded coverage", () => {
   const mask = makeMask();

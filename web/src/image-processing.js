@@ -1,6 +1,7 @@
 import { blendEnhancementInto } from "./enhancement-lut.js";
 import { buildCurveTable, lookupCurve } from "./tone-curves.js";
 import { prepareColorMix, mixColorInto } from "./color-mixer.js";
+import { grainAt } from "./film-grain.js";
 import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
@@ -20,6 +21,8 @@ export function createDefaultEditSettings() {
     vibrance: 0,
     sharpen: 0,
     vignette: 0,
+    grain: 0,
+    grainSize: 1,
     bw: false,
     curve: "linear",
     matchColor: 0,
@@ -240,6 +243,16 @@ export function applyPhotoAdjustments(
         }
       }
   }
+  if (edits.grain > 0) {
+    const amount = (edits.grain / 100) * 60;
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (!out[i + 3]) continue;
+        const value = grainAt(x, y, width, height, edits.grainSize) * amount;
+        for (let c = 0; c < 3; c++) out[i + c] += value;
+      }
+  }
   let masked = false;
   for (const mask of (edits.masks ?? []).slice(0, 8)) {
     if (!mask.enabled || !hasLocalAdjustments(mask.adjustments)) continue;
@@ -270,7 +283,7 @@ export function applyPhotoAdjustments(
           out[i + c] += (adjusted[i + c] - out[i + c]) * amount;
       }
   }
-  if (masked && collectHistogram) {
+  if ((masked || edits.grain > 0) && collectHistogram) {
     histogram.fill(0);
     for (let i = 0; i < out.length; i += 4) {
       const gray =

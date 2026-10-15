@@ -12,6 +12,7 @@ Python backend, account, or photo-upload service is required.
 - Optional learned enhancement, using an upstream PyTorch model exported to ONNX.
 - Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
 - Eight-range hue, saturation, and lightness mixing, globally or inside masks.
+- Film-grain overlay with adjustable strength and size, globally or inside masks.
 - Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
 - Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
 - Numeric controls, individual resets, before/after comparison, and undo/redo.
@@ -59,6 +60,7 @@ web/                         Deploy this directory as a static website
     curve-editor.js          Draggable curve points and numeric channel controls
     tone-curves.js           Shape-preserving curve interpolation and lookup tables
     color-mixer.js           Smooth eight-band HSL color adjustments
+    film-grain.js            Repeatable, resolution-independent monochrome grain
     render-worker.js         Background-thread processing message boundary
   styles/editor.css          Mobile-first layout and desktop inspector
   assets/icons/              Locally served Lucide icons and license

@@ -28,7 +28,7 @@ to source-image coordinates. Preview and export share this path.
 There are at most eight masks, each with up to eight geometric components.
 Components support union (add), subtraction, and intersection. Whole-mask
 inversion happens before optional color/luminance intersection and opacity.
-Color, tone, matching, enhancement strength, sharpening, and vignette can be local;
+Color, tone, matching, enhancement strength, sharpening, grain, and vignette can be local;
 geometry and output settings remain whole-photo operations. Mask selection is UI
 state; edits, mask names, and geometry are undoable. This release does not include
 brush painting, automatic subject segmentation, or hair matting.
@@ -38,7 +38,13 @@ Tool menus overlay the workspace without resizing the photo. Selecting an adjust
 portals its existing DOM control into a compact floating sheet; Done restores it.
 `mobile-editor.js` owns these portals, region shortcuts, fit/zoom/pan, and fullscreen
 (with a CSS fallback where native fullscreen is unavailable). The page itself need
-not scroll to perform an edit. Two-finger navigation cancels mask geometry dragging.
+not scroll to perform an edit. The tool strip stays anchored at the bottom, menus
+open upward over at most 40% of the viewport, and only the menu's contents scroll.
+The compact LinkedIn footer remains visible below the tool strip outside fullscreen.
+When a mask is selected for editing, two-finger gestures resize/rotate its geometry,
+not the image. Radial edge handles and linear endpoints also support one-finger
+dragging. Geometry gestures commit one undo entry. Outside mask editing, pinch
+gestures zoom the photo normally.
 Region buttons select the shared whole-photo or mask adjustment scope; they do not
 create independent per-slider mask stacks. Selected coverage is cyan, excluded coverage
 gray; the overlay checkbox hides this visualization without changing exported pixels.
@@ -47,6 +53,11 @@ gray; the overlay checkbox hides this visualization without changing exported pi
 `curve-editor.js` owns draggable points, channel selection, numeric input, and keyboard
 editing. `color-mixer.js` owns eight overlapping HSL hue ranges. Both features run in
 the same worker/export pipeline and work within the selected mask.
+
+`film-grain.js` generates deterministic, monochrome procedural texture. Grain strength
+and size are non-destructive settings; a normalized source-coordinate field keeps
+the pattern stable as preview resolution changes. Full-resolution export regenerates
+that same field, rather than baking a lower-resolution preview into the photo.
 
 `workspace-layout.js` owns display-only photo fitting and the right, bottom,
 and floating tool-panel positions. Viewer resize and canvas geometry changes
