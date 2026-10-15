@@ -407,17 +407,26 @@ const { join } = require("node:path");
     const afterMask = await samples();
     assert.deepEqual(afterMask.outside, beforeMask.outside);
     assert.notDeepEqual(afterMask.center, beforeMask.center);
+    const waitForCenter = (expected) =>
+      maskPage.waitForFunction((expected) => {
+        const pixels = document
+          .querySelector("#preview")
+          .getContext("2d")
+          .getImageData(400, 300, 1, 1).data;
+        return expected.every((value, index) => pixels[index] === value);
+      }, expected);
     await maskPage.locator("#undo").click();
-    await maskPage.waitForTimeout(250);
+    await waitForCenter(beforeMask.center);
     assert.deepEqual((await samples()).center, beforeMask.center);
     await maskPage.locator("#redo").click();
-    await maskPage.waitForTimeout(250);
+    await waitForCenter(afterMask.center);
     assert.deepEqual((await samples()).center, afterMask.center);
     await maskPage.locator("[data-panel=mask]").click();
     await maskPage.locator("#mask-invert").check();
-    await maskPage.waitForTimeout(250);
+    await waitForCenter(beforeMask.center);
     assert.deepEqual((await samples()).center, beforeMask.center);
     await maskPage.locator("#mask-invert").uncheck();
+    await waitForCenter(afterMask.center);
     await maskPage.locator("#mask-operation").selectOption("subtract");
     await maskPage.locator("#append-linear").click();
     assert.equal(await maskPage.locator("#mask-component option").count(), 2);

@@ -23,6 +23,8 @@ export function createMaskControls({
   const $ = (selector) => document.querySelector(selector);
   const overlay = $("#mask-overlay"),
     scope = $("#adjustment-scope");
+  let overlayKey = "",
+    overlayPixels = null;
   let selectedId = "",
     componentIndex = 0,
     showOverlay = true,
@@ -317,7 +319,36 @@ export function createMaskControls({
     const mask = selected(),
       pixels = getPixels();
     overlay.hidden = !mask || !pixels || getPanel() !== "mask" || isOriginal();
-    if (overlay.hidden) return;
+    if (overlay.hidden) {
+      if (!mask || !pixels) {
+        overlayPixels = null;
+        overlayKey = "";
+        overlay.width = overlay.height = 1;
+      }
+      return;
+    }
+    const preview = $("#preview");
+    overlay.style.width = preview.style.width;
+    overlay.style.height = preview.style.height;
+    const key = JSON.stringify([
+      mask.id,
+      mask.components,
+      componentIndex,
+      mask.invert,
+      mask.opacity,
+      mask.refinement,
+      mask.lumaMin,
+      mask.lumaMax,
+      mask.rangeSoftness,
+      mask.color,
+      mask.colorTolerance,
+      showOverlay,
+      getEdits().rotation,
+      getEdits().flip,
+    ]);
+    if (key === overlayKey && pixels === overlayPixels) return;
+    overlayKey = key;
+    overlayPixels = pixels;
     const canvas = document.createElement("canvas");
     canvas.width = pixels.width;
     canvas.height = pixels.height;
@@ -379,8 +410,7 @@ export function createMaskControls({
       Math.PI * 2,
     );
     context.stroke();
-    const preview = $("#preview"),
-      display = getDisplayPixels();
+    const display = getDisplayPixels();
     drawPhoto(
       overlay,
       canvas,
