@@ -540,6 +540,10 @@ const { join } = require("node:path");
       curve.x + curve.width * 0.5,
       curve.y + curve.height * 0.3,
     );
+    await maskPage.screenshot({
+      path: join(artifacts, "mobile-compact-curves.png"),
+    });
+    await maskPage.locator("#curve-point-options summary").click();
     await maskPage.locator("#curve-output").fill("190");
     await maskPage.locator("#curve-output").dispatchEvent("change");
     assert.equal(await maskPage.locator("#curve-output").inputValue(), "190");

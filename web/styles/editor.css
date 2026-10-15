@@ -509,7 +509,7 @@ main[data-dock="floating"] aside {
   border: 2px solid transparent;
 }
 .color-bands button[aria-pressed="true"] {
-  outline: 2px solid var(--text);
+  outline: 2px solid currentColor;
   outline-offset: 2px;
   border-color: var(--surface);
 }
@@ -575,7 +575,26 @@ main:fullscreen {
   }
   .single-adjustment-content #curve-preview {
     max-width: 320px;
+    height: 144px;
+    aspect-ratio: auto;
     margin: 0 auto;
+  }
+  .single-adjustment-content > div > .region-button {
+    position: absolute;
+    top: 6px;
+    right: 112px;
+  }
+  .single-adjustment-content
+    #color-mixer-controls
+    .control
+    > input[type="range"],
+  .single-adjustment-content #grade-controls .control > input[type="range"] {
+    display: none;
+  }
+  #curve-point-options summary {
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px 0;
   }
   .single-adjustment-content #wheel {
     width: 160px;

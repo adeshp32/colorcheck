@@ -307,13 +307,7 @@
             <button id="open-curves" class="advanced-tool">Curves</button>
             <div id="curve-panel">
               <h3>Tone curve</h3>
-              <select id="curve">
-                <option value="custom" disabled>Custom curve</option>
-                <option value="linear">Linear</option>
-                <option value="soft">Soft contrast</option>
-                <option value="strong">Strong contrast</option>
-                <option value="matte">Lifted blacks</option></select
-              ><canvas
+              <canvas
                 id="curve-preview"
                 width="320"
                 height="240"
@@ -331,27 +325,37 @@
                 ><button data-channel="green" aria-pressed="false">Green</button
                 ><button data-channel="blue" aria-pressed="false">Blue</button>
               </div>
-              <div class="curve-values">
-                <label
-                  >Input<input
-                    id="curve-input"
-                    type="number"
-                    min="0"
-                    max="255"
-                    step="1" /></label
-                ><label
-                  >Output<input
-                    id="curve-output"
-                    type="number"
-                    min="0"
-                    max="255"
-                    step="1"
-                /></label>
-              </div>
-              <div class="commands">
-                <button id="delete-curve-point">Remove point</button
-                ><button id="reset-curve-channel">Reset channel</button>
-              </div>
+              <details id="curve-point-options" open>
+                <summary>Point controls</summary>
+                <select id="curve">
+                  <option value="custom" disabled>Custom curve</option>
+                  <option value="linear">Linear</option>
+                  <option value="soft">Soft contrast</option>
+                  <option value="strong">Strong contrast</option>
+                  <option value="matte">Lifted blacks</option>
+                </select>
+                <div class="curve-values">
+                  <label
+                    >Input<input
+                      id="curve-input"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1" /></label
+                  ><label
+                    >Output<input
+                      id="curve-output"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1"
+                  /></label>
+                </div>
+                <div class="commands">
+                  <button id="delete-curve-point">Remove point</button
+                  ><button id="reset-curve-channel">Reset channel</button>
+                </div>
+              </details>
             </div>
             <canvas
               id="histogram"

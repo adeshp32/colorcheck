@@ -31,6 +31,7 @@ export function initializeMobileEditor({ onViewChange, hasPhoto }) {
     else transportMarker.after(transport);
   }
   placeTransport();
+  $("#curve-point-options").open = !media.matches;
   dock.hidden = true;
   dock.setAttribute("aria-label", "Active adjustment");
   const back = make("button"),
@@ -39,7 +40,7 @@ export function initializeMobileEditor({ onViewChange, hasPhoto }) {
   overlayToggle.title = "Show mask overlay";
   overlayToggle.setAttribute("aria-label", "Show mask overlay");
   const overlayIcon = make("img", "icon");
-  overlayIcon.src = "./assets/icons/icon-scan-line.svg";
+  overlayIcon.src = "./assets/icons/icon-eye.svg";
   overlayIcon.alt = "";
   overlayToggle.append(overlayIcon);
   overlayToggle.onclick = () => {
@@ -362,6 +363,7 @@ export function initializeMobileEditor({ onViewChange, hasPhoto }) {
   media.addEventListener("change", () => {
     restore();
     placeTransport();
+    $("#curve-point-options").open = !media.matches;
     paintView();
   });
   function sync() {
