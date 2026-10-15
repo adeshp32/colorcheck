@@ -8,6 +8,7 @@ import {
 import { createEditHistory } from "./edit-history.js";
 import { createEnhancementClient } from "./learned-enhancement.js";
 import { initializeWorkspaceLayout } from "./workspace-layout.js";
+import { createMaskControls } from "./mask-controls.js";
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
@@ -24,6 +25,8 @@ let edits = createDefaultEditSettings(),
   exporting = false;
 const editHistory = createEditHistory(edits);
 const enhancementClient = createEnhancementClient();
+let masking;
+const adjustmentSettings = () => masking?.currentAdjustments() ?? edits;
 let activeEnhancement = null,
   enhancing = false;
 let worker,
@@ -68,7 +71,11 @@ function renderInWorker(pixels, width, height, settings) {
         height,
         edits: settings,
         enhancementLut:
-          settings.enhancementId === activeEnhancement?.id
+          activeEnhancement &&
+          (settings.enhancementId === activeEnhancement.id ||
+            settings.masks?.some(
+              (mask) => mask.adjustments.enhancementId === activeEnhancement.id,
+            ))
             ? activeEnhancement.lut
             : null,
       },
@@ -125,20 +132,21 @@ function createAdjustmentControl(
   $(container).append(row);
   const get = () =>
     key.startsWith("grade-")
-      ? edits.grades[range][key.slice(6)]
+      ? adjustmentSettings().grades[range][key.slice(6)]
       : key.startsWith("crop-")
         ? edits.crop[key.slice(5)]
         : key === "quality"
           ? quality
-          : edits[key];
+          : adjustmentSettings()[key];
   const set = (v, interactive = false) => {
     v = clamp(v, min, max);
-    if (key.startsWith("grade-")) edits.grades[range][key.slice(6)] = v;
+    if (key.startsWith("grade-"))
+      adjustmentSettings().grades[range][key.slice(6)] = v;
     else if (key.startsWith("crop-")) {
       edits.crop[key.slice(5)] = v;
       boundCrop();
     } else if (key === "quality") quality = v;
-    else edits[key] = v;
+    else adjustmentSettings()[key] = v;
     slider.value = get();
     number.value = get();
     if (key === "quality") synchronizeControls();
@@ -272,14 +280,15 @@ function boundCrop() {
   c.y = clamp(c.y, 0, 100 - c.h);
 }
 function synchronizeControls() {
+  masking?.sync();
   for (const control of controls.values()) {
     control.slider.value = control.get();
     control.number.value = Number(control.get()).toFixed(
       Number(control.slider.step) < 1 ? 2 : 0,
     );
   }
-  $("#bw").checked = edits.bw;
-  $("#curve").value = edits.curve;
+  $("#bw").checked = adjustmentSettings().bw;
+  $("#curve").value = adjustmentSettings().curve;
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
@@ -289,7 +298,8 @@ function synchronizeControls() {
     controls.get("enhanceStrength").number,
   ])
     input.disabled =
-      !activeEnhancement || edits.enhancementId !== activeEnhancement.id;
+      !activeEnhancement ||
+      adjustmentSettings().enhancementId !== activeEnhancement.id;
   for (const id of ["export", "compare", "reset"])
     $(`#${id}`).disabled = !source;
   $("#output-size").textContent = source
@@ -387,8 +397,9 @@ $("#enhance").onclick = async () => {
     const id = `${result.modelId}:${ticket}`;
     activeEnhancement = { id, ...result };
     applyEdit(() => {
-      edits.enhancementId = id;
-      edits.enhanceStrength = result.assessment.recommendedStrength;
+      adjustmentSettings().enhancementId = id;
+      adjustmentSettings().enhanceStrength =
+        result.assessment.recommendedStrength;
     });
     original = false;
     $("#compare").textContent = "Original";
@@ -442,11 +453,16 @@ $("#reference").onchange = async (e) => {
     image.src = canvas.toDataURL();
     image.alt = `Reference: ${file.name}`;
     $("#reference-preview").replaceChildren(image);
-    if (edits.match)
+    if (adjustmentSettings().match)
       applyEdit(() => {
-        edits.match = null;
-        edits.matchColor = 0;
-        edits.matchTone = 0;
+        for (const settings of [
+          edits,
+          ...(edits.masks ?? []).map((mask) => mask.adjustments),
+        ]) {
+          settings.match = null;
+          settings.matchColor = 0;
+          settings.matchTone = 0;
+        }
       });
     synchronizeControls();
     showStatus("Reference ready.");
@@ -457,9 +473,12 @@ $("#reference").onchange = async (e) => {
 $("#match").onclick = () => {
   if (!source || !referenceStats) return;
   applyEdit(() => {
-    edits.match = calculateReferenceMatch(source.stats, referenceStats);
-    edits.matchColor = 65;
-    edits.matchTone = 45;
+    adjustmentSettings().match = calculateReferenceMatch(
+      source.stats,
+      referenceStats,
+    );
+    adjustmentSettings().matchColor = 65;
+    adjustmentSettings().matchTone = 45;
   });
   showStatus("Reference applied. Adjust palette and tone independently.");
 };
@@ -518,7 +537,7 @@ function drawCurve() {
   c.lineWidth = 2;
   c.beginPath();
   for (let x = 0; x <= 256; x++) {
-    const y = 100 - 100 * applyToneCurve(x / 256, edits.curve);
+    const y = 100 - 100 * applyToneCurve(x / 256, adjustmentSettings().curve);
     x ? c.lineTo(x, y) : c.moveTo(x, y);
   }
   c.stroke();
@@ -563,10 +582,11 @@ async function renderPreview(interactive = false) {
       previewPixels.width,
       previewPixels.height,
       settings,
-      panel !== "crop",
+      panel !== "crop" && panel !== "mask",
     );
     if (result.histogram) drawHistogram(result.histogram);
     positionCrop();
+    masking?.drawOverlay();
   } catch (error) {
     showStatus(error.message);
   } finally {
@@ -604,15 +624,17 @@ $("#compare").onclick = () => {
 };
 $("#bw").onchange = (e) =>
   applyEdit(() => {
-    edits.bw = e.target.checked;
+    adjustmentSettings().bw = e.target.checked;
   });
 $("#curve").onchange = (e) =>
   applyEdit(() => {
-    edits.curve = e.target.value;
+    adjustmentSettings().curve = e.target.value;
   });
 for (const button of document.querySelectorAll("[data-panel]"))
   button.onclick = () => {
-    const cropChanged = panel === "crop" || button.dataset.panel === "crop";
+    const cropChanged =
+      ["crop", "mask"].includes(panel) ||
+      ["crop", "mask"].includes(button.dataset.panel);
     panel = button.dataset.panel;
     for (const b of document.querySelectorAll("[data-panel]"))
       b.setAttribute("aria-selected", String(b === button));
@@ -630,7 +652,7 @@ for (const button of document.querySelectorAll("[data-range]"))
   };
 $("#reset-grade").onclick = () =>
   applyEdit(() => {
-    edits.grades[range] = { hue: 0, saturation: 0, amount: 20 };
+    adjustmentSettings().grades[range] = { hue: 0, saturation: 0, amount: 20 };
   });
 let wheelBackground;
 function drawWheel() {
@@ -673,7 +695,7 @@ function drawWheel() {
     background.fill();
   }
   c.drawImage(wheelBackground, 0, 0);
-  const g = edits.grades[range],
+  const g = adjustmentSettings().grades[range],
     a = (g.hue * Math.PI) / 180,
     x = 110 + (Math.cos(a) * radius * g.saturation) / 100,
     y = 110 + (Math.sin(a) * radius * g.saturation) / 100;
@@ -696,8 +718,13 @@ function updateGradingFromPointer(e) {
   const rect = $("#wheel").getBoundingClientRect(),
     x = ((e.clientX - rect.left) / rect.width) * 220 - 110,
     y = ((e.clientY - rect.top) / rect.height) * 220 - 110;
-  edits.grades[range].hue = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-  edits.grades[range].saturation = clamp((Math.hypot(x, y) / 96) * 100, 0, 100);
+  adjustmentSettings().grades[range].hue =
+    ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+  adjustmentSettings().grades[range].saturation = clamp(
+    (Math.hypot(x, y) / 96) * 100,
+    0,
+    100,
+  );
   renderPreview(true);
 }
 $("#wheel").onpointerdown = (e) => {
@@ -721,7 +748,7 @@ $("#wheel").onkeydown = (e) => {
     return;
   e.preventDefault();
   applyEdit(() => {
-    const g = edits.grades[range];
+    const g = adjustmentSettings().grades[range];
     if (e.key === "ArrowLeft" || e.key === "ArrowRight")
       g.hue = (g.hue + (e.key === "ArrowRight" ? 2 : 358)) % 360;
     else
@@ -824,7 +851,23 @@ $("#crop-box").onkeydown = (e) => {
     boundCrop();
   });
 };
-initializeWorkspaceLayout(positionCrop);
+masking = createMaskControls({
+  getEdits: () => edits,
+  getSource: () => source,
+  getPixels: () => interactionPixels,
+  getDisplayPixels: () => previewPixels,
+  getPanel: () => panel,
+  isOriginal: () => original,
+  render: renderPreview,
+  commit: commitEditHistory,
+  synchronize: synchronizeControls,
+  drawPhoto: drawTransformedPhoto,
+  status: showStatus,
+});
+initializeWorkspaceLayout(() => {
+  positionCrop();
+  masking.drawOverlay();
+});
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob),
     a = document.createElement("a");

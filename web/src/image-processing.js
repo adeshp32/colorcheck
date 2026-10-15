@@ -1,4 +1,5 @@
 import { blendEnhancementInto } from "./enhancement-lut.js";
+import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
 export function createDefaultEditSettings() {
@@ -215,6 +216,43 @@ export function applyPhotoAdjustments(
           out[i + c] = copy[i + c] + amount * (copy[i + c] - blur);
         }
       }
+  }
+  let masked = false;
+  for (const mask of (edits.masks ?? []).slice(0, 8)) {
+    if (!mask.enabled || !hasLocalAdjustments(mask.adjustments)) continue;
+    masked = true;
+    const preparedMask = prepareMask(mask);
+    const adjusted = applyPhotoAdjustments(
+      out,
+      width,
+      height,
+      { ...mask.adjustments, masks: [] },
+      enhancementLut,
+    ).data;
+    const rgb = [0, 0, 0];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        rgb[0] = data[i];
+        rgb[1] = data[i + 1];
+        rgb[2] = data[i + 2];
+        const amount = maskCoverage(
+          preparedMask,
+          (x + 0.5) / width,
+          (y + 0.5) / height,
+          rgb,
+        );
+        for (let c = 0; c < 3; c++)
+          out[i + c] += (adjusted[i + c] - out[i + c]) * amount;
+      }
+  }
+  if (masked) {
+    histogram.fill(0);
+    for (let i = 0; i < out.length; i += 4) {
+      const gray =
+        (0.2126 * out[i] + 0.7152 * out[i + 1] + 0.0722 * out[i + 2]) / 255;
+      histogram[Math.min(63, Math.floor(gray * 64))]++;
+    }
   }
   return { data: out, histogram };
 }

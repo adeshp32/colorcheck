@@ -59,6 +59,12 @@
             hidden
             aria-label="Edited photo preview"
           ></canvas>
+          <canvas
+            id="mask-overlay"
+            hidden
+            aria-label="Mask selection: drag to reposition; arrow keys move, Shift plus arrows resize"
+            tabindex="0"
+          ></canvas>
           <div
             class="crop-box"
             id="crop-box"
@@ -98,6 +104,13 @@
             <img class="icon" src="./assets/icons/icon-grip.svg" alt="" />
           </button>
           <span>Tools</span>
+          <button
+            id="close-tools"
+            aria-label="Close tool controls"
+            title="Close controls"
+          >
+            ×
+          </button>
           <div
             class="panel-docks"
             role="group"
@@ -142,6 +155,13 @@
           </div>
         </div>
         <nav class="tools" aria-label="Tools">
+          <button data-panel="mask" title="Local masks">
+            <img
+              class="icon"
+              src="./assets/icons/icon-scan-line.svg"
+              alt=""
+            /><span>Masks</span>
+          </button>
           <button
             data-panel="match"
             aria-selected="true"
@@ -180,7 +200,80 @@
             /><span>Output</span>
           </button>
         </nav>
+        <label class="adjustment-scope"
+          >Editing<select id="adjustment-scope" aria-label="Adjustment scope">
+            <option value="">Whole photo</option>
+          </select></label
+        >
         <div class="inspector" id="inspector">
+          <section data-section="mask" hidden>
+            <h2>Masks</h2>
+            <div class="commands">
+              <button id="add-radial">+ Radial</button
+              ><button id="add-linear">+ Linear</button>
+            </div>
+            <div id="mask-settings" hidden>
+              <label>Name<input id="mask-name" maxlength="48" /></label>
+              <div class="mask-toggles">
+                <label class="check"
+                  ><input
+                    id="mask-enabled"
+                    type="checkbox"
+                    checked
+                  />Enabled</label
+                ><label class="check"
+                  ><input id="mask-invert" type="checkbox" />Outside</label
+                ><label class="check"
+                  ><input
+                    id="mask-show"
+                    type="checkbox"
+                    checked
+                  />Overlay</label
+                >
+              </div>
+              <label
+                >Shape<select
+                  id="mask-component"
+                  aria-label="Mask component"
+                ></select
+              ></label>
+              <div class="commands">
+                <select id="mask-operation" aria-label="New shape operation">
+                  <option value="add">Add area</option>
+                  <option value="subtract">Subtract area</option>
+                  <option value="intersect">Intersect area</option></select
+                ><button id="append-radial">+ Radial</button
+                ><button id="append-linear">+ Linear</button
+                ><button id="remove-component">Remove shape</button>
+              </div>
+              <div id="mask-geometry"></div>
+              <label
+                >Refine by<select id="mask-refinement">
+                  <option value="none">No range restriction</option>
+                  <option value="luminance">Luminance range</option>
+                  <option value="color">Color range</option>
+                </select></label
+              >
+              <div id="mask-luminance" hidden></div>
+              <div id="mask-color" hidden>
+                <label
+                  >Color<input
+                    id="mask-color-value"
+                    type="color"
+                    value="#808080"
+                /></label>
+                <div id="mask-color-controls"></div>
+              </div>
+              <div class="commands">
+                <button id="duplicate-mask">Duplicate mask</button
+                ><button id="delete-mask">Delete mask</button>
+              </div>
+              <p class="note">
+                Color and light controls apply to the selected mask. Crop,
+                rotation, and export apply to the whole photo.
+              </p>
+            </div>
+          </section>
           <section data-section="match">
             <h2>Reference match</h2>
             <div id="reference-preview"><span>No reference selected</span></div>

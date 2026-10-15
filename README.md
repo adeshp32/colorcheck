@@ -14,6 +14,9 @@ Python backend, account, or photo-upload service is required.
 - Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
 - Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
 - Numeric controls, individual resets, before/after comparison, and undo/redo.
+- Local radial and linear masks with inside/outside selection, feathering,
+  add/subtract/intersect shapes, and color/luminance refinement.
+- Image-first mobile workspace with an expandable tool tray and individual sliders.
 - Full-resolution JPEG, PNG, or WebP export and optional JSON settings report.
 
 JPEG/PNG/WebP input is limited to 50 MB and 24 megapixels. This baseline is an
@@ -49,6 +52,8 @@ web/                         Deploy this directory as a static website
     editor-controller.js     Files, edit history, controls, preview, and export
     image-processing.js      Pure pixel transforms and reference statistics
     edit-history.js          Bounded, isolated undo/redo settings snapshots
+    masking.js               Source-coordinate mask coverage and range refinement
+    mask-controls.js         Local adjustment scope, mask gestures, and overlays
     render-worker.js         Background-thread processing message boundary
   styles/editor.css          Mobile-first layout and desktop inspector
   assets/icons/              Locally served Lucide icons and license

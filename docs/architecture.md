@@ -16,6 +16,28 @@ or a build pipeline. The static `web/` directory is the production artifact.
 responsive layout, not image processing. `tools/serve.mjs` only serves local
 development files and does not accept uploads.
 
+`masking.js` defines resolution-independent radial/linear coverage, feathering,
+shape composition, range refinement, and inverse display coordinates.
+`mask-controls.js` owns mask selection, numeric controls, overlays, and gestures.
+Masks and their local adjustment settings are plain objects in the existing
+undo history, not stored full-resolution bitmaps. The processing worker applies
+global adjustments first, then blends each enabled mask's local result in stack
+order. Cropping, rotation, and flipping happen afterward, so masks remain anchored
+to source-image coordinates. Preview and export share this path.
+
+There are at most eight masks, each with up to eight geometric components.
+Components support union (add), subtraction, and intersection. Whole-mask
+inversion happens before optional color/luminance intersection and opacity.
+Color, tone, matching, enhancement strength, sharpening, and vignette can be local;
+geometry and output settings remain whole-photo operations. Mask selection is UI
+state; edits, mask names, and geometry are undoable. This release does not include
+brush painting, automatic subject segmentation, or hair matting.
+
+On mobile the image workspace fills the viewport above a compact tool strip.
+Selecting a tool opens a scrollable bottom tray; selecting it again or closing
+the tray restores image space. Individual adjustment sliders expand on request.
+The page itself need not scroll to perform an edit.
+
 `workspace-layout.js` owns display-only photo fitting and the right, bottom,
 and floating tool-panel positions. Viewer resize and canvas geometry changes
 recalculate the fitted dimensions without changing image or export resolution.

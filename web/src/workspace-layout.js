@@ -25,6 +25,77 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   let mode = mobile.matches ? "bottom" : "right",
     drag = null;
   const buttons = [...document.querySelectorAll("[data-dock-mode]")];
+  function toggleAdjustment(label) {
+    if (!mobile.matches) return;
+    const row = label.closest(".control"),
+      open = row.dataset.expanded !== "true";
+    panel.querySelectorAll(".control").forEach((control) => {
+      control.dataset.expanded = "false";
+      control.querySelector("label")?.setAttribute("aria-expanded", "false");
+    });
+    row.dataset.expanded = String(open);
+    label.setAttribute("aria-expanded", String(open));
+  }
+  panel.querySelectorAll(".control-top label").forEach((label) => {
+    label.addEventListener("click", (event) => {
+      if (mobile.matches) {
+        event.preventDefault();
+        toggleAdjustment(label);
+      }
+    });
+    label.addEventListener("keydown", (event) => {
+      if (mobile.matches && ["Enter", " "].includes(event.key)) {
+        event.preventDefault();
+        toggleAdjustment(label);
+      }
+    });
+  });
+  function adjustmentAccessibility() {
+    panel.querySelectorAll(".control-top label").forEach((label) => {
+      if (mobile.matches) {
+        label.setAttribute("role", "button");
+        label.setAttribute("aria-label", label.textContent);
+        label.tabIndex = 0;
+        label.setAttribute(
+          "aria-expanded",
+          String(label.closest(".control").dataset.expanded === "true"),
+        );
+      } else {
+        label.removeAttribute("role");
+        label.removeAttribute("aria-label");
+        label.removeAttribute("tabindex");
+        label.removeAttribute("aria-expanded");
+      }
+    });
+  }
+  layout.dataset.tray = mobile.matches ? "closed" : "open";
+  for (const button of document.querySelectorAll("[data-panel]"))
+    button.addEventListener("click", () => {
+      if (!mobile.matches) return;
+      const same = layout.dataset.activeTool === button.dataset.panel;
+      layout.dataset.tray =
+        same && layout.dataset.tray === "open" ? "closed" : "open";
+      layout.dataset.activeTool = button.dataset.panel;
+      updateExpanded();
+    });
+  function updateExpanded() {
+    document
+      .querySelectorAll("[data-panel]")
+      .forEach((button) =>
+        button.setAttribute(
+          "aria-expanded",
+          String(
+            !mobile.matches ||
+              (layout.dataset.tray === "open" &&
+                layout.dataset.activeTool === button.dataset.panel),
+          ),
+        ),
+      );
+  }
+  document.querySelector("#close-tools").onclick = () => {
+    layout.dataset.tray = "closed";
+    updateExpanded();
+  };
 
   function fitPreview() {
     const fitted = fitPreviewDimensions(
@@ -50,6 +121,7 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   function dock(next) {
     if (mobile.matches && next === "right") next = "bottom";
     mode = next;
+    if (next === "floating") layout.dataset.tray = "open";
     layout.dataset.dock = next;
     panel.style.cssText = "";
     buttons.forEach((button) =>
@@ -125,8 +197,13 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     fitPreview();
   });
   addEventListener("scroll", keepVisible, { passive: true });
-  mobile.addEventListener("change", () =>
-    dock(mobile.matches ? "bottom" : "right"),
-  );
+  mobile.addEventListener("change", () => {
+    layout.dataset.tray = mobile.matches ? "closed" : "open";
+    dock(mobile.matches ? "bottom" : "right");
+    updateExpanded();
+    adjustmentAccessibility();
+  });
   dock(mode);
+  updateExpanded();
+  adjustmentAccessibility();
 }

@@ -328,6 +328,7 @@ const { join } = require("node:path");
     await layoutPage.screenshot({ path: join(artifacts, "bottom-tools.png") });
     await layoutPage.setViewportSize({ width: 390, height: 844 });
     await assertPreviewFits();
+    await layoutPage.locator("[data-panel=mask]").click();
     await layoutPage.locator("[data-dock-mode=floating]").click();
     await layoutPage.setViewportSize({ width: 320, height: 568 });
     await assertPreviewFits();
@@ -351,6 +352,122 @@ const { join } = require("node:path");
       fullPage: true,
     });
     await layoutPage.close();
+    assert.deepEqual(errors, []);
+    const maskPage = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+    });
+    maskPage.on("pageerror", (error) => errors.push(error.message));
+    await maskPage.goto(url);
+    await maskPage.locator("#target").setInputFiles({
+      name: "masked-photo.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(bytes, "base64"),
+    });
+    await maskPage.waitForFunction(
+      () => document.querySelector("#preview").width === 800,
+    );
+    assert.equal(
+      await maskPage.locator("#editor-layout").getAttribute("data-tray"),
+      "closed",
+    );
+    const viewerBefore = await maskPage.locator("#viewer").boundingBox();
+    assert.ok(
+      viewerBefore.height > 450,
+      "Image should dominate the closed mobile workspace",
+    );
+    const samples = () =>
+      maskPage.locator("#preview").evaluate((canvas) => {
+        const context = canvas.getContext("2d");
+        return {
+          center: [...context.getImageData(400, 300, 1, 1).data],
+          outside: [...context.getImageData(10, 10, 1, 1).data],
+        };
+      });
+    const beforeMask = await samples();
+    await maskPage.locator("[data-panel=mask]").click();
+    await maskPage.locator("#add-radial").click();
+    assert.equal(await maskPage.locator("#adjustment-scope option").count(), 2);
+    await maskPage.locator("[data-panel=light]").click();
+    await maskPage
+      .getByRole("button", { name: "Exposure (EV)", exact: true })
+      .click();
+    assert.equal(await maskPage.locator("#slider-exposure").isVisible(), true);
+    await maskPage.locator("#slider-exposure").evaluate((input) => {
+      input.value = "1";
+      input.dispatchEvent(new Event("input"));
+      input.dispatchEvent(new Event("change"));
+    });
+    await maskPage.waitForFunction(
+      () =>
+        document
+          .querySelector("#preview")
+          .getContext("2d")
+          .getImageData(400, 300, 1, 1).data[0] > 240,
+    );
+    const afterMask = await samples();
+    assert.deepEqual(afterMask.outside, beforeMask.outside);
+    assert.notDeepEqual(afterMask.center, beforeMask.center);
+    await maskPage.locator("#undo").click();
+    await maskPage.waitForTimeout(250);
+    assert.deepEqual((await samples()).center, beforeMask.center);
+    await maskPage.locator("#redo").click();
+    await maskPage.waitForTimeout(250);
+    assert.deepEqual((await samples()).center, afterMask.center);
+    await maskPage.locator("[data-panel=mask]").click();
+    await maskPage.locator("#mask-invert").check();
+    await maskPage.waitForTimeout(250);
+    assert.deepEqual((await samples()).center, beforeMask.center);
+    await maskPage.locator("#mask-invert").uncheck();
+    await maskPage.locator("#mask-operation").selectOption("subtract");
+    await maskPage.locator("#append-linear").click();
+    assert.equal(await maskPage.locator("#mask-component option").count(), 2);
+    await maskPage.locator("#remove-component").click();
+    const overlayBounds = await maskPage.locator("#mask-overlay").boundingBox();
+    await maskPage.locator("#mask-overlay").focus();
+    await maskPage.keyboard.press("ArrowRight");
+    await maskPage.screenshot({ path: join(artifacts, "mobile-masking.png") });
+    assert.ok(overlayBounds.height > 100);
+    await maskPage.locator("[data-panel=output]").click();
+    await maskPage.locator("#format").selectOption("image/png");
+    const maskedDownload = maskPage.waitForEvent("download");
+    await maskPage.locator("#export").click();
+    await (await maskedDownload).saveAs(join(artifacts, "masked-export.png"));
+    const exportedMask = await maskPage.evaluate(
+      async (data) => {
+        const binary = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+        const image = await createImageBitmap(
+          new Blob([binary], { type: "image/png" }),
+        );
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext("2d");
+        context.drawImage(image, 0, 0);
+        const result = {
+          width: image.width,
+          height: image.height,
+          center: [...context.getImageData(400, 300, 1, 1).data],
+          outside: [...context.getImageData(10, 10, 1, 1).data],
+        };
+        image.close();
+        return result;
+      },
+      fs.readFileSync(join(artifacts, "masked-export.png")).toString("base64"),
+    );
+    assert.equal(exportedMask.width, 800);
+    assert.equal(exportedMask.height, 600);
+    assert.deepEqual(exportedMask.outside, beforeMask.outside);
+    assert.deepEqual(exportedMask.center, afterMask.center);
+    await maskPage.locator("#close-tools").click();
+    await maskPage.screenshot({
+      path: join(artifacts, "mobile-image-first.png"),
+    });
+    assert.equal(
+      await maskPage.evaluate(() => scrollY),
+      0,
+      "Tools should not require page scrolling",
+    );
+    await maskPage.close();
     assert.deepEqual(errors, []);
     const fallback = await browser.newPage();
     await fallback.route("**/assets/models/**", (route) =>
