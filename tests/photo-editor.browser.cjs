@@ -366,6 +366,7 @@ const { join } = require("node:path");
     await maskPage.waitForFunction(
       () => document.querySelector("#preview").width === 800,
     );
+    await maskPage.evaluate(() => document.fonts.ready);
     assert.equal(
       await maskPage.locator("#editor-layout").getAttribute("data-tray"),
       "closed",
@@ -388,10 +389,48 @@ const { join } = require("node:path");
     await maskPage.locator("#add-radial").click();
     assert.equal(await maskPage.locator("#adjustment-scope option").count(), 2);
     await maskPage.locator("[data-panel=light]").click();
+    const menuViewer = await maskPage.locator("#viewer").boundingBox();
+    assert.deepEqual(
+      menuViewer,
+      viewerBefore,
+      "Opening tools must never resize the photo canvas",
+    );
     await maskPage
       .getByRole("button", { name: "Exposure (EV)", exact: true })
       .click();
     assert.equal(await maskPage.locator("#slider-exposure").isVisible(), true);
+    assert.equal(
+      await maskPage.locator(".single-adjustment").isVisible(),
+      true,
+    );
+    assert.equal(await maskPage.locator("#slider-contrast").isVisible(), false);
+    assert.deepEqual(
+      await maskPage.locator("#viewer").boundingBox(),
+      viewerBefore,
+    );
+    await maskPage.screenshot({
+      path: join(artifacts, "mobile-single-adjustment.png"),
+    });
+    const overlayColors = await maskPage
+      .locator("#mask-overlay")
+      .evaluate((canvas) => {
+        const c = canvas.getContext("2d");
+        return {
+          inside: [...c.getImageData(420, 320, 1, 1).data],
+          outside: [...c.getImageData(10, 10, 1, 1).data],
+        };
+      });
+    assert.ok(
+      overlayColors.inside[1] > overlayColors.inside[0] + 100 &&
+        overlayColors.inside[2] > overlayColors.inside[0] + 100,
+      "Selected mask should be cyan",
+    );
+    assert.equal(
+      overlayColors.outside[0],
+      overlayColors.outside[1],
+      "Excluded mask should be gray",
+    );
+    assert.equal(overlayColors.outside[1], overlayColors.outside[2]);
     await maskPage.locator("#slider-exposure").evaluate((input) => {
       input.value = "1";
       input.dispatchEvent(new Event("input"));
@@ -476,6 +515,91 @@ const { join } = require("node:path");
       0,
       "Tools should not require page scrolling",
     );
+    await maskPage
+      .getByRole("button", { name: "Zoom in", exact: true })
+      .click();
+    assert.ok(
+      Number(
+        await maskPage
+          .locator("#viewer")
+          .evaluate((node) => node.style.getPropertyValue("--view-zoom")),
+      ) > 1,
+    );
+    await maskPage
+      .getByRole("button", { name: "Fit image", exact: true })
+      .click();
+    assert.deepEqual(
+      await maskPage.locator("#viewer").boundingBox(),
+      viewerBefore,
+    );
+    await maskPage.locator("[data-panel=light]").click();
+    await maskPage.locator("#open-curves").click();
+    await maskPage.locator("[data-channel=red]").click();
+    const curve = await maskPage.locator("#curve-preview").boundingBox();
+    await maskPage.mouse.click(
+      curve.x + curve.width * 0.5,
+      curve.y + curve.height * 0.3,
+    );
+    await maskPage.locator("#curve-output").fill("190");
+    await maskPage.locator("#curve-output").dispatchEvent("change");
+    assert.equal(await maskPage.locator("#curve-output").inputValue(), "190");
+    await maskPage.screenshot({ path: join(artifacts, "mobile-curves.png") });
+    await maskPage.getByRole("button", { name: "Done", exact: true }).click();
+    await maskPage.locator("[data-panel=color]").click();
+    await maskPage.locator("#open-color-mixer").click();
+    await maskPage
+      .getByRole("button", { name: "Adjust red colors", exact: true })
+      .click();
+    await maskPage.locator("#slider-mix-hue").evaluate((input) => {
+      input.value = "25";
+      input.dispatchEvent(new Event("input"));
+      input.dispatchEvent(new Event("change"));
+    });
+    assert.equal(await maskPage.locator("#slider-mix-hue").inputValue(), "25");
+    await maskPage
+      .getByRole("button", { name: "Adjust blue colors", exact: true })
+      .click();
+    assert.equal(await maskPage.locator("#slider-mix-hue").inputValue(), "0");
+    await maskPage
+      .getByRole("button", { name: "Adjust red colors", exact: true })
+      .click();
+    assert.equal(await maskPage.locator("#slider-mix-hue").inputValue(), "25");
+    await maskPage.screenshot({
+      path: join(artifacts, "mobile-color-mixer.png"),
+    });
+    await maskPage.getByRole("button", { name: "Done", exact: true }).click();
+    await maskPage.locator("[data-panel=light]").click();
+    await maskPage
+      .getByRole("button", { name: "Exposure (EV)", exact: true })
+      .click();
+    await maskPage
+      .getByRole("button", {
+        name: "Apply Exposure (EV) to region",
+        exact: true,
+      })
+      .click();
+    await maskPage
+      .getByRole("button", { name: "New radial mask", exact: true })
+      .click();
+    await maskPage.locator("#close-tools").click();
+    await maskPage.locator(".return-adjustment").click();
+    assert.equal(
+      await maskPage.locator(".single-adjustment").isVisible(),
+      true,
+    );
+    await maskPage.getByRole("button", { name: "Done", exact: true }).click();
+    await maskPage
+      .getByRole("button", { name: "Fullscreen image", exact: true })
+      .click();
+    assert.equal(
+      await maskPage
+        .locator("body")
+        .evaluate((node) => node.classList.contains("image-fullscreen")),
+      true,
+    );
+    await maskPage
+      .getByRole("button", { name: "Fullscreen image", exact: true })
+      .click();
     await maskPage.close();
     assert.deepEqual(errors, []);
     const fallback = await browser.newPage();

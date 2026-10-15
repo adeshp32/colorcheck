@@ -90,6 +90,20 @@ export function sourcePoint(u, v, width, height, settings) {
 }
 
 export function hasLocalAdjustments(edits) {
+  if (
+    edits.colorMix &&
+    Object.values(edits.colorMix).some(
+      (band) => band.hue || band.saturation || band.lightness,
+    )
+  )
+    return true;
+  if (
+    edits.curves &&
+    Object.values(edits.curves).some((points) =>
+      points?.some((point) => point.x !== point.y),
+    )
+  )
+    return true;
   return (
     [
       "exposure",

@@ -1,4 +1,6 @@
 import { blendEnhancementInto } from "./enhancement-lut.js";
+import { buildCurveTable, lookupCurve } from "./tone-curves.js";
+import { prepareColorMix, mixColorInto } from "./color-mixer.js";
 import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
@@ -78,6 +80,7 @@ export function hueToRgb(hue) {
 export function applyToneCurve(v, name) {
   if (name === "matte") return 0.035 + 0.93 * v;
   const amount = name === "strong" ? 0.35 : name === "soft" ? 0.16 : 0;
+  if (!amount) return clamp(v);
   return clamp(v + amount * Math.sin((v - 0.5) * Math.PI * 2) * 0.25);
 }
 /**
@@ -91,6 +94,7 @@ export function applyPhotoAdjustments(
   height,
   edits,
   enhancementLut = null,
+  collectHistogram = true,
 ) {
   const out = new Uint8ClampedArray(data.length),
     grades = Object.entries(edits.grades)
@@ -107,6 +111,10 @@ export function applyPhotoAdjustments(
         };
       });
   const histogram = new Uint32Array(64);
+  const colorMix = prepareColorMix(edits.colorMix);
+  const curveTables = ["master", "red", "green", "blue"].map((channel) =>
+    buildCurveTable(edits.curves?.[channel]),
+  );
   const exposure = 2 ** edits.exposure,
     contrast = 1 + edits.contrast / 100,
     temperature = (edits.temperature / 100) * 0.08,
@@ -157,11 +165,16 @@ export function applyPhotoAdjustments(
     const lift =
       (edits.shadows / 100) * shadow * 0.25 +
       (edits.highlights / 100) * highlight * 0.25 +
-      (edits.blacks / 100) * (1 - l) ** 4 * 0.15 +
-      (edits.whites / 100) * l ** 4 * 0.15;
+      (edits.blacks ? (edits.blacks / 100) * (1 - l) ** 4 * 0.15 : 0) +
+      (edits.whites ? (edits.whites / 100) * l ** 4 * 0.15 : 0);
     r = applyToneCurve((r - 0.5) * contrast + 0.5 + lift, edits.curve);
     g = applyToneCurve((g - 0.5) * contrast + 0.5 + lift, edits.curve);
     b = applyToneCurve((b - 0.5) * contrast + 0.5 + lift, edits.curve);
+    if (edits.curves) {
+      r = lookupCurve(curveTables[1], lookupCurve(curveTables[0], r));
+      g = lookupCurve(curveTables[2], lookupCurve(curveTables[0], g));
+      b = lookupCurve(curveTables[3], lookupCurve(curveTables[0], b));
+    }
     r += temperature;
     b -= temperature;
     g -= tintGreen;
@@ -180,6 +193,12 @@ export function applyPhotoAdjustments(
       g += grade.rgb[1] * weight;
       b += grade.rgb[2] * weight;
     }
+    if (colorMix) {
+      mixColorInto(r, g, b, colorMix, enhanced);
+      r = enhanced[0];
+      g = enhanced[1];
+      b = enhanced[2];
+    }
     const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     const chroma = Math.max(r, g, b) - Math.min(r, g, b),
       sat = edits.bw
@@ -190,15 +209,19 @@ export function applyPhotoAdjustments(
               edits.saturation / 100 +
               (edits.vibrance / 100) * (1 - clamp(chroma)),
           );
-    const px = (i / 4) % width,
-      py = Math.floor(i / 4 / width),
-      radius = ((px / width - 0.5) ** 2 + (py / height - 0.5) ** 2) * 2;
-    const vignette = 1 - (edits.vignette / 100) * radius * 0.65;
+    let vignette = 1;
+    if (edits.vignette) {
+      const px = (i / 4) % width,
+        py = Math.floor(i / 4 / width);
+      const radius = ((px / width - 0.5) ** 2 + (py / height - 0.5) ** 2) * 2;
+      vignette = 1 - (edits.vignette / 100) * radius * 0.65;
+    }
     out[i] = clamp((gray + (r - gray) * sat) * vignette) * 255;
     out[i + 1] = clamp((gray + (g - gray) * sat) * vignette) * 255;
     out[i + 2] = clamp((gray + (b - gray) * sat) * vignette) * 255;
     out[i + 3] = data[i + 3];
-    histogram[Math.min(63, Math.floor(clamp(gray) * 64))]++;
+    if (collectHistogram)
+      histogram[Math.min(63, Math.floor(clamp(gray) * 64))]++;
   }
   if (edits.sharpen > 0) {
     const copy = out.slice(),
@@ -228,6 +251,7 @@ export function applyPhotoAdjustments(
       height,
       { ...mask.adjustments, masks: [] },
       enhancementLut,
+      false,
     ).data;
     const rgb = [0, 0, 0];
     for (let y = 0; y < height; y++)
@@ -246,7 +270,7 @@ export function applyPhotoAdjustments(
           out[i + c] += (adjusted[i + c] - out[i + c]) * amount;
       }
   }
-  if (masked) {
+  if (masked && collectHistogram) {
     histogram.fill(0);
     for (let i = 0; i < out.length; i += 4) {
       const gray =

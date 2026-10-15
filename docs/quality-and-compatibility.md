@@ -10,7 +10,8 @@ Use HTTPS in production so module workers load reliably.
 - JPEG, PNG, and WebP input; up to 50 MB compressed and 24 megapixels decoded.
 - Optional reference image with independent palette and tonal matching strength.
 - Optional pretrained enhancement, with adjustable strength and sampled clipping checks.
-- Exposure, contrast, highlights, shadows, whites, blacks, and tone-curve presets.
+- Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
+- Eight overlapping color ranges with independent hue, saturation, and lightness.
 - Warmth, tint, saturation, vibrance, B&W, and global/shadow/midtone/highlight grading.
 - Sharpening, vignette, crop, aspect-ratio presets, 90-degree rotation, and horizontal flip.
 - Numeric adjustment values, individual resets, a draggable crop, undo/redo, and original comparison.
@@ -38,8 +39,8 @@ The decoded-pixel limit is an admission limit, not a performance guarantee.
 Mobile browser memory and performance vary. Extremely large dimensions can fail
 during browser decoding before the image's dimensions can be checked.
 
-No healing, segmentation, denoising model, upscaler, local adjustment masks, or
-custom curve-point editing is shipped yet. These should be added with measured
+No healing, automatic segmentation, denoising model, or upscaler is shipped yet.
+These should be added with measured
 quality, compatible licenses, and explicit device support rather than placeholder
 controls. This is not a claim of parity with any existing photo editor.
 

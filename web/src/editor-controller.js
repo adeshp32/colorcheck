@@ -2,13 +2,15 @@ import {
   createDefaultEditSettings,
   calculateChannelStatistics,
   calculateReferenceMatch,
-  applyToneCurve,
   clamp,
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
 import { createEnhancementClient } from "./learned-enhancement.js";
 import { initializeWorkspaceLayout } from "./workspace-layout.js";
 import { createMaskControls } from "./mask-controls.js";
+import { createCurveEditor } from "./curve-editor.js";
+import { initializeMobileEditor } from "./mobile-editor.js";
+import { COLOR_BANDS } from "./color-mixer.js";
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
@@ -19,13 +21,14 @@ let edits = createDefaultEditSettings(),
   interactionPixels = null,
   referenceStats = null,
   range = "global",
+  colorBand = "red",
   panel = "match",
   original = false,
   requestId = 0,
   exporting = false;
 const editHistory = createEditHistory(edits);
 const enhancementClient = createEnhancementClient();
-let masking;
+let masking, curveEditor, mobileEditor;
 const adjustmentSettings = () => masking?.currentAdjustments() ?? edits;
 let activeEnhancement = null,
   enhancing = false;
@@ -133,16 +136,23 @@ function createAdjustmentControl(
   const get = () =>
     key.startsWith("grade-")
       ? adjustmentSettings().grades[range][key.slice(6)]
-      : key.startsWith("crop-")
-        ? edits.crop[key.slice(5)]
-        : key === "quality"
-          ? quality
-          : adjustmentSettings()[key];
+      : key.startsWith("mix-")
+        ? (adjustmentSettings().colorMix?.[colorBand]?.[key.slice(4)] ?? 0)
+        : key.startsWith("crop-")
+          ? edits.crop[key.slice(5)]
+          : key === "quality"
+            ? quality
+            : adjustmentSettings()[key];
   const set = (v, interactive = false) => {
     v = clamp(v, min, max);
     if (key.startsWith("grade-"))
       adjustmentSettings().grades[range][key.slice(6)] = v;
-    else if (key.startsWith("crop-")) {
+    else if (key.startsWith("mix-")) {
+      const settings = adjustmentSettings();
+      settings.colorMix ??= {};
+      settings.colorMix[colorBand] ??= { hue: 0, saturation: 0, lightness: 0 };
+      settings.colorMix[colorBand][key.slice(4)] = v;
+    } else if (key.startsWith("crop-")) {
       edits.crop[key.slice(5)] = v;
       boundCrop();
     } else if (key === "quality") quality = v;
@@ -169,6 +179,37 @@ function createAdjustmentControl(
   controls.set(key, { slider, number, get });
 }
 let quality = 95;
+for (const [id, label, , color] of COLOR_BANDS) {
+  const button = document.createElement("button");
+  button.dataset.colorBand = id;
+  button.style.setProperty("--swatch", color);
+  button.title = label;
+  button.setAttribute("aria-label", `Adjust ${label.toLowerCase()} colors`);
+  button.setAttribute("aria-pressed", String(id === colorBand));
+  button.onclick = () => {
+    colorBand = id;
+    synchronizeControls();
+  };
+  $("#color-bands").append(button);
+}
+for (const [key, label, limit] of [
+  ["hue", "Color hue", 60],
+  ["saturation", "Color saturation", 100],
+  ["lightness", "Color lightness", 100],
+])
+  createAdjustmentControl(
+    "#color-mixer-controls",
+    `mix-${key}`,
+    label,
+    -limit,
+    limit,
+  );
+$("#reset-color-band").onclick = () => {
+  if (adjustmentSettings().colorMix)
+    delete adjustmentSettings().colorMix[colorBand];
+  renderPreview();
+  commitEditHistory();
+};
 createAdjustmentControl(
   "#enhancement-controls",
   "enhanceStrength",
@@ -281,6 +322,11 @@ function boundCrop() {
 }
 function synchronizeControls() {
   masking?.sync();
+  for (const button of document.querySelectorAll("[data-color-band]"))
+    button.setAttribute(
+      "aria-pressed",
+      String(button.dataset.colorBand === colorBand),
+    );
   for (const control of controls.values()) {
     control.slider.value = control.get();
     control.number.value = Number(control.get()).toFixed(
@@ -288,7 +334,9 @@ function synchronizeControls() {
     );
   }
   $("#bw").checked = adjustmentSettings().bw;
-  $("#curve").value = adjustmentSettings().curve;
+  $("#curve").value = adjustmentSettings().curves?.master
+    ? "custom"
+    : adjustmentSettings().curve;
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
@@ -308,6 +356,7 @@ function synchronizeControls() {
   drawWheel();
   drawCurve();
   positionCrop();
+  mobileEditor?.sync();
 }
 async function decodePhoto(file) {
   if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type))
@@ -356,6 +405,7 @@ async function openTargetPhoto(file) {
     };
     activeEnhancement = null;
     previewPixels = pixels;
+    mobileEditor?.resetView();
     interactionPixels = createPreviewPixels(bitmap, 640);
     edits = createDefaultEditSettings();
     editHistory.reset(edits);
@@ -524,23 +574,7 @@ function drawHistogram(bins) {
     c.fillRect(i * 4, 72 - (68 * bins[i]) / max, 3, (68 * bins[i]) / max);
 }
 function drawCurve() {
-  const canvas = $("#curve-preview"),
-    c = canvas.getContext("2d");
-  c.clearRect(0, 0, 256, 100);
-  c.strokeStyle = "#c4c6d3";
-  c.lineWidth = 1;
-  c.beginPath();
-  c.moveTo(0, 100);
-  c.lineTo(256, 0);
-  c.stroke();
-  c.strokeStyle = "#7474ed";
-  c.lineWidth = 2;
-  c.beginPath();
-  for (let x = 0; x <= 256; x++) {
-    const y = 100 - 100 * applyToneCurve(x / 256, adjustmentSettings().curve);
-    x ? c.lineTo(x, y) : c.moveTo(x, y);
-  }
-  c.stroke();
+  curveEditor?.draw();
 }
 async function renderPreview(interactive = false) {
   clearTimeout(refineTimer);
@@ -629,6 +663,7 @@ $("#bw").onchange = (e) =>
 $("#curve").onchange = (e) =>
   applyEdit(() => {
     adjustmentSettings().curve = e.target.value;
+    if (adjustmentSettings().curves) delete adjustmentSettings().curves.master;
   });
 for (const button of document.querySelectorAll("[data-panel]"))
   button.onclick = () => {
@@ -867,6 +902,17 @@ masking = createMaskControls({
 initializeWorkspaceLayout(() => {
   positionCrop();
   masking.drawOverlay();
+});
+curveEditor = createCurveEditor({
+  getSettings: adjustmentSettings,
+  render: renderPreview,
+  commit: commitEditHistory,
+});
+mobileEditor = initializeMobileEditor({
+  onViewChange: () => {
+    positionCrop();
+  },
+  hasPhoto: () => !!source,
 });
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob),

@@ -10,13 +10,14 @@ Python backend, account, or photo-upload service is required.
 
 - Independent palette and tone matching strengths.
 - Optional learned enhancement, using an upstream PyTorch model exported to ONNX.
-- Exposure, contrast, highlights, shadows, whites, blacks, and tone-curve presets.
+- Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
+- Eight-range hue, saturation, and lightness mixing, globally or inside masks.
 - Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
 - Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
 - Numeric controls, individual resets, before/after comparison, and undo/redo.
 - Local radial and linear masks with inside/outside selection, feathering,
   add/subtract/intersect shapes, and color/luminance refinement.
-- Image-first mobile workspace with an expandable tool tray and individual sliders.
+- Fixed mobile image canvas with overlay tool menus, focused sliders, zoom/pan, and fullscreen.
 - Full-resolution JPEG, PNG, or WebP export and optional JSON settings report.
 
 JPEG/PNG/WebP input is limited to 50 MB and 24 megapixels. This baseline is an
@@ -54,6 +55,10 @@ web/                         Deploy this directory as a static website
     edit-history.js          Bounded, isolated undo/redo settings snapshots
     masking.js               Source-coordinate mask coverage and range refinement
     mask-controls.js         Local adjustment scope, mask gestures, and overlays
+    mobile-editor.js         Overlay control portals, region shortcuts, and view gestures
+    curve-editor.js          Draggable curve points and numeric channel controls
+    tone-curves.js           Shape-preserving curve interpolation and lookup tables
+    color-mixer.js           Smooth eight-band HSL color adjustments
     render-worker.js         Background-thread processing message boundary
   styles/editor.css          Mobile-first layout and desktop inspector
   assets/icons/              Locally served Lucide icons and license

@@ -318,7 +318,10 @@ export function createMaskControls({
   function drawOverlay() {
     const mask = selected(),
       pixels = getPixels();
-    overlay.hidden = !mask || !pixels || getPanel() !== "mask" || isOriginal();
+    overlay.hidden = !mask || !pixels || isOriginal();
+    const editingGeometry = getPanel() === "mask";
+    overlay.style.pointerEvents = editingGeometry ? "auto" : "none";
+    overlay.tabIndex = editingGeometry ? 0 : -1;
     if (overlay.hidden) {
       if (!mask || !pixels) {
         overlayPixels = null;
@@ -345,6 +348,8 @@ export function createMaskControls({
       showOverlay,
       getEdits().rotation,
       getEdits().flip,
+      getEdits().crop,
+      editingGeometry,
     ]);
     if (key === overlayKey && pixels === overlayPixels) return;
     overlayKey = key;
@@ -356,24 +361,25 @@ export function createMaskControls({
       image = context.createImageData(canvas.width, canvas.height),
       rgb = [0, 0, 0],
       preparedMask = prepareMask(mask);
-    for (let y = 0; y < canvas.height; y++)
-      for (let x = 0; x < canvas.width; x++) {
-        const i = (y * canvas.width + x) * 4;
-        rgb[0] = pixels.data[i];
-        rgb[1] = pixels.data[i + 1];
-        rgb[2] = pixels.data[i + 2];
-        image.data[i] = 245;
-        image.data[i + 1] = 60;
-        image.data[i + 2] = 130;
-        image.data[i + 3] = showOverlay
-          ? maskCoverage(
-              preparedMask,
-              (x + 0.5) / canvas.width,
-              (y + 0.5) / canvas.height,
-              rgb,
-            ) * 90
-          : 0;
-      }
+    if (showOverlay)
+      for (let y = 0; y < canvas.height; y++)
+        for (let x = 0; x < canvas.width; x++) {
+          const i = (y * canvas.width + x) * 4;
+          rgb[0] = pixels.data[i];
+          rgb[1] = pixels.data[i + 1];
+          rgb[2] = pixels.data[i + 2];
+          const coverage = maskCoverage(
+            preparedMask,
+            (x + 0.5) / canvas.width,
+            (y + 0.5) / canvas.height,
+            rgb,
+          );
+          // Cyan marks selected coverage, gray the excluded region. Feathering remains visible.
+          image.data[i] = 128 + (20 - 128) * coverage;
+          image.data[i + 1] = 128 + (215 - 128) * coverage;
+          image.data[i + 2] = 128 + (235 - 128) * coverage;
+          image.data[i + 3] = 105;
+        }
     context.putImageData(image, 0, 0);
     const shape = component();
     context.strokeStyle = "white";
@@ -400,7 +406,7 @@ export function createMaskControls({
       context.moveTo(shape.x * canvas.width, shape.y * canvas.height);
       context.lineTo(shape.x2 * canvas.width, shape.y2 * canvas.height);
     }
-    context.stroke();
+    if (editingGeometry) context.stroke();
     context.beginPath();
     context.arc(
       shape.x * canvas.width,
@@ -409,7 +415,7 @@ export function createMaskControls({
       0,
       Math.PI * 2,
     );
-    context.stroke();
+    if (editingGeometry) context.stroke();
     const display = getDisplayPixels();
     drawPhoto(
       overlay,
@@ -417,7 +423,7 @@ export function createMaskControls({
       display.width,
       display.height,
       getEdits(),
-      false,
+      getPanel() !== "mask" && getPanel() !== "crop",
     );
     overlay.style.width = preview.style.width;
     overlay.style.height = preview.style.height;
@@ -445,12 +451,14 @@ export function createMaskControls({
     );
   }
   overlay.onpointerdown = (event) => {
+    if (document.querySelector("#viewer").dataset.navigation === "true") return;
     if (!component()) return;
     event.preventDefault();
     drag = { start: point(event), shape: structuredClone(component()) };
     overlay.setPointerCapture(event.pointerId);
   };
   overlay.onpointermove = (event) => {
+    if (document.querySelector("#viewer").dataset.navigation === "true") return;
     if (!drag) return;
     const p = point(event),
       shape = component(),
@@ -493,6 +501,13 @@ export function createMaskControls({
     }
     changed();
   };
+  document.querySelector("#viewer").addEventListener("image-navigation", () => {
+    if (drag) {
+      Object.assign(component(), drag.shape);
+      drag = null;
+      render(true);
+    }
+  });
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
     overlay.addEventListener(name, () => {
       if (drag) {

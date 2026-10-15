@@ -304,19 +304,56 @@
           <section data-section="light" hidden>
             <h2>Light &amp; tone</h2>
             <div id="light-controls"></div>
-            <h3>Tone curve</h3>
-            <select id="curve">
-              <option value="linear">Linear</option>
-              <option value="soft">Soft contrast</option>
-              <option value="strong">Strong contrast</option>
-              <option value="matte">Lifted blacks</option></select
-            ><canvas
-              id="curve-preview"
-              width="256"
-              height="100"
-              aria-label="Tone curve"
-            ></canvas
-            ><canvas
+            <button id="open-curves" class="advanced-tool">Curves</button>
+            <div id="curve-panel">
+              <h3>Tone curve</h3>
+              <select id="curve">
+                <option value="custom" disabled>Custom curve</option>
+                <option value="linear">Linear</option>
+                <option value="soft">Soft contrast</option>
+                <option value="strong">Strong contrast</option>
+                <option value="matte">Lifted blacks</option></select
+              ><canvas
+                id="curve-preview"
+                width="320"
+                height="240"
+                aria-label="Tone curve"
+                tabindex="0"
+              ></canvas>
+              <div
+                id="curve-channels"
+                class="segments"
+                role="group"
+                aria-label="Curve channel"
+              >
+                <button data-channel="master" aria-pressed="true">RGB</button
+                ><button data-channel="red" aria-pressed="false">Red</button
+                ><button data-channel="green" aria-pressed="false">Green</button
+                ><button data-channel="blue" aria-pressed="false">Blue</button>
+              </div>
+              <div class="curve-values">
+                <label
+                  >Input<input
+                    id="curve-input"
+                    type="number"
+                    min="0"
+                    max="255"
+                    step="1" /></label
+                ><label
+                  >Output<input
+                    id="curve-output"
+                    type="number"
+                    min="0"
+                    max="255"
+                    step="1"
+                /></label>
+              </div>
+              <div class="commands">
+                <button id="delete-curve-point">Remove point</button
+                ><button id="reset-curve-channel">Reset channel</button>
+              </div>
+            </div>
+            <canvas
               id="histogram"
               width="256"
               height="72"
@@ -326,31 +363,51 @@
           <section data-section="color" hidden>
             <h2>Color</h2>
             <div id="color-controls"></div>
+            <button id="open-color-mixer" class="advanced-tool">
+              Color mixer
+            </button>
+            <div id="color-mixer-panel">
+              <h3>Color mixer</h3>
+              <div
+                id="color-bands"
+                class="color-bands"
+                role="group"
+                aria-label="Color ranges"
+              ></div>
+              <div id="color-mixer-controls"></div>
+              <button id="reset-color-band">Reset this color</button>
+            </div>
             <label class="check"
               ><input id="bw" type="checkbox" />Black &amp; white</label
             >
-            <h3>Color grading</h3>
-            <div class="segments" id="ranges">
-              <button data-range="global" aria-pressed="true">Global</button
-              ><button data-range="shadows" aria-pressed="false">Shadows</button
-              ><button data-range="midtones" aria-pressed="false">Mids</button
-              ><button data-range="highlights" aria-pressed="false">
-                Lights
-              </button>
+            <button id="open-grading" class="advanced-tool">
+              Color wheels
+            </button>
+            <div id="grading-panel">
+              <h3>Color grading</h3>
+              <div class="segments" id="ranges">
+                <button data-range="global" aria-pressed="true">Global</button
+                ><button data-range="shadows" aria-pressed="false">
+                  Shadows</button
+                ><button data-range="midtones" aria-pressed="false">Mids</button
+                ><button data-range="highlights" aria-pressed="false">
+                  Lights
+                </button>
+              </div>
+              <canvas
+                id="wheel"
+                width="220"
+                height="220"
+                tabindex="0"
+                role="slider"
+                aria-label="Color grading wheel; arrow keys adjust hue and saturation"
+                aria-valuemin="0"
+                aria-valuemax="360"
+                aria-valuenow="0"
+              ></canvas>
+              <div id="grade-controls"></div>
+              <button id="reset-grade">Reset this range</button>
             </div>
-            <canvas
-              id="wheel"
-              width="220"
-              height="220"
-              tabindex="0"
-              role="slider"
-              aria-label="Color grading wheel; arrow keys adjust hue and saturation"
-              aria-valuemin="0"
-              aria-valuemax="360"
-              aria-valuenow="0"
-            ></canvas>
-            <div id="grade-controls"></div>
-            <button id="reset-grade">Reset this range</button>
           </section>
           <section data-section="detail" hidden>
             <h2>Detail</h2>

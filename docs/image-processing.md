@@ -22,12 +22,13 @@ forcing the reference's contrast. Matching an image to itself is neutral.
 1. Reference mean and channel-spread matching.
 2. Exposure, using `2 ** exposure` as the multiplier.
 3. Luminance-weighted shadow/highlight and black/white adjustments.
-4. Contrast and the selected monotonic tone-curve preset.
+4. Contrast, the tone-curve preset, then optional editable master/R/G/B curves.
 5. Temperature and tint channel offsets.
 6. Global and luminance-weighted shadow/midtone/highlight color grading.
-7. Saturation, vibrance, or monochrome conversion.
-8. Radial vignette and bounded 8-bit output.
-9. Optional neighborhood sharpening.
+7. Optional eight-range hue/saturation/lightness color mixer.
+8. Saturation, vibrance, or monochrome conversion.
+9. Radial vignette and bounded 8-bit output.
+10. Optional neighborhood sharpening, followed by enabled local mask adjustments.
 
 If learned enhancement is enabled, its bounded LUT transform is applied before
 the above sequence. It is separate from reference matching and has its own
@@ -42,7 +43,13 @@ white because JPEG does not carry alpha.
 - Calculations use browser-decoded, gamma-encoded sRGB values, not a calibrated
   scene-linear or perceptually uniform color pipeline.
 - Channel statistics do not identify skin, sky, subjects, or lighting sources.
-- Tone-curve presets are monotonic; arbitrary editable curve points are not shipped.
+- Editable curves support up to 16 ordered points per channel, with numeric 0-255
+  input/output values. Shape-preserving cubic interpolation avoids overshoot between
+  monotonic points; users can deliberately draw nonmonotonic curves. Processing uses
+  1024-sample per-channel tables with linear lookup interpolation.
+- The color mixer interpolates smoothly between eight hue-band centers, not semantic
+  objects or every unique pixel color. Achromatic pixels remain protected. Mix controls
+  work globally or within a mask and are part of undo/redo and exported settings.
 - Grading ranges overlap smoothly using source luminance weights.
 - Preview and export use the same algorithm, but sharpening depends on pixel scale.
 - The histogram is a diagnostic luminance estimate, not a calibrated exposure meter.
@@ -51,3 +58,12 @@ white because JPEG does not carry alpha.
 These choices make the baseline understandable and testable. Improving perceptual
 matching, color management, and edge-preserving detail requires measured comparison
 against real photographs before changing public quality claims.
+
+## Quality-preserving efficiency
+
+Neutral curves bypass sine calculations; zero white/black/vignette settings skip their
+unused math. Intermediate local-mask passes omit unused histograms. Cached display
+overlays avoid rerasterizing unchanged geometry. Pixel and histogram regression hashes
+cover the existing neutral, tone, grading, matching, and detail paths. These shortcuts
+do not reduce export dimensions, image bit depth, or encoder quality; preview sizing
+remains separate from the original-resolution export.

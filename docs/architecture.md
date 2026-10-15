@@ -34,9 +34,19 @@ state; edits, mask names, and geometry are undoable. This release does not inclu
 brush painting, automatic subject segmentation, or hair matting.
 
 On mobile the image workspace fills the viewport above a compact tool strip.
-Selecting a tool opens a scrollable bottom tray; selecting it again or closing
-the tray restores image space. Individual adjustment sliders expand on request.
-The page itself need not scroll to perform an edit.
+Tool menus overlay the workspace without resizing the photo. Selecting an adjustment
+portals its existing DOM control into a compact floating sheet; Done restores it.
+`mobile-editor.js` owns these portals, region shortcuts, fit/zoom/pan, and fullscreen
+(with a CSS fallback where native fullscreen is unavailable). The page itself need
+not scroll to perform an edit. Two-finger navigation cancels mask geometry dragging.
+Region buttons select the shared whole-photo or mask adjustment scope; they do not
+create independent per-slider mask stacks. Selected coverage is cyan, excluded coverage
+gray; the overlay checkbox hides this visualization without changing exported pixels.
+
+`tone-curves.js` implements shape-preserving cubic interpolation and lookup tables;
+`curve-editor.js` owns draggable points, channel selection, numeric input, and keyboard
+editing. `color-mixer.js` owns eight overlapping HSL hue ranges. Both features run in
+the same worker/export pipeline and work within the selected mask.
 
 `workspace-layout.js` owns display-only photo fitting and the right, bottom,
 and floating tool-panel positions. Viewer resize and canvas geometry changes
@@ -101,5 +111,5 @@ settings and passes them through the same engine for preview and export.
 
 The controller is currently the largest module. Extract geometry or
 export orchestration when those responsibilities gain independent complexity,
-not simply to increase the file count. Tiled processing and selective masks are
-future architectural work, not existing capabilities.
+not simply to increase the file count. Tiled processing and automatic semantic
+segmentation remain future architectural work, not existing capabilities.
