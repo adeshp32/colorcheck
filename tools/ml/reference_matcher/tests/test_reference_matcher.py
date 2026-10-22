@@ -106,6 +106,21 @@ class ReferenceMatcherTests(unittest.TestCase):
         synthetic = {"delta_e76": 12.0}
         self.assertEqual(checkpoint_selection_score(real, synthetic), 10.0)
 
+    def test_scene_splits_are_deterministic_exhaustive_and_disjoint(self):
+        scenes = tuple(f"scene-{index:04d}.jpg" for index in range(5000))
+        first = create_splits(scenes, seed=42)
+        second = create_splits(tuple(reversed(scenes)), seed=42)
+        self.assertEqual(first, second)
+        self.assertEqual(
+            (len(first.train), len(first.validation), len(first.test)),
+            (4000, 500, 500),
+        )
+        partitions = [set(first.train), set(first.validation), set(first.test)]
+        self.assertEqual(set.union(*partitions), set(scenes))
+        self.assertFalse(partitions[0] & partitions[1])
+        self.assertFalse(partitions[0] & partitions[2])
+        self.assertFalse(partitions[1] & partitions[2])
+
     def test_identity_lut_preserves_pixels(self):
         image = torch.rand(2, 3, 13, 17)
         lut = identity_lut(17).unsqueeze(0).repeat(2, 1, 1, 1, 1)
@@ -257,6 +272,9 @@ class ReferenceMatcherTests(unittest.TestCase):
 
             directory_sample = directory_dataset[0]
             archive_sample = archive_dataset[0]
+            self.assertNotEqual(
+                directory_sample["scene"], directory_sample["reference_scene"]
+            )
             torch.testing.assert_close(directory_sample["source"], archive_sample["source"])
             self.assertNotIn("expected_lut", directory_sample)
             torch.testing.assert_close(
