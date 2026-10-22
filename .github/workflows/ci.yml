@@ -23,3 +23,32 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+
+  reference-matcher:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: tools/ml/reference_matcher/requirements.txt
+      - name: Install CPU PyTorch
+        run: >-
+          python -m pip install
+          --index-url https://download.pytorch.org/whl/cpu
+          "torch>=2.4,<3" "torchvision>=0.19,<1"
+      - name: Install evaluation and export dependencies
+        run: >-
+          python -m pip install
+          "Pillow>=10,<13" "numpy>=2,<3" "tqdm>=4.66,<5"
+          "onnx>=1.17,<2" "onnxruntime>=1.19,<2"
+      - name: Test reference matcher
+        run: python -m unittest discover -s tools/ml/reference_matcher/tests -v
+      - name: Compile training modules
+        run: python -m compileall -q tools/ml/reference_matcher
+      - name: Verify generated Kaggle notebook
+        run: |
+          python -m tools.ml.reference_matcher.build_kaggle_notebook
+          git diff --exit-code -- kaggle/reference-matcher/colorcheck-reference-matcher.ipynb
