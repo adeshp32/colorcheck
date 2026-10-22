@@ -79,6 +79,9 @@ archive/video-editor/        Former Python/video product, retained for history
 
 Start with [architecture](docs/architecture.md), then
 [image processing](docs/image-processing.md) and
+[reference matcher architecture](docs/reference-matcher-architecture.md),
+[model card](docs/reference-matcher-model-card.md), and
+[data card](docs/reference-matcher-data-card.md), then
 [development conventions](docs/development.md). These describe what the code does,
 why responsibilities are separated, and which trade-offs remain.
 

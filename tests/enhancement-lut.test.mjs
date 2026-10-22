@@ -11,6 +11,7 @@ import {
   applyPhotoAdjustments,
   createDefaultEditSettings,
 } from "../web/src/image-processing.js";
+import { createMaskComponent } from "../web/src/masking.js";
 
 function identityLut() {
   const lut = new Float32Array(3 * 33 ** 3);
@@ -80,4 +81,70 @@ test("same transform is used by preview/export engine and alpha survives", () =>
   );
   assert.ok(result.data[0] > pixels[0]);
   assert.equal(result.data[3], 100);
+});
+test("learned LUT composes with the complete pixel tool stack and local masks", () => {
+  const width = 16,
+    height = 16,
+    pixels = Uint8ClampedArray.from(
+      { length: width * height * 4 },
+      (_, index) => (index % 4 === 3 ? 137 : (index * 29 + 40) % 256),
+    ),
+    edits = createDefaultEditSettings(),
+    local = createDefaultEditSettings();
+  Object.assign(edits, {
+    enhanceStrength: 40,
+    exposure: 0.25,
+    contrast: 12,
+    highlights: -8,
+    shadows: 9,
+    whites: 4,
+    blacks: -3,
+    temperature: 7,
+    tint: -5,
+    saturation: 8,
+    vibrance: 11,
+    sharpen: 10,
+    vignette: 6,
+    grain: 5,
+    grainSize: 2,
+    match: {
+      source: [0.4, 0.45, 0.5],
+      reference: [0.45, 0.4, 0.55],
+      gain: [1.05, 0.95, 1.08],
+    },
+    matchColor: 20,
+    matchTone: 15,
+    colorMix: { red: { hue: 8, saturation: 6, lightness: 3 } },
+    curves: {
+      master: [
+        { x: 0, y: 0.02 },
+        { x: 0.5, y: 0.53 },
+        { x: 1, y: 0.98 },
+      ],
+    },
+  });
+  edits.grades.midtones = { hue: 210, saturation: 12, amount: 10 };
+  local.enhanceStrength = 20;
+  local.exposure = 0.1;
+  local.colorMix = { blue: { hue: -4, saturation: 5, lightness: 2 } };
+  edits.masks = [
+    {
+      enabled: true,
+      invert: false,
+      opacity: 0.8,
+      components: [createMaskComponent()],
+      refinement: "none",
+      adjustments: local,
+    },
+  ];
+  const result = applyPhotoAdjustments(
+    pixels,
+    width,
+    height,
+    edits,
+    identityLut(),
+  ).data;
+  assert.notDeepEqual(result, pixels);
+  for (let index = 3; index < result.length; index += 4)
+    assert.equal(result[index], 137);
 });
