@@ -39,10 +39,12 @@ scenes are untouched until that choice is complete.
 
 ## Evaluation
 
-The final report retains per-photograph measurements and 95% bootstrap confidence
-intervals for CIEDE2000, SSIM, PSNR, MAE, luminance, chroma, edge agreement, and
-clipping. Controls include identity, the current statistics matcher, incorrect
-references, reference sensitivity, LUT-basis usage, runtime, and peak memory.
+The final report retains per-photograph measurements and scene-clustered 95%
+bootstrap confidence intervals for CIEDE2000, SSIM, PSNR, MAE, luminance, chroma,
+edge agreement, and clipping. This prevents five edits of one source photograph
+from being counted as five independent scenes. Controls include identity, the
+current statistics matcher, incorrect references, reference sensitivity,
+LUT-basis usage, runtime, and peak memory.
 
 Separate real-expert and exact-synthetic reports must pass every evidence gate.
 PyTorch-to-ONNX and FP32-to-INT8 rendered pixels are compared independently.

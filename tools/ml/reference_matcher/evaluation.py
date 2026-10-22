@@ -5,9 +5,10 @@ module answers the harder product question: does the trained model improve an
 unseen photograph, use the supplied reference, preserve structure, and remain
 small and fast enough for an interactive browser editor?
 
-Every metric is retained per photograph before aggregation. That permits paired
-comparisons and bootstrap confidence intervals instead of treating thousands of
-correlated pixels as thousands of independent examples.
+Every metric is retained per photograph before aggregation. Confidence intervals
+resample source scenes, not individual expert variants or pixels, because the five
+edits of one FiveK photograph are related observations rather than five independent
+photographs.
 """
 
 from __future__ import annotations
@@ -220,30 +221,68 @@ def _bootstrap(values: np.ndarray, seed: int, samples: int = 1000) -> dict[str, 
     }
 
 
+def _cluster_bootstrap(
+    values: np.ndarray, scene_ids, seed: int, samples: int = 1000
+) -> dict[str, float]:
+    """Bootstrap scene means so repeated expert edits do not inflate certainty.
+
+    FiveK contains five expert variants of each source scene. Averaging those
+    variants within a scene and then resampling scenes gives each photograph one
+    independent vote while retaining every expert measurement in its scene mean.
+    """
+    values = np.asarray(values, dtype=np.float64)
+    scenes = np.asarray(scene_ids, dtype=object)
+    if len(values) != len(scenes):
+        raise ValueError("One source scene identifier is required per metric value")
+    unique_scenes = tuple(dict.fromkeys(scenes.tolist()))
+    scene_means = np.asarray(
+        [values[scenes == scene].mean() for scene in unique_scenes], dtype=np.float64
+    )
+    result = _bootstrap(scene_means, seed, samples)
+    result["sceneCount"] = result.pop("sampleCount")
+    result["observationCount"] = int(len(values))
+    return result
+
+
 class MetricStore:
     """Collect per-image measurements while retaining expert identities."""
 
     def __init__(self) -> None:
         self.values: dict[str, list[float]] = defaultdict(list)
         self.experts: list[int] = []
+        self.scenes: list[str] = []
 
-    def add(self, metrics: dict[str, torch.Tensor], experts: torch.Tensor) -> None:
+    def add(
+        self, metrics: dict[str, torch.Tensor], experts: torch.Tensor, scenes
+    ) -> None:
+        scene_values = list(scenes)
+        batch_size = len(experts)
+        if len(scene_values) != batch_size:
+            raise ValueError("One source scene identifier is required per photograph")
         for name, values in metrics.items():
+            if len(values) != batch_size:
+                raise ValueError("Every metric must contain one value per photograph")
             self.values[name].extend(values.detach().cpu().tolist())
         self.experts.extend(experts.detach().cpu().tolist())
+        self.scenes.extend(scene_values)
 
     def summary(self, seed: int = 42) -> dict:
         overall = {
-            name: _bootstrap(np.asarray(values), seed + index)
+            name: _cluster_bootstrap(np.asarray(values), self.scenes, seed + index)
             for index, (name, values) in enumerate(sorted(self.values.items()))
         }
         expert_array = np.asarray(self.experts)
+        scene_array = np.asarray(self.scenes, dtype=object)
         by_expert = {}
         for expert_index, expert_name in enumerate(EXPERTS):
             selected = expert_array == expert_index
             if selected.any():
                 by_expert[expert_name.upper()] = {
-                    name: _bootstrap(np.asarray(values)[selected], seed + expert_index)
+                    name: _cluster_bootstrap(
+                        np.asarray(values)[selected],
+                        scene_array[selected],
+                        seed + expert_index,
+                    )
                     for name, values in sorted(self.values.items())
                 }
         return {"overall": overall, "byExpert": by_expert}
@@ -254,6 +293,8 @@ def paired_improvement(
 ) -> dict[str, dict[str, float]]:
     """Report positive values when the model improves over a paired baseline."""
     higher_is_better = {"psnrDb", "ssim"}
+    if model.scenes != baseline.scenes:
+        raise ValueError("Paired comparisons require metrics in the same scene order")
     comparisons = {}
     for index, name in enumerate(sorted(model.values)):
         model_values = np.asarray(model.values[name])
@@ -263,7 +304,9 @@ def paired_improvement(
             if name in higher_is_better
             else baseline_values - model_values
         )
-        comparisons[name] = _bootstrap(difference, seed + index)
+        comparisons[name] = _cluster_bootstrap(
+            difference, model.scenes, seed + index
+        )
     return comparisons
 
 

@@ -209,6 +209,7 @@ def comprehensive_evaluation(model, loader, device, mixed_precision, seed: int =
     for batch in tqdm(loader, desc="comprehensive evaluation", leave=False):
         source, reference, expected = move_images(batch, device)
         experts = batch["expert"]
+        scenes = batch["scene"]
         wrong_reference, _ = mismatch_references(reference, experts)
 
         if device.type == "cuda":
@@ -229,13 +230,13 @@ def comprehensive_evaluation(model, loader, device, mixed_precision, seed: int =
 
         output = output.float()
         wrong_output = wrong_output.float()
-        stores["model"].add(metric_samples(output, expected), experts)
-        stores["identity"].add(metric_samples(source, expected), experts)
+        stores["model"].add(metric_samples(output, expected), experts, scenes)
+        stores["identity"].add(metric_samples(source, expected), experts, scenes)
         stores["statisticsMatch"].add(
-            metric_samples(statistics_match(source, reference), expected), experts
+            metric_samples(statistics_match(source, reference), expected), experts, scenes
         )
         stores["shuffledReference"].add(
-            metric_samples(wrong_output, expected), experts
+            metric_samples(wrong_output, expected), experts, scenes
         )
         sensitivities.extend(
             (output - wrong_output).abs().flatten(1).mean(1).cpu().tolist()

@@ -21,9 +21,11 @@ from tools.ml.reference_matcher.model import (
     initial_lut_bases,
 )
 from tools.ml.reference_matcher.evaluation import (
+    MetricStore,
     ciede2000,
     metric_samples,
     mismatch_references,
+    paired_improvement,
     statistics_match,
 )
 from tools.ml.reference_matcher.train import checkpoint_selection_score
@@ -137,6 +139,26 @@ class ReferenceMatcherTests(unittest.TestCase):
         torch.testing.assert_close(metrics["mae"], torch.zeros(2))
         torch.testing.assert_close(metrics["ssim"], torch.ones(2), atol=1e-5, rtol=0)
         self.assertTrue(torch.all(metrics["psnrDb"] >= 99))
+
+    def test_metric_confidence_intervals_resample_source_scenes(self):
+        """Repeated expert edits count as observations, not independent scenes."""
+        model = MetricStore()
+        baseline = MetricStore()
+        scenes = ["scene-a", "scene-a", "scene-b", "scene-b"]
+        experts = torch.tensor([0, 1, 0, 1])
+        model.add({"deltaE2000": torch.tensor([1.0, 3.0, 5.0, 7.0])}, experts, scenes)
+        baseline.add(
+            {"deltaE2000": torch.tensor([2.0, 4.0, 8.0, 10.0])}, experts, scenes
+        )
+
+        summary = model.summary()["overall"]["deltaE2000"]
+        self.assertEqual(summary["sceneCount"], 2)
+        self.assertEqual(summary["observationCount"], 4)
+        self.assertEqual(summary["mean"], 4.0)
+        gain = paired_improvement(model, baseline)["deltaE2000"]
+        self.assertEqual(gain["sceneCount"], 2)
+        self.assertEqual(gain["observationCount"], 4)
+        self.assertEqual(gain["mean"], 2.0)
 
     def test_statistics_match_reaches_reference_channel_statistics(self):
         source = torch.rand(2, 3, 32, 32) * 0.2 + 0.2

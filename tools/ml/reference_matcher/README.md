@@ -140,8 +140,10 @@ images. It supports qualitative review for casts, clipping, and photographic
 plausibility; it never overrides the quantitative deployment gates.
 
 The final held-out evaluation is intentionally broader than the training loss.
-It reports photograph-level 95% bootstrap confidence intervals for CIEDE2000,
-SSIM, PSNR, luminance, chroma, edges, clipping, and absolute error. It compares
+It reports scene-clustered 95% bootstrap confidence intervals for CIEDE2000,
+SSIM, PSNR, luminance, chroma, edges, clipping, and absolute error. The five expert
+variants remain measured, but confidence resampling treats their shared source
+photograph as one independent unit. It compares
 the model against both an identity baseline and ColorCheck's existing bounded
 channel-statistics matcher, stratifies results by FiveK expert, checks whether a
 wrong reference degrades performance, detects collapsed LUT-basis usage, and

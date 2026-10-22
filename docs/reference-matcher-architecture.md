@@ -83,8 +83,9 @@ untouched scene-level test split must establish all of the following:
 1. Improvement over identity and the current bounded statistics matcher.
 2. Better results with the correct reference than a shuffled reference.
 3. Nontrivial response to reference changes without mean-weight or dominant-basis collapse.
-4. Photograph-level 95% confidence intervals for CIEDE2000, SSIM, PSNR, MAE,
-   luminance, chroma, edge agreement, and clipping.
+4. Scene-clustered 95% confidence intervals for CIEDE2000, SSIM, PSNR, MAE,
+   luminance, chroma, edge agreement, and clipping. All five expert variants
+   remain observations, but one source photograph remains one resampling unit.
 5. Separate evidence on real expert edits and exact synthetic reference pairs.
 6. PyTorch-to-ONNX and FP32-to-INT8 rendered-pixel parity.
 7. Browser artifact size, inference latency, peak memory, integrity, and fallback
