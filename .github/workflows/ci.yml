@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   photo-editor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -25,7 +25,7 @@ jobs:
       - run: npm run test:browser
 
   reference-matcher:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
