@@ -66,9 +66,9 @@ def build_notebook() -> dict:
             "reference, transferring visual treatment without generating or replacing "
             "image content.\n\n"
             "This private notebook trains original PyTorch weights on MIT-Adobe FiveK. "
-            "It first runs a deliberately small end-to-end experiment. Full training "
-            "remains disabled until the dataset path, GPU, metrics, and checkpoints are "
-            "confirmed."
+            "It first runs a deliberately small end-to-end experiment, then a measured "
+            "5,000-pair pilot. A full-dataset run remains disabled until both stages, "
+            "their metrics, and their checkpoints are reviewed."
         ),
         markdown_cell(
             "## 1. Verify the Kaggle environment\n\n"

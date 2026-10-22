@@ -104,10 +104,11 @@ files from `/kaggle/input/adobe-fivek`. This avoids repeated random seeks throug
 the 28.5 GB ZIP on removable media. CUDA mixed precision is enabled automatically,
 while reported metrics are still calculated in float32.
 
-The first private notebook version is intentionally a smoke run: 256 training
-pairs and 64 validation/test pairs for one epoch. It proves that Kaggle can mount
+The notebook first runs a 256-pair smoke experiment that proves Kaggle can mount
 the data, import the exact repository code, train on its GPU, save checkpoints,
-and complete every evaluation. Full training is enabled only after that run is
+and complete every evaluation. It then runs a measured 5,000-pair, three-epoch
+pilot with 500-pair validation and test controls. Full-dataset training remains
+disabled until the pilot's learning curves, controls, and visual results are
 reviewed.
 
 The optimized curriculum trains and exports at 128-by-128 because the model
