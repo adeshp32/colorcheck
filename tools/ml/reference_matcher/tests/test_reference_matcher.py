@@ -1,5 +1,5 @@
-import unittest
 import tempfile
+import unittest
 import zipfile
 from pathlib import Path
 
@@ -9,16 +9,10 @@ from PIL import Image
 from tools.ml.reference_matcher.dataset import (
     EXPERTS,
     FiveKReferenceDataset,
+    apply_synthetic_style,
     create_splits,
     inspect_dataset,
-    apply_synthetic_style,
     synthetic_style_lut,
-)
-from tools.ml.reference_matcher.model import (
-    ReferenceLutModel,
-    apply_lut,
-    identity_lut,
-    initial_lut_bases,
 )
 from tools.ml.reference_matcher.evaluation import (
     MINIMUM_PRACTICAL_EFFECTS,
@@ -30,13 +24,25 @@ from tools.ml.reference_matcher.evaluation import (
     paired_improvement,
     statistics_match,
 )
-from tools.ml.reference_matcher.train import checkpoint_selection_score
-from tools.ml.reference_matcher.export_onnx import browser_probe_inputs, deployment_decision
+from tools.ml.reference_matcher.export_onnx import (
+    browser_probe_inputs,
+    deployment_decision,
+)
 from tools.ml.reference_matcher.losses import (
     exact_lut_supervision_loss,
+    expert_style_classification_loss,
     reference_ranking_loss,
+    same_style_consistency_loss,
+)
+from tools.ml.reference_matcher.model import (
+    ExpertStyleClassifier,
+    ReferenceLutModel,
+    apply_lut,
+    identity_lut,
+    initial_lut_bases,
 )
 from tools.ml.reference_matcher.render_comparisons import sample_indices
+from tools.ml.reference_matcher.train import checkpoint_selection_score
 
 
 class ReferenceMatcherTests(unittest.TestCase):
@@ -87,6 +93,31 @@ class ReferenceMatcherTests(unittest.TestCase):
             reference_ranking_loss(correct, correct, expected).item(), 0.01, places=6
         )
 
+    def test_same_style_consistency_and_auxiliary_classifier_are_training_only(self):
+        first = torch.zeros(2, 3, 3, 3, 3)
+        second = first.clone()
+        self.assertEqual(same_style_consistency_loss(first, second).item(), 0.0)
+        self.assertGreater(
+            same_style_consistency_loss(first, torch.ones_like(first)).item(), 0.1
+        )
+
+        classifier = ExpertStyleClassifier(feature_size=96, expert_count=len(EXPERTS))
+        logits = classifier(torch.rand(4, 96))
+        self.assertEqual(logits.shape, (4, len(EXPERTS)))
+        labels = torch.tensor([0, 1, 2, 3])
+        self.assertGreater(
+            expert_style_classification_loss(
+                logits, labels, torch.tensor([True, True, False, False])
+            ).item(),
+            0,
+        )
+        self.assertEqual(
+            expert_style_classification_loss(
+                logits, labels, torch.zeros(4, dtype=torch.bool)
+            ).item(),
+            0,
+        )
+
     def test_deployment_requires_matching_quality_and_quantization_evidence(self):
         checkpoint = {"epoch": 4}
         summary = {"bestEpoch": 4, "allDeploymentEvidenceGatesPass": True}
@@ -105,6 +136,10 @@ class ReferenceMatcherTests(unittest.TestCase):
         real = {"delta_e76": 8.0}
         synthetic = {"delta_e76": 12.0}
         self.assertEqual(checkpoint_selection_score(real, synthetic), 10.0)
+        shuffled = {"delta_e76": 8.5}
+        self.assertEqual(checkpoint_selection_score(real, synthetic, shuffled), 9.5)
+        shuffled["delta_e76"] = 7.5
+        self.assertEqual(checkpoint_selection_score(real, synthetic, shuffled), 10.5)
 
     def test_scene_splits_are_deterministic_exhaustive_and_disjoint(self):
         scenes = tuple(f"scene-{index:04d}.jpg" for index in range(5000))
@@ -179,6 +214,7 @@ class ReferenceMatcherTests(unittest.TestCase):
 
     def test_deployment_rejects_statistically_positive_but_trivial_effects(self):
         """A tiny positive CI is evidence of direction, not useful product impact."""
+
         def result(mean, lower=0.001):
             return {"mean": mean, "ci95Lower": lower, "ci95Upper": mean + 0.1}
 
@@ -245,14 +281,16 @@ class ReferenceMatcherTests(unittest.TestCase):
         reference = torch.arange(12).reshape(4, 3, 1, 1).float()
         styles = ["synthetic:1", "synthetic:2", "expert:a", "expert:a"]
         mismatched, indices = mismatch_references(reference, styles)
-        self.assertTrue(all(styles[index] != styles[indices[index]] for index in range(4)))
+        self.assertTrue(
+            all(styles[index] != styles[indices[index]] for index in range(4))
+        )
         torch.testing.assert_close(mismatched, reference[indices])
 
     def test_directory_and_zip_load_the_same_fivek_layout(self):
         """Both local and Kaggle storage paths must produce identical tensors."""
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory) / "fivek"
-            scenes = ("scene-1.jpg", "scene-2.jpg", "scene-3.jpg", "scene-4.jpg")
+            scenes = tuple(f"scene-{index}.jpg" for index in range(1, 7))
             for directory in ("raw", *EXPERTS):
                 (root / directory).mkdir(parents=True)
                 for index, scene in enumerate(scenes):
@@ -275,22 +313,38 @@ class ReferenceMatcherTests(unittest.TestCase):
             self.assertNotEqual(
                 directory_sample["scene"], directory_sample["reference_scene"]
             )
-            torch.testing.assert_close(directory_sample["source"], archive_sample["source"])
+            torch.testing.assert_close(
+                directory_sample["source"], archive_sample["source"]
+            )
             self.assertNotIn("expected_lut", directory_sample)
             torch.testing.assert_close(
                 directory_sample["reference"], archive_sample["reference"]
             )
-            torch.testing.assert_close(directory_sample["expected"], archive_sample["expected"])
+            torch.testing.assert_close(
+                directory_sample["expected"], archive_sample["expected"]
+            )
             supervised_dataset = FiveKReferenceDataset(
                 root,
                 split.train,
                 image_size=16,
                 synthetic_probability=1.0,
                 include_lut_supervision=True,
+                include_alternate_reference=True,
             )
             supervised_sample = supervised_dataset[0]
             self.assertEqual(supervised_sample["expected_lut"].shape, (3, 33, 33, 33))
             self.assertTrue(supervised_sample["has_exact_lut"])
+            self.assertNotEqual(
+                supervised_sample["scene"],
+                supervised_sample["alternate_reference_scene"],
+            )
+            self.assertNotEqual(
+                supervised_sample["reference_scene"],
+                supervised_sample["alternate_reference_scene"],
+            )
+            self.assertEqual(
+                supervised_sample["alternate_reference"].shape, (3, 16, 16)
+            )
 
 
 if __name__ == "__main__":

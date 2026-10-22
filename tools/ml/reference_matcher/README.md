@@ -40,16 +40,21 @@ black-level relationships. The held-out report evaluates real expert edits and
 synthetic reference transfer separately; both must pass their evidence gates.
 
 Checkpoint selection uses the same balance before the test set is touched.
-Every epoch is evaluated on real expert edits and exact synthetic shared-style
-pairs from held-out scenes. The arithmetic mean of their DeltaE76 scores selects
-best.pt, so neither photographic polish nor reference responsiveness can choose
-the deployed model alone.
+Every epoch is evaluated on real expert edits, shuffled real references, and
+exact synthetic shared-style pairs from held-out scenes. The score begins with
+the arithmetic mean of real and synthetic DeltaE76, then rewards or penalizes the
+held-out real correct-reference gain. A generically attractive checkpoint can no
+longer win selection by ignoring its real reference.
 
-Training also includes a pairwise wrong-reference objective. For each batch, the
-true reference and a reference carrying a different style identifier are scored
-together. The true reference must reconstruct the expected edit by a measurable
-margin. This targets reference use directly while adding no parameters or work
-to exported browser inference.
+Training includes three complementary reference-conditioning controls. For each
+batch, the true reference and a reference carrying a different style identifier
+are scored together; the true reference must reconstruct the expected edit by a
+measurable margin. A second reference from another scene with the same treatment
+must produce a compatible LUT, reducing the chance that scene content is mistaken
+for style. Finally, a small training-only classifier asks shared encoder features
+to distinguish FiveK's five expert treatments. The classifier and extra reference
+branches are absent from ONNX, so they add no parameters or work to browser
+inference.
 
 ## Reproducible commands
 
@@ -111,6 +116,13 @@ pilot with 500-pair validation and test controls. Full-dataset training remains
 disabled until the pilot's learning curves, controls, and visual results are
 reviewed.
 
+The first completed medium pilot is intentionally retained as a negative result:
+it improved held-out real-photo CIEDE2000 over an unchanged source, and it learned
+exact synthetic reference transfer, but a correct real reference did not beat a
+shuffled reference. The current conditioning objectives were introduced in
+response to that measured failure. A longer run is justified only if the revised
+pilot improves the predeclared correct-reference gate.
+
 The optimized curriculum trains and exports at 128-by-128 because the model
 predicts one global LUT rather than spatial output. Validation and testing remain
 at 256-by-256 to retain stronger edge and local-structure evidence. A bounded
@@ -134,6 +146,12 @@ python -m tools.ml.reference_matcher.train \
 - `history.json` records training time and validation metrics per epoch; and
 - `summary.json` compares the final model against unchanged images and incorrect
   shuffled references.
+
+History also records raw ranking, exact-LUT, same-style consistency, and expert
+classification losses, validation classification accuracy, and the real
+correct-versus-shuffled reference gain. Keeping these components separate makes
+it possible to tell whether the intended reference signal learned, rather than
+inferring success from total loss alone.
 
 The Kaggle notebook also writes `held-out-comparisons.jpg`, a deterministic
 contact sheet of source, reference, expected, learned, and statistics-baseline

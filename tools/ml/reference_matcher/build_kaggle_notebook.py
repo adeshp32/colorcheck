@@ -9,10 +9,9 @@ training code visible in Kaggle's interface.
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 from pathlib import Path
-
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 OUTPUT_DIRECTORY = REPOSITORY_ROOT / "kaggle" / "reference-matcher"
@@ -67,8 +66,11 @@ def build_notebook() -> dict:
             "image content.\n\n"
             "This private notebook trains original PyTorch weights on MIT-Adobe FiveK. "
             "It first runs a deliberately small end-to-end experiment, then a measured "
-            "5,000-pair pilot. A full-dataset run remains disabled until both stages, "
-            "their metrics, and their checkpoints are reviewed."
+            "5,000-pair conditioning pilot. The preceding pilot improved generic color "
+            "error but did not prove that real-photo outputs benefited from the correct "
+            "reference. This version directly trains that missing behavior with stronger "
+            "ranking, same-style references from separate scenes, and a training-only "
+            "expert-style objective."
         ),
         markdown_cell(
             "## 1. Verify the Kaggle environment\n\n"
@@ -131,6 +133,9 @@ def build_notebook() -> dict:
                 "    '--max-train-pairs', '256',\n"
                 "    '--max-validation-pairs', '64',\n"
                 "    '--max-test-pairs', '64',\n"
+                "    '--ranking-weight', '1.0',\n"
+                "    '--same-style-weight', '0.25',\n"
+                "    '--style-classification-weight', '0.05',\n"
                 "]\n"
                 "subprocess.run(smoke_command, cwd='/kaggle/working', check=True)\n"
             ),
@@ -162,8 +167,10 @@ def build_notebook() -> dict:
                 "## 5. Measured medium pilot\n\n"
                 "The validated smoke run measured the complete systems path. This pilot "
                 "uses 5,000 training pairs over three "
-                "epochs and 500-pair validation/test controls, remaining well inside one "
-                "GPU session. The best checkpoint remains separate from the latest."
+                "epochs and 500-pair validation/test controls. Its decisive gate is whether "
+                "the correct real reference beats a shuffled reference by a statistically "
+                "confident, practically meaningful CIEDE2000 margin. The best checkpoint "
+                "remains separate from the latest."
             ),
             code_cell(
                 "RUN_MEDIUM_PILOT = True\n\n"
@@ -182,10 +189,35 @@ def build_notebook() -> dict:
                 "        '--max-train-pairs', '5000',\n"
                 "        '--max-validation-pairs', '500',\n"
                 "        '--max-test-pairs', '500',\n"
+                "        '--ranking-weight', '1.0',\n"
+                "        '--same-style-weight', '0.25',\n"
+                "        '--style-classification-weight', '0.05',\n"
                 "    ]\n"
                 "    subprocess.run(pilot_command, cwd='/kaggle/working', check=True)\n"
                 "else:\n"
                 "    print('Medium pilot is disabled.')\n"
+            ),
+            markdown_cell(
+                "## 6. Review the conditioning pilot\n\n"
+                "This report is the decision surface, not a victory lap. Both real and "
+                "synthetic held-out gates must pass under scene-clustered confidence "
+                "intervals and predeclared practical-effect thresholds before export."
+            ),
+            code_cell(
+                "if RUN_MEDIUM_PILOT:\n"
+                "    pilot_summary = json.loads((OUTPUT_ROOT / 'pilot' / 'summary.json').read_text())\n"
+                "    pilot_history = json.loads((OUTPUT_ROOT / 'pilot' / 'history.json').read_text())\n"
+                "    print(json.dumps(pilot_summary, indent=2))\n"
+                "    print(json.dumps(pilot_history, indent=2))\n"
+                "    pilot_comparison_command = [\n"
+                "        sys.executable, '-m', 'tools.ml.reference_matcher.render_comparisons',\n"
+                "        '--dataset-root', str(DATASET_ROOT),\n"
+                "        '--checkpoint', str(OUTPUT_ROOT / 'pilot' / 'best.pt'),\n"
+                "        '--splits', str(OUTPUT_ROOT / 'pilot' / 'splits.json'),\n"
+                "        '--output', str(OUTPUT_ROOT / 'pilot' / 'held-out-comparisons.jpg'),\n"
+                "        '--samples', '12',\n"
+                "    ]\n"
+                "    subprocess.run(pilot_comparison_command, cwd='/kaggle/working', check=True)\n"
             ),
         ]
     )

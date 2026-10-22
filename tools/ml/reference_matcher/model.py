@@ -41,6 +41,26 @@ class ImageEncoder(nn.Module):
         return self.features(image).flatten(1)
 
 
+class ExpertStyleClassifier(nn.Module):
+    """Training-only head that asks encoder features to retain editing style.
+
+    FiveK's A-E labels are supervision for representation learning, not product
+    choices exposed to users. The head is saved for reproducibility but is never
+    called by ``ReferenceLutModel.forward`` and therefore never enters ONNX.
+    """
+
+    def __init__(self, feature_size: int = 96, expert_count: int = 5) -> None:
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(feature_size, 64),
+            nn.SiLU(),
+            nn.Linear(64, expert_count),
+        )
+
+    def forward(self, reference_features: torch.Tensor) -> torch.Tensor:
+        return self.layers(reference_features)
+
+
 def identity_lut(size: int) -> torch.Tensor:
     """Create a 3D lookup table that returns every RGB color unchanged."""
     values = torch.linspace(0, 1, size)
@@ -158,7 +178,11 @@ def apply_lut(image: torch.Tensor, lut: torch.Tensor) -> torch.Tensor:
     fraction = (scaled - lower).to(dtype=lut.dtype)
     red0, green0, blue0 = lower[:, 0], lower[:, 1], lower[:, 2]
     red1, green1, blue1 = upper[:, 0], upper[:, 1], upper[:, 2]
-    red_weight, green_weight, blue_weight = fraction[:, 0], fraction[:, 1], fraction[:, 2]
+    red_weight, green_weight, blue_weight = (
+        fraction[:, 0],
+        fraction[:, 1],
+        fraction[:, 2],
+    )
     flattened = lut.reshape(batch, channels, -1)
 
     def sample(red, green, blue):

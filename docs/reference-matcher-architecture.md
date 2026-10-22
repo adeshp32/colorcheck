@@ -38,16 +38,21 @@ share known exposure, contrast, gamma, channel balance, saturation, shadow,
 highlight, and black-level intent. This forces the model to read the reference
 rather than merely learning a generic enhancement.
 
-Checkpoint selection follows that two-part contract. Every epoch receives one
-DeltaE76 score for real validation pairs and one for synthetic shared-style
-validation pairs on held-out scenes. Their arithmetic mean selects the best
-checkpoint; the untouched test split is evaluated only after selection.
+Checkpoint selection follows that two-part contract. Every epoch receives
+DeltaE76 scores for real validation pairs, shuffled real references, and
+synthetic shared-style pairs on held-out scenes. The score starts with balanced
+real/synthetic error and then rewards the real correct-reference gain or
+penalizes its reversal. The untouched test split is evaluated only after
+selection.
 
-A pairwise ranking loss supplies a second defense against generic enhancement.
-During training, the same target is evaluated with its correct reference and a
-known-wrong style. The correct reference must produce the closer result by a
-fixed margin. This control is training-only and does not enlarge the ONNX model
-or add a second inference in the browser.
+Three training-only controls defend against generic enhancement. The same target
+is evaluated with its correct reference and a known-wrong style; the correct
+reference must produce the closer result by a fixed margin. A second reference
+from another scene carrying the same treatment must lead to a compatible LUT,
+which discourages scene-content leakage. A small expert classifier trains the
+shared reference features to preserve FiveK's editing-style signal. The extra
+branches and classifier are omitted from ONNX, so browser inference remains one
+target/reference pass through the original predictor.
 
 Synthetic recipes also provide exact LUT supervision. Each labeled recipe is
 evaluated over all 35,937 points of the 33-cube color lattice, so training covers

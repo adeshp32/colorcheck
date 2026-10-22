@@ -101,7 +101,9 @@ class SplitManifest:
 
 def _contains_fivek_folders(path: Path) -> bool:
     """Return whether a directory directly contains raw and all expert folders."""
-    return path.is_dir() and all((path / name).is_dir() for name in REQUIRED_DIRECTORIES)
+    return path.is_dir() and all(
+        (path / name).is_dir() for name in REQUIRED_DIRECTORIES
+    )
 
 
 def find_dataset_root(path: Path) -> Path:
@@ -169,7 +171,9 @@ def inspect_dataset(dataset_path: Path) -> tuple[str, ...]:
 
     missing_count = len(source_names) - len(complete)
     if missing_count:
-        raise ValueError(f"Dataset has {missing_count} source scenes missing expert edits")
+        raise ValueError(
+            f"Dataset has {missing_count} source scenes missing expert edits"
+        )
     if not complete:
         raise ValueError("No complete raw/A-E scenes found in the dataset")
     return tuple(complete)
@@ -181,7 +185,10 @@ def inspect_archive(archive: Path) -> tuple[str, ...]:
 
 
 def create_splits(
-    scenes: tuple[str, ...], seed: int = 42, validation_size: int = 500, test_size: int = 500
+    scenes: tuple[str, ...],
+    seed: int = 42,
+    validation_size: int = 500,
+    test_size: int = 500,
 ) -> SplitManifest:
     """Create deterministic, scene-level train/validation/test partitions."""
     if validation_size + test_size >= len(scenes):
@@ -222,12 +229,15 @@ class FiveKReferenceDataset(Dataset):
         synthetic_probability: float = 0.0,
         lut_size: int = 33,
         include_lut_supervision: bool = False,
+        include_alternate_reference: bool = False,
     ) -> None:
         if len(scenes) < 2:
             raise ValueError("At least two scenes are required for reference pairing")
         self.dataset_path = Path(dataset_path)
         self.dataset_root = (
-            None if self.dataset_path.is_file() else find_dataset_root(self.dataset_path)
+            None
+            if self.dataset_path.is_file()
+            else find_dataset_root(self.dataset_path)
         )
         self.scenes = scenes
         self.image_size = image_size
@@ -238,6 +248,7 @@ class FiveKReferenceDataset(Dataset):
         self.synthetic_probability = synthetic_probability
         self.lut_size = lut_size
         self.include_lut_supervision = include_lut_supervision
+        self.include_alternate_reference = include_alternate_reference
         # ZIP handles cannot be shared safely by DataLoader worker processes.
         self._bundle: zipfile.ZipFile | None = None
 
@@ -298,10 +309,30 @@ class FiveKReferenceDataset(Dataset):
         offset_seed = int.from_bytes(
             hashlib.sha256(f"{self.seed}:{scene}:{expert}".encode()).digest()[:8], "big"
         )
-        reference_index = (scene_index + 1 + offset_seed % (len(self.scenes) - 1)) % len(
-            self.scenes
-        )
+        reference_index = (
+            scene_index + 1 + offset_seed % (len(self.scenes) - 1)
+        ) % len(self.scenes)
         reference_scene = self.scenes[reference_index]
+
+        # Training may request a second, same-style reference from another scene.
+        # Agreement across two unrelated photographs teaches the model to retain
+        # the edit treatment while discarding reference-scene content. Validation
+        # and browser inference still require only one reference image.
+        alternate_reference_scene = None
+        if self.include_alternate_reference:
+            alternate_seed = int.from_bytes(
+                hashlib.sha256(
+                    f"alternate:{self.seed}:{scene}:{expert}".encode()
+                ).digest()[:8],
+                "big",
+            )
+            alternate_index = (
+                scene_index + 1 + alternate_seed % (len(self.scenes) - 1)
+            ) % len(self.scenes)
+            if len(self.scenes) > 2:
+                while alternate_index in (scene_index, reference_index):
+                    alternate_index = (alternate_index + 1) % len(self.scenes)
+            alternate_reference_scene = self.scenes[alternate_index]
 
         source = self._read(f"raw/{scene}")
         # Deterministically mix exact synthetic supervision with real edits.
@@ -316,9 +347,17 @@ class FiveKReferenceDataset(Dataset):
                 self._read(f"raw/{reference_scene}"), style_seed
             )
             expected = apply_synthetic_style(source, style_seed)
+            if alternate_reference_scene is not None:
+                alternate_reference = apply_synthetic_style(
+                    self._read(f"raw/{alternate_reference_scene}"), style_seed
+                )
         else:
             reference = self._read(f"{expert}/{reference_scene}")
             expected = self._read(f"{expert}/{scene}")
+            if alternate_reference_scene is not None:
+                alternate_reference = self._read(
+                    f"{expert}/{alternate_reference_scene}"
+                )
 
         # Flip source and expected together. This adds compositional variety
         # without changing the color relationship that the network must learn.
@@ -345,4 +384,7 @@ class FiveKReferenceDataset(Dataset):
                 else torch.zeros(3, self.lut_size, self.lut_size, self.lut_size)
             )
             sample["has_exact_lut"] = synthetic
+        if alternate_reference_scene is not None:
+            sample["alternate_reference"] = alternate_reference
+            sample["alternate_reference_scene"] = alternate_reference_scene
         return sample

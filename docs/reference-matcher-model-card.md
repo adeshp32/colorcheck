@@ -33,9 +33,13 @@ Training balances two related objectives:
    raw scenes, providing exact supervision for reference-conditioned transfer.
 
 A pairwise ranking loss compares the correct reference with a known-wrong style.
+A second, same-style reference from another scene supplies a content-invariance
+objective, while a training-only classifier teaches the shared encoder to retain
+FiveK expert-treatment cues. Neither auxiliary path enters the exported graph.
 Synthetic samples additionally supervise every point in their exact 33-cube LUT.
-Balanced real and synthetic validation DeltaE76 selects the checkpoint. Test
-scenes are untouched until that choice is complete.
+Balanced real and synthetic validation DeltaE76 plus held-out real-reference
+discrimination selects the checkpoint. Test scenes are untouched until that
+choice is complete.
 
 ## Evaluation
 
@@ -73,6 +77,11 @@ contains the aesthetic choices of five experts and cannot represent every camera
 skin tone, lighting condition, culture, or photographic genre. Synthetic recipes
 cover declared controls, not all possible edits. Human visual review remains
 mandatory even when numerical gates pass.
+
+The first measured medium pilot improved real-photo color error over identity
+but did not make the correct real reference outperform a shuffled one. That
+checkpoint is not deployment-ready. The added conditioning objectives are a
+measured response to this failure, not evidence that it has already been solved.
 
 ## Privacy And Delivery
 

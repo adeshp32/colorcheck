@@ -29,12 +29,17 @@ audited.
 
 For real supervision, the target is a raw scene, the expected output is one
 expert's edit of that scene, and the reference is a different scene edited by the
-same expert. This prevents direct content copying.
+same expert. During training, a second reference uses a third scene edited by the
+same expert. Agreement between their predicted LUTs discourages the model from
+mistaking scene content for treatment. Validation, testing, and product inference
+still consume one reference.
 
 For exact synthetic supervision, one deterministic bounded recipe transforms
 two unrelated raw scenes. One transformed scene is the reference and the other
 is the expected target. Its style identifier is unique to the recipe, allowing a
-known-wrong reference to be selected for pairwise ranking.
+known-wrong reference to be selected for pairwise ranking. Training also applies
+the same recipe to the alternate reference scene, giving an exact same-style
+consistency example.
 
 ## Transform Boundaries
 
