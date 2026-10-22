@@ -47,6 +47,8 @@ current statistics matcher, incorrect references, reference sensitivity,
 LUT-basis usage, runtime, and peak memory.
 
 Separate real-expert and exact-synthetic reports must pass every evidence gate.
+Each improvement gate combines scene-clustered statistical confidence with a
+predeclared minimum practical effect, recorded in the evaluation summary.
 PyTorch-to-ONNX and FP32-to-INT8 rendered pixels are compared independently.
 The export manifest recommends no production artifact unless the checkpoint,
 quality summary, and quantization evidence all agree.

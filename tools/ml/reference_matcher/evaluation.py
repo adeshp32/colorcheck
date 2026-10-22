@@ -23,6 +23,17 @@ import torch.nn.functional as F
 from .dataset import EXPERTS
 from .losses import image_gradients, rgb_to_lab
 
+# These thresholds are declared in source before full training. They prevent a
+# large evaluation set from promoting a statistically positive but visually tiny
+# result. Confidence intervals must still exclude zero independently.
+MINIMUM_PRACTICAL_EFFECTS = {
+    "identityDeltaE2000": 0.25,
+    "identitySsim": 0.002,
+    "statisticsDeltaE2000": 0.10,
+    "correctReferenceDeltaE2000": 0.05,
+    "referenceSensitivityMae": 1 / 1024,
+}
+
 
 def _per_image_mean(values: torch.Tensor) -> torch.Tensor:
     """Average every dimension except the leading batch dimension."""
@@ -325,4 +336,46 @@ def coefficient_diagnostics(coefficients: torch.Tensor) -> dict[str, object]:
         "basisWeightStandardDeviations": coefficients.std(0, correction=0).tolist(),
         "dominantBasisCounts": dominant_counts.tolist(),
         "dominantBasisFraction": float(dominant_counts.max() / coefficients.shape[0]),
+    }
+
+
+def deployment_evidence_gates(
+    identity_gain: dict,
+    statistics_gain: dict,
+    wrong_reference_gain: dict,
+    reference_sensitivity_mean: float,
+    coefficient_report: dict,
+) -> dict[str, bool]:
+    """Require statistical confidence, practical effect, and model diversity."""
+    minimum = MINIMUM_PRACTICAL_EFFECTS
+    return {
+        "beatsIdentityDeltaE2000": (
+            identity_gain["deltaE2000"]["ci95Lower"] > 0
+            and identity_gain["deltaE2000"]["mean"]
+            >= minimum["identityDeltaE2000"]
+        ),
+        "beatsIdentitySsim": (
+            identity_gain["ssim"]["ci95Lower"] > 0
+            and identity_gain["ssim"]["mean"] >= minimum["identitySsim"]
+        ),
+        "beatsStatisticsDeltaE2000": (
+            statistics_gain["deltaE2000"]["ci95Lower"] > 0
+            and statistics_gain["deltaE2000"]["mean"]
+            >= minimum["statisticsDeltaE2000"]
+        ),
+        "correctReferenceBeatsShuffledDeltaE2000": (
+            wrong_reference_gain["deltaE2000"]["ci95Lower"] > 0
+            and wrong_reference_gain["deltaE2000"]["mean"]
+            >= minimum["correctReferenceDeltaE2000"]
+        ),
+        "respondsToReference": (
+            reference_sensitivity_mean >= minimum["referenceSensitivityMae"]
+        ),
+        "avoidsSingleBasisCollapse": (
+            max(coefficient_report["meanBasisWeights"]) < 0.9
+            and coefficient_report["dominantBasisFraction"] < 0.9
+        ),
+        "doesNotIncreaseClippingVsIdentity": (
+            identity_gain["clippingPercent"]["ci95Lower"] >= 0
+        ),
     }

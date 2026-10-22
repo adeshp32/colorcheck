@@ -91,6 +91,10 @@ untouched scene-level test split must establish all of the following:
 7. Browser artifact size, inference latency, peak memory, integrity, and fallback
    checks on representative mobile and desktop devices.
 
+Quality gates require both a scene-clustered confidence interval above zero and
+a predeclared minimum practical effect. A large test set therefore cannot promote
+a change that is statistically detectable but too small to be useful.
+
 Export and promotion are separate operations. Research artifacts may be emitted
 for parity testing, but the manifest names no recommended production artifact
 unless the checkpoint matches its evaluation summary, every held-out quality

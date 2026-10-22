@@ -21,8 +21,10 @@ from tools.ml.reference_matcher.model import (
     initial_lut_bases,
 )
 from tools.ml.reference_matcher.evaluation import (
+    MINIMUM_PRACTICAL_EFFECTS,
     MetricStore,
     ciede2000,
+    deployment_evidence_gates,
     metric_samples,
     mismatch_references,
     paired_improvement,
@@ -159,6 +161,46 @@ class ReferenceMatcherTests(unittest.TestCase):
         self.assertEqual(gain["sceneCount"], 2)
         self.assertEqual(gain["observationCount"], 4)
         self.assertEqual(gain["mean"], 2.0)
+
+    def test_deployment_rejects_statistically_positive_but_trivial_effects(self):
+        """A tiny positive CI is evidence of direction, not useful product impact."""
+        def result(mean, lower=0.001):
+            return {"mean": mean, "ci95Lower": lower, "ci95Upper": mean + 0.1}
+
+        identity = {
+            "deltaE2000": result(MINIMUM_PRACTICAL_EFFECTS["identityDeltaE2000"]),
+            "ssim": result(MINIMUM_PRACTICAL_EFFECTS["identitySsim"]),
+            "clippingPercent": result(0.0, lower=0.0),
+        }
+        statistics = {
+            "deltaE2000": result(MINIMUM_PRACTICAL_EFFECTS["statisticsDeltaE2000"])
+        }
+        correct_reference = {
+            "deltaE2000": result(
+                MINIMUM_PRACTICAL_EFFECTS["correctReferenceDeltaE2000"]
+            )
+        }
+        mixture = {"meanBasisWeights": [0.5, 0.5], "dominantBasisFraction": 0.6}
+        passing = deployment_evidence_gates(
+            identity,
+            statistics,
+            correct_reference,
+            MINIMUM_PRACTICAL_EFFECTS["referenceSensitivityMae"],
+            mixture,
+        )
+        self.assertTrue(all(passing.values()))
+
+        identity["deltaE2000"] = result(
+            MINIMUM_PRACTICAL_EFFECTS["identityDeltaE2000"] - 1e-6
+        )
+        failing = deployment_evidence_gates(
+            identity,
+            statistics,
+            correct_reference,
+            MINIMUM_PRACTICAL_EFFECTS["referenceSensitivityMae"],
+            mixture,
+        )
+        self.assertFalse(failing["beatsIdentityDeltaE2000"])
 
     def test_statistics_match_reaches_reference_channel_statistics(self):
         source = torch.rand(2, 3, 32, 32) * 0.2 + 0.2

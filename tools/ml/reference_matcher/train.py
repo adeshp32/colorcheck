@@ -22,8 +22,10 @@ from tqdm import tqdm
 
 from .dataset import FiveKReferenceDataset, create_splits, inspect_dataset
 from .evaluation import (
+    MINIMUM_PRACTICAL_EFFECTS,
     MetricStore,
     coefficient_diagnostics,
+    deployment_evidence_gates,
     metric_samples,
     mismatch_references,
     paired_improvement,
@@ -257,24 +259,13 @@ def comprehensive_evaluation(model, loader, device, mixed_precision, seed: int =
     sensitivity = np.asarray(sensitivities)
     sample_count = len(sensitivity)
     coefficient_report = coefficient_diagnostics(torch.cat(all_coefficients))
-    gates = {
-        # Require the complete confidence interval to favor the model. These are
-        # conservative evidence gates, not claims of subjective superiority.
-        "beatsIdentityDeltaE2000": identity_gain["deltaE2000"]["ci95Lower"] > 0,
-        "beatsIdentitySsim": identity_gain["ssim"]["ci95Lower"] > 0,
-        "beatsStatisticsDeltaE2000": statistics_gain["deltaE2000"]["ci95Lower"] > 0,
-        "correctReferenceBeatsShuffledDeltaE2000": (
-            wrong_reference_gain["deltaE2000"]["ci95Lower"] > 0
-        ),
-        "respondsToReference": float(sensitivity.mean()) > 1 / 1024,
-        "avoidsSingleBasisCollapse": (
-            max(coefficient_report["meanBasisWeights"]) < 0.9
-            and coefficient_report["dominantBasisFraction"] < 0.9
-        ),
-        "doesNotIncreaseClippingVsIdentity": (
-            identity_gain["clippingPercent"]["ci95Lower"] >= 0
-        ),
-    }
+    gates = deployment_evidence_gates(
+        identity_gain,
+        statistics_gain,
+        wrong_reference_gain,
+        float(sensitivity.mean()),
+        coefficient_report,
+    )
     return {
         "metrics": summaries,
         "pairedImprovementOverIdentity": identity_gain,
@@ -293,6 +284,7 @@ def comprehensive_evaluation(model, loader, device, mixed_precision, seed: int =
             "parameterCount": sum(parameter.numel() for parameter in model.parameters()),
         },
         "deploymentEvidenceGates": gates,
+        "minimumPracticalEffects": MINIMUM_PRACTICAL_EFFECTS,
         "allEvidenceGatesPass": all(gates.values()),
     }
 

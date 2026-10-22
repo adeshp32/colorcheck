@@ -148,7 +148,9 @@ the model against both an identity baseline and ColorCheck's existing bounded
 channel-statistics matcher, stratifies results by FiveK expert, checks whether a
 wrong reference degrades performance, detects collapsed LUT-basis usage, and
 records model/LUT latency, CUDA peak memory, and parameter count. Explicit
-evidence gates must pass before a checkpoint is considered for ONNX export.
+evidence gates must pass before a checkpoint is considered for ONNX export. Each
+quality gate requires both a scene-clustered confidence interval above zero and
+a predeclared minimum practical effect stored in the report.
 The export manifest additionally verifies that its checkpoint epoch matches that
 summary and withholds a recommended browser artifact unless both the held-out
 quality gates and rendered-pixel quantization tolerances pass.
