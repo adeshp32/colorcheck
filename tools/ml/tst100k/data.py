@@ -12,9 +12,10 @@ import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 from urllib.parse import quote
 from urllib.request import urlopen
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 
 import torch
 import numpy as np
@@ -24,6 +25,28 @@ from torch.utils.data import Dataset
 DATASET_REVISION = "63bf13833b75407c862d608c3d81281d0a35b61f"
 BASE_URL = f"https://huggingface.co/datasets/ToneStyle/TST100K/resolve/{DATASET_REVISION}"
 SPLITS = ("train", "validation", "test")
+
+
+class RequestPacer:
+    """Space image requests and share server backoff across worker threads."""
+
+    def __init__(self, interval_seconds: float = 0.75):
+        self.interval_seconds = interval_seconds
+        self.next_request_at = 0.0
+        self.lock = Lock()
+
+    def wait(self) -> None:
+        while True:
+            with self.lock:
+                remaining = self.next_request_at - time.monotonic()
+                if remaining <= 0:
+                    self.next_request_at = time.monotonic() + self.interval_seconds
+                    return
+            time.sleep(remaining)
+
+    def pause_for(self, seconds: float) -> None:
+        with self.lock:
+            self.next_request_at = max(self.next_request_at, time.monotonic() + seconds)
 
 
 def scene_id(path: str) -> str:
@@ -82,16 +105,17 @@ def fetch_manifest() -> list[dict[str, str]]:
         return json.load(response)
 
 
-def _download_one(root: Path, relative: str, max_bytes: int) -> int:
+def _download_one(root: Path, relative: str, max_bytes: int, pacer: RequestPacer) -> int:
     """Stream one image to Kaggle scratch, with bounded size and retries."""
     destination = root / relative
     if destination.is_file():
         return destination.stat().st_size
     destination.parent.mkdir(parents=True, exist_ok=True)
     url = f"{BASE_URL}/{quote(relative, safe='/')}"
-    for attempt in range(3):
+    for attempt in range(7):
         temporary = destination.with_name(destination.name + ".part")
         try:
+            pacer.wait()
             with urlopen(url, timeout=90) as response:
                 size = 0
                 with temporary.open("wb") as output:
@@ -104,24 +128,39 @@ def _download_one(root: Path, relative: str, max_bytes: int) -> int:
                 image.verify()
             temporary.replace(destination)
             return size
+        except HTTPError as error:
+            temporary.unlink(missing_ok=True)
+            if error.code != 429 or attempt == 6:
+                raise
+            retry_after = error.headers.get("Retry-After")
+            try:
+                delay = max(1.0, float(retry_after)) if retry_after else 0.0
+            except ValueError:
+                delay = 0.0
+            delay = min(300.0, max(delay, 20.0 * 2**attempt))
+            pacer.pause_for(delay)
+            print(f"Rate limited by data host; pausing image requests for {delay:.0f}s", flush=True)
         except (URLError, OSError, ValueError) as error:
             temporary.unlink(missing_ok=True)
-            if attempt == 2 or isinstance(error, ValueError):
+            if attempt == 6 or isinstance(error, ValueError):
                 raise
-            time.sleep(2 ** attempt)
+            time.sleep(min(30, 2**attempt))
     raise RuntimeError("Unreachable download retry state")
 
 
 def stage_images(
-    selected: dict[str, list[dict[str, str]]], root: Path, workers: int = 8
+    selected: dict[str, list[dict[str, str]]], root: Path, workers: int = 2
 ) -> dict[str, int]:
     """Download only selected files; the full 94 GB collection is never staged."""
     paths = sorted({path for rows in selected.values() for row in rows for path in row.values()})
     total_bytes = 0
+    pacer = RequestPacer()
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        pending = {pool.submit(_download_one, root, path, 40_000_000): path for path in paths}
-        for task in as_completed(pending):
+        pending = {pool.submit(_download_one, root, path, 40_000_000, pacer): path for path in paths}
+        for completed, task in enumerate(as_completed(pending), 1):
             total_bytes += task.result()
+            if completed % 250 == 0 or completed == len(paths):
+                print(json.dumps({"downloadedFiles": completed, "totalFiles": len(paths)}), flush=True)
     return {"files": len(paths), "bytes": total_bytes}
 
 

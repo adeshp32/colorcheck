@@ -73,8 +73,8 @@ def build() -> dict:
                 "code",
                 "import subprocess\n"
                 "subprocess.run([sys.executable, '-m', 'tools.ml.tst100k.train',\n"
-                "    '--train-pairs', '2048', '--validation-pairs', '256',\n"
-                "    '--test-pairs', '448', '--epochs', '8', '--batch-size', '8',\n"
+                "    '--train-pairs', '1024', '--validation-pairs', '160',\n"
+                "    '--test-pairs', '320', '--epochs', '8', '--batch-size', '8',\n"
                 "    '--workers', '2', '--size', '128', '--seed', '2027',\n"
                 f"    '--output-dir', '/kaggle/working/{RUN_NAME}',\n"
                 f"    '--scratch-dir', '/kaggle/temp/{RUN_NAME}'],\n"

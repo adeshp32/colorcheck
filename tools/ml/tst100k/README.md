@@ -29,8 +29,11 @@ over a wrong reference was 0.68 (0.42 to 0.96). The paired gain over the
 statistics matcher was 0.92, but its interval crossed zero (-0.22 to 2.10).
 **That last gate failed**, so no checkpoint was promoted to the website.
 
-The expanded-validation notebook uses a fresh seed, 2048/256/448 triplets,
-and eight epochs. It also reports SSIM, edge error, and clipping so that
+The expanded-validation notebook uses a fresh seed, 1024/160/320 triplets,
+and eight epochs. The first larger attempt stopped at an upstream HTTP 429
+while fetching thousands of individual images; the revised fetcher spaces
+requests, shares the host's retry delay across workers, and reports progress.
+It also reports SSIM, edge error, and clipping so that
 reduced color error cannot silently mask a structural or tonal regression.
 
 TST100K combines third-party research datasets and is restricted to

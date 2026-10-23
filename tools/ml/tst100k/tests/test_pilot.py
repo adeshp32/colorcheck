@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
+from unittest.mock import patch
+from urllib.error import HTTPError
 
 import numpy as np
 import torch
@@ -12,11 +15,33 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 from tools.ml.reference_matcher.model import ReferenceLutModel
-from tools.ml.tst100k.data import TripletDataset, scene_id, scene_split, select_triplets
+from tools.ml.tst100k.data import TripletDataset, _download_one, scene_id, scene_split, select_triplets
 from tools.ml.tst100k.train import evaluate, train_epoch
 
 
 class TstPilotTests(unittest.TestCase):
+    def test_rate_limit_pauses_all_image_requests_before_retry(self):
+        class Pacer:
+            waits = 0
+            pauses = []
+
+            def wait(self):
+                self.waits += 1
+
+            def pause_for(self, seconds):
+                self.pauses.append(seconds)
+
+        buffer = BytesIO()
+        Image.new("RGB", (2, 2), "red").save(buffer, format="PNG")
+        blocked = HTTPError("https://example.test/photo.png", 429, "rate limited", {"Retry-After": "1"}, None)
+        pacer = Pacer()
+        with tempfile.TemporaryDirectory() as folder:
+            with patch("tools.ml.tst100k.data.urlopen", side_effect=[blocked, BytesIO(buffer.getvalue())]):
+                count = _download_one(Path(folder), "photo.png", 1000, pacer)
+            self.assertEqual(count, len(buffer.getvalue()))
+            self.assertEqual(pacer.waits, 2)
+            self.assertGreaterEqual(pacer.pauses[0], 20)
+
     def test_split_never_reuses_scene_across_partitions(self):
         rows = [
             {
