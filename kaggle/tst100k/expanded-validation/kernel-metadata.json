@@ -1,0 +1,13 @@
+{
+  "id": "adides567/colorcheck-tst100k-expanded-validation",
+  "title": "ColorCheck TST100K Expanded Validation",
+  "code_file": "colorcheck-tst100k-v2.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": []
+}

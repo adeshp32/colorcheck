@@ -64,7 +64,11 @@ class TstPilotTests(unittest.TestCase):
             self.assertFalse(torch.equal(before, model.basis))
             report = evaluate(model, loader, torch.device("cpu"), 42)
             self.assertEqual(report["model"]["deltaE2000"]["n"], 4)
+            self.assertEqual(report["model"]["ssim"]["n"], 4)
+            self.assertEqual(report["model"]["edgeMae"]["n"], 4)
+            self.assertEqual(report["model"]["clippingPercent"]["n"], 4)
             self.assertEqual(report["modelVsWrongReference"]["n"], 4)
+            self.assertEqual(report["modelVsStatisticsSsim"]["n"], 4)
 
 
 if __name__ == "__main__":

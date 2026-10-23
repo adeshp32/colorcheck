@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 OUT = ROOT / "kaggle" / "tst100k"
+RUN_NAME = "colorcheck-tst100k-v2"
 MODULES = {
     "tools/ml/reference_matcher": ("model.py", "losses.py", "dataset.py", "evaluation.py"),
     "tools/ml/tst100k": ("data.py", "train.py"),
@@ -30,11 +31,11 @@ def build() -> dict:
     cells = [
         cell(
             "markdown",
-            "# ColorCheck TST100K reference matcher pilot\n\n"
+            "# ColorCheck TST100K reference matcher: expanded validation\n\n"
             "**Question:** does the correct reference improve a held-out target more "
             "than a wrong reference, an unchanged photo, and the editor's existing "
             "statistics matcher?\n\n"
-            "This notebook trains original PyTorch weights on a small, deterministic "
+            "This notebook trains original PyTorch weights on a larger, deterministic "
             "sample of [TST100K](https://huggingface.co/datasets/ToneStyle/TST100K). "
             "The dataset is restricted to non-commercial academic research. It is "
             "not copied into Git, and this run does not deploy a model."
@@ -72,15 +73,18 @@ def build() -> dict:
                 "code",
                 "import subprocess\n"
                 "subprocess.run([sys.executable, '-m', 'tools.ml.tst100k.train',\n"
-                "    '--train-pairs', '512', '--validation-pairs', '96',\n"
-                "    '--test-pairs', '96', '--epochs', '4', '--batch-size', '8',\n"
-                "    '--workers', '2', '--size', '128'], cwd='/kaggle/working', check=True)\n"
+                "    '--train-pairs', '2048', '--validation-pairs', '256',\n"
+                "    '--test-pairs', '512', '--epochs', '8', '--batch-size', '8',\n"
+                "    '--workers', '2', '--size', '128', '--seed', '2027',\n"
+                f"    '--output-dir', '/kaggle/working/{RUN_NAME}',\n"
+                f"    '--scratch-dir', '/kaggle/temp/{RUN_NAME}'],\n"
+                "    cwd='/kaggle/working', check=True)\n"
             ),
             cell(
                 "code",
                 "import json\n"
                 "from pathlib import Path\n"
-                "summary = json.loads(Path('/kaggle/working/colorcheck-tst100k/summary.json').read_text())\n"
+                f"summary = json.loads(Path('/kaggle/working/{RUN_NAME}/summary.json').read_text())\n"
                 "print(json.dumps({'checkpointEpoch':summary['selectedCheckpointEpoch'], "
                 "'gates':summary['gates'], 'test':summary['test']}, indent=2))\n"
             ),
@@ -96,7 +100,9 @@ def build() -> dict:
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    path = OUT / "colorcheck-tst100k-pilot.ipynb"
+    run_directory = OUT / "expanded-validation"
+    run_directory.mkdir(parents=True, exist_ok=True)
+    path = run_directory / f"{RUN_NAME}.ipynb"
     path.write_text(json.dumps(build(), indent=1, ensure_ascii=True) + "\n")
     print(path)
 

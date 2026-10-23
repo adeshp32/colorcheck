@@ -14,9 +14,24 @@ remains a research artifact until browser parity, quality review, performance,
 and these evidence gates are checked.
 
 Run `python -m tools.ml.tst100k.build_kaggle_notebook` to regenerate the notebook
-from the documented modules. Push `kaggle/tst100k/` with the Kaggle CLI. The run
+from the documented modules. Push the selected notebook directory with the Kaggle CLI. The run
 needs a GPU and internet, stages images only in `/kaggle/temp`, and writes only
 the manifest, history, summary, and best checkpoint to `/kaggle/working`.
+
+## First pilot (October 23, 2026)
+
+The first private Kaggle run used 512 training, 96 validation, and 96 test
+triplets. The selected epoch was 4. On the scene-disjoint test set, mean
+Delta E 2000 was 9.97 for the model, 10.78 for unchanged images, and 10.89
+for the current statistics matcher. The paired gain over the unchanged image
+was 0.82 (95% bootstrap interval 0.57 to 1.06). The correct-reference gain
+over a wrong reference was 0.68 (0.42 to 0.96). The paired gain over the
+statistics matcher was 0.92, but its interval crossed zero (-0.22 to 2.10).
+**That last gate failed**, so no checkpoint was promoted to the website.
+
+The expanded-validation notebook uses a fresh seed, 2048/256/512 triplets,
+and eight epochs. It also reports SSIM, edge error, and clipping so that
+reduced color error cannot silently mask a structural or tonal regression.
 
 TST100K combines third-party research datasets and is restricted to
 non-commercial academic research by its [dataset card](https://huggingface.co/datasets/ToneStyle/TST100K).

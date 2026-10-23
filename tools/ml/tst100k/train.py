@@ -52,8 +52,10 @@ def autocast_context(device: torch.device):
 def evaluate(model: ReferenceLutModel, loader: DataLoader, device: torch.device, seed: int) -> dict:
     """Measure correct, wrong, identity, and existing statistics matching."""
     model.eval()
-    errors = {name: [] for name in ("model", "wrongReference", "identity", "statistics")}
-    mae = {name: [] for name in errors}
+    metrics = {
+        name: {metric: [] for metric in ("deltaE2000", "mae", "ssim", "edgeMae", "clippingPercent")}
+        for name in ("model", "wrongReference", "identity", "statistics")
+    }
     difference = []
     started = time.perf_counter()
     for batch in loader:
@@ -73,22 +75,28 @@ def evaluate(model: ReferenceLutModel, loader: DataLoader, device: torch.device,
             "statistics": statistics_match(source, reference),
         }
         for name, image in images.items():
-            metrics = metric_samples(image, expected)
-            errors[name].extend(metrics["deltaE2000"].cpu().tolist())
-            mae[name].extend(metrics["mae"].cpu().tolist())
+            samples = metric_samples(image, expected)
+            for metric in metrics[name]:
+                metrics[name][metric].extend(samples[metric].cpu().tolist())
         difference.extend((output - wrong).abs().flatten(1).mean(1).cpu().tolist())
     results = {
-        name: {"deltaE2000": mean_interval(errors[name], seed), "rgbMae": mean_interval(mae[name], seed)}
-        for name in errors
+        name: {
+            ("rgbMae" if metric == "mae" else metric): mean_interval(values, seed)
+            for metric, values in sample_metrics.items()
+        }
+        for name, sample_metrics in metrics.items()
     }
     results["modelVsWrongReference"] = mean_interval(
-        (np.asarray(errors["wrongReference"]) - np.asarray(errors["model"])).tolist(), seed
+        (np.asarray(metrics["wrongReference"]["deltaE2000"]) - np.asarray(metrics["model"]["deltaE2000"])).tolist(), seed
     )
     results["modelVsStatistics"] = mean_interval(
-        (np.asarray(errors["statistics"]) - np.asarray(errors["model"])).tolist(), seed
+        (np.asarray(metrics["statistics"]["deltaE2000"]) - np.asarray(metrics["model"]["deltaE2000"])).tolist(), seed
     )
     results["modelVsIdentity"] = mean_interval(
-        (np.asarray(errors["identity"]) - np.asarray(errors["model"])).tolist(), seed
+        (np.asarray(metrics["identity"]["deltaE2000"]) - np.asarray(metrics["model"]["deltaE2000"])).tolist(), seed
+    )
+    results["modelVsStatisticsSsim"] = mean_interval(
+        (np.asarray(metrics["model"]["ssim"]) - np.asarray(metrics["statistics"]["ssim"])).tolist(), seed
     )
     results["referenceSensitivityRgbMae"] = mean_interval(difference, seed)
     results["elapsedSeconds"] = time.perf_counter() - started
@@ -198,8 +206,10 @@ def main() -> None:
     test = evaluate(model, loaders["test"], device, args.seed + 1)
     gates = {
         "beatsIdentity": test["modelVsIdentity"]["ci95"][0] > 0,
-        "beatsCurrentMatcher": test["modelVsStatistics"]["ci95"][0] > 0,
-        "usesCorrectReference": test["modelVsWrongReference"]["ci95"][0] > 0,
+        "beatsCurrentMatcher": test["modelVsStatistics"]["ci95"][0] > 0
+        and test["modelVsStatistics"]["mean"] >= 0.5,
+        "usesCorrectReference": test["modelVsWrongReference"]["ci95"][0] > 0
+        and test["modelVsWrongReference"]["mean"] >= 0.25,
     }
     result = {
         "dataset": "ToneStyle/TST100K",
