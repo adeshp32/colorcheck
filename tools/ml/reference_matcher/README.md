@@ -113,9 +113,10 @@ while reported metrics are still calculated in float32.
 
 The notebook first runs a 256-pair smoke experiment that proves Kaggle can mount
 the data, import the exact repository code, train on its GPU, save checkpoints,
-and complete every evaluation. It then runs a measured 12,000-pair, five-epoch
-pilot with 500-pair validation and test controls. This final focused pilot uses
-more real supervision and retains the same scene-disjoint evidence gates.
+and complete every evaluation. It then runs a bounded 2,000-pair, three-epoch
+pilot with 500-pair validation and test controls. The previous 12,000-pair run
+was canceled before its first epoch finished; this pilot retains the same
+scene-disjoint evidence gates while producing a complete learning curve.
 
 The first completed medium pilot is intentionally retained as a negative result:
 it improved held-out real-photo CIEDE2000 over an unchanged source, and it learned
