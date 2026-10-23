@@ -79,8 +79,10 @@ def ciede2000(lab_a: torch.Tensor, lab_b: torch.Tensor) -> torch.Tensor:
     delta_h_degrees = torch.where(
         (c1_prime * c2_prime) == 0, torch.zeros_like(delta_h_degrees), delta_h_degrees
     )
-    delta_h = 2 * torch.sqrt(c1_prime * c2_prime) * torch.sin(
-        torch.deg2rad(delta_h_degrees) / 2
+    delta_h = (
+        2
+        * torch.sqrt(c1_prime * c2_prime)
+        * torch.sin(torch.deg2rad(delta_h_degrees) / 2)
     )
 
     mean_l = (l1 + l2) / 2
@@ -88,9 +90,7 @@ def ciede2000(lab_a: torch.Tensor, lab_b: torch.Tensor) -> torch.Tensor:
     hue_distance = (h1_prime - h2_prime).abs()
     mean_h = (h1_prime + h2_prime) / 2
     mean_h = torch.where(hue_distance > 180, mean_h + 180, mean_h).remainder(360)
-    mean_h = torch.where(
-        (c1_prime * c2_prime) == 0, h1_prime + h2_prime, mean_h
-    )
+    mean_h = torch.where((c1_prime * c2_prime) == 0, h1_prime + h2_prime, mean_h)
     t = (
         1
         - 0.17 * torch.cos(torch.deg2rad(mean_h - 30))
@@ -100,9 +100,7 @@ def ciede2000(lab_a: torch.Tensor, lab_b: torch.Tensor) -> torch.Tensor:
     )
     delta_theta = 30 * torch.exp(-((mean_h - 275) / 25).square())
     r_c = 2 * torch.sqrt(mean_c_prime.pow(7) / (mean_c_prime.pow(7) + 25**7))
-    s_l = 1 + (0.015 * (mean_l - 50).square()) / torch.sqrt(
-        20 + (mean_l - 50).square()
-    )
+    s_l = 1 + (0.015 * (mean_l - 50).square()) / torch.sqrt(20 + (mean_l - 50).square())
     s_c = 1 + 0.045 * mean_c_prime
     s_h = 1 + 0.015 * mean_c_prime * t
     r_t = -torch.sin(torch.deg2rad(2 * delta_theta)) * r_c
@@ -110,8 +108,9 @@ def ciede2000(lab_a: torch.Tensor, lab_b: torch.Tensor) -> torch.Tensor:
     chroma = delta_c / s_c
     hue = delta_h / s_h
     return torch.sqrt(
-        (lightness.square() + chroma.square() + hue.square() + r_t * chroma * hue)
-        .clamp_min(0)
+        (
+            lightness.square() + chroma.square() + hue.square() + r_t * chroma * hue
+        ).clamp_min(0)
         + 1e-12
     )
 
@@ -130,13 +129,14 @@ def _ssim_per_image(output: torch.Tensor, expected: torch.Tensor) -> torch.Tenso
     covariance = F.avg_pool2d(x * y, kernel, 1, padding) - mean_x * mean_y
     c1, c2 = 0.01**2, 0.03**2
     score = ((2 * mean_x * mean_y + c1) * (2 * covariance + c2)) / (
-        (mean_x.square() + mean_y.square() + c1)
-        * (variance_x + variance_y + c2)
+        (mean_x.square() + mean_y.square() + c1) * (variance_x + variance_y + c2)
     )
     return _per_image_mean(score)
 
 
-def metric_samples(output: torch.Tensor, expected: torch.Tensor) -> dict[str, torch.Tensor]:
+def metric_samples(
+    output: torch.Tensor, expected: torch.Tensor
+) -> dict[str, torch.Tensor]:
     """Calculate one value per photograph for each complementary quality axis."""
     output, expected = output.float(), expected.float()
     error = output - expected
@@ -149,13 +149,17 @@ def metric_samples(output: torch.Tensor, expected: torch.Tensor) -> dict[str, to
         + _per_image_mean((output_y - expected_y).abs())
     ) / 2
     chroma_output = torch.sqrt(lab_output[:, 1].square() + lab_output[:, 2].square())
-    chroma_expected = torch.sqrt(lab_expected[:, 1].square() + lab_expected[:, 2].square())
+    chroma_expected = torch.sqrt(
+        lab_expected[:, 1].square() + lab_expected[:, 2].square()
+    )
     return {
         "mae": _per_image_mean(error.abs()),
         "psnrDb": -10 * torch.log10(mse.clamp_min(1e-10)),
         "ssim": _ssim_per_image(output, expected),
         "deltaE2000": _per_image_mean(ciede2000(lab_output, lab_expected)),
-        "luminanceMae": _per_image_mean((_luminance(output) - _luminance(expected)).abs()),
+        "luminanceMae": _per_image_mean(
+            (_luminance(output) - _luminance(expected)).abs()
+        ),
         "chromaMae": _per_image_mean((chroma_output - chroma_expected).abs()),
         "edgeMae": edge_error,
         "clippingPercent": _per_image_mean(
@@ -315,9 +319,7 @@ def paired_improvement(
             if name in higher_is_better
             else baseline_values - model_values
         )
-        comparisons[name] = _cluster_bootstrap(
-            difference, model.scenes, seed + index
-        )
+        comparisons[name] = _cluster_bootstrap(difference, model.scenes, seed + index)
     return comparisons
 
 
@@ -351,8 +353,7 @@ def deployment_evidence_gates(
     return {
         "beatsIdentityDeltaE2000": (
             identity_gain["deltaE2000"]["ci95Lower"] > 0
-            and identity_gain["deltaE2000"]["mean"]
-            >= minimum["identityDeltaE2000"]
+            and identity_gain["deltaE2000"]["mean"] >= minimum["identityDeltaE2000"]
         ),
         "beatsIdentitySsim": (
             identity_gain["ssim"]["ci95Lower"] > 0
@@ -360,8 +361,7 @@ def deployment_evidence_gates(
         ),
         "beatsStatisticsDeltaE2000": (
             statistics_gain["deltaE2000"]["ci95Lower"] > 0
-            and statistics_gain["deltaE2000"]["mean"]
-            >= minimum["statisticsDeltaE2000"]
+            and statistics_gain["deltaE2000"]["mean"] >= minimum["statisticsDeltaE2000"]
         ),
         "correctReferenceBeatsShuffledDeltaE2000": (
             wrong_reference_gain["deltaE2000"]["ci95Lower"] > 0

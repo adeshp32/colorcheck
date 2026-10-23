@@ -107,9 +107,12 @@ class ReferenceLutModel(nn.Module):
         super().__init__()
         self.basis_count = basis_count
         self.lut_size = lut_size
+        self.histogram_bins = 8
         self.encoder = ImageEncoder()
         self.predictor = nn.Sequential(
-            nn.Linear(96 * 5 + 12, 160),
+            # Five learned feature interactions, channel statistics, and two
+            # four-channel soft histograms describe both scene and treatment.
+            nn.Linear(96 * 5 + 12 + 2 * 4 * self.histogram_bins, 160),
             nn.SiLU(),
             nn.Dropout(0.1),
             nn.Linear(160, basis_count),
@@ -122,6 +125,29 @@ class ReferenceLutModel(nn.Module):
         mean = image.mean(dim=(2, 3))
         std = image.std(dim=(2, 3), correction=0)
         return torch.cat((mean, std), dim=1)
+
+    def color_distribution(self, image: torch.Tensor) -> torch.Tensor:
+        """Summarize RGB and luminance distributions with soft histogram bins.
+
+        Means and standard deviations cannot distinguish, for example, an image
+        concentrated in shadows and highlights from one concentrated in the
+        midtones. Each pixel contributes linearly to its neighboring bins, so
+        this descriptor retains more tonal information while remaining smooth,
+        differentiable, and exportable through ordinary ONNX operations.
+        """
+        luminance = (
+            image * image.new_tensor([0.2126, 0.7152, 0.0722])[None, :, None, None]
+        ).sum(1, keepdim=True)
+        channels = torch.cat((image, luminance), dim=1).unsqueeze(2)
+        centers = torch.linspace(
+            0,
+            1,
+            self.histogram_bins,
+            device=image.device,
+            dtype=image.dtype,
+        ).view(1, 1, self.histogram_bins, 1, 1)
+        membership = (1 - (channels - centers).abs() * (self.histogram_bins - 1)).relu()
+        return membership.mean(dim=(3, 4)).flatten(1)
 
     def predict_coefficients(self, source: torch.Tensor, reference: torch.Tensor):
         """Decide how strongly each learned LUT basis should influence the result."""
@@ -141,6 +167,8 @@ class ReferenceLutModel(nn.Module):
                 reference_features * source_features,
                 self.statistics(source),
                 self.statistics(reference),
+                self.color_distribution(source),
+                self.color_distribution(reference),
             ),
             dim=1,
         )

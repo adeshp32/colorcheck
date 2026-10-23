@@ -67,6 +67,27 @@ def reference_ranking_loss(
     return (margin + correct_error - wrong_error).relu().mean()
 
 
+def perceptual_reference_ranking_loss(
+    correct_output: torch.Tensor,
+    wrong_output: torch.Tensor,
+    expected: torch.Tensor,
+    margin: float = 0.25,
+) -> torch.Tensor:
+    """Rank references by perceptual Lab error instead of raw RGB distance.
+
+    The strict deployment gate uses perceptual color difference. This companion
+    objective gives training a signal in the same units: a correct reference
+    should beat a known-wrong style by at least a small visible margin. The loss
+    is training-only and therefore does not enlarge browser inference.
+    """
+    expected_lab = rgb_to_lab(expected)
+    correct_delta = (rgb_to_lab(correct_output) - expected_lab).square().sum(1).sqrt()
+    wrong_delta = (rgb_to_lab(wrong_output) - expected_lab).square().sum(1).sqrt()
+    correct_error = correct_delta.mean(dim=(1, 2))
+    wrong_error = wrong_delta.mean(dim=(1, 2))
+    return (margin + correct_error - wrong_error).relu().mean()
+
+
 def exact_lut_supervision_loss(
     predicted_lut: torch.Tensor,
     expected_lut: torch.Tensor,

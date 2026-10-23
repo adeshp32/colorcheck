@@ -46,15 +46,17 @@ the arithmetic mean of real and synthetic DeltaE76, then rewards or penalizes th
 held-out real correct-reference gain. A generically attractive checkpoint can no
 longer win selection by ignoring its real reference.
 
-Training includes three complementary reference-conditioning controls. For each
+Training includes four complementary reference-conditioning controls. For each
 batch, the true reference and a reference carrying a different style identifier
 are scored together; the true reference must reconstruct the expected edit by a
-measurable margin. A second reference from another scene with the same treatment
+measurable RGB and perceptual Lab margin. A second reference from another scene with the same treatment
 must produce a compatible LUT, reducing the chance that scene content is mistaken
 for style. Finally, a small training-only classifier asks shared encoder features
 to distinguish FiveK's five expert treatments. The classifier and extra reference
 branches are absent from ONNX, so they add no parameters or work to browser
-inference.
+inference. Soft RGB-and-luminance histograms give the deployed predictor compact
+shadow, midtone, highlight, and color-distribution evidence beyond mean and
+standard deviation.
 
 ## Reproducible commands
 
@@ -111,10 +113,9 @@ while reported metrics are still calculated in float32.
 
 The notebook first runs a 256-pair smoke experiment that proves Kaggle can mount
 the data, import the exact repository code, train on its GPU, save checkpoints,
-and complete every evaluation. It then runs a measured 5,000-pair, three-epoch
-pilot with 500-pair validation and test controls. Full-dataset training remains
-disabled until the pilot's learning curves, controls, and visual results are
-reviewed.
+and complete every evaluation. It then runs a measured 12,000-pair, five-epoch
+pilot with 500-pair validation and test controls. This final focused pilot uses
+more real supervision and retains the same scene-disjoint evidence gates.
 
 The first completed medium pilot is intentionally retained as a negative result:
 it improved held-out real-photo CIEDE2000 over an unchanged source, and it learned

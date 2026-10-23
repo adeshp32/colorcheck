@@ -64,9 +64,11 @@ or metrics.
 
 The encoder processes target and reference in one batch for a compact ONNX graph.
 Its predictor uses source features, reference features, signed and absolute
-differences, feature interactions, and channel statistics to blend eight learned
-LUT bases. The complete model remains under one million parameters before
-quantization.
+differences, feature interactions, channel statistics, and differentiable soft
+histograms of RGB and luminance to blend eight learned LUT bases. The histograms
+retain shadow, midtone, and highlight distribution information using only
+browser-safe ONNX primitives. The complete model remains under one million
+parameters before quantization.
 
 The bases start from mild paired photographic anchors: warm/cool, higher/lower
 contrast, higher/lower saturation, and opposing gamma curves. Their mean remains

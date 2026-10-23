@@ -18,7 +18,7 @@ editing decisions.
 - Output: a convex mixture of eight learned 33-cube LUT bases.
 - Initialization: paired warm/cool, contrast, saturation, and gamma anchors with
   a near-neutral mean; all LUT values remain trainable.
-- Size: 956,032 trainable parameters before quantization.
+- Size: 966,272 trainable parameters before quantization.
 - Application: trilinear interpolation over the original-resolution photograph.
 
 The 128-pixel inputs determine one global transform; they are not the exported
@@ -32,7 +32,9 @@ Training balances two related objectives:
 2. Deterministic shared-style pairs apply one known bounded recipe to unrelated
    raw scenes, providing exact supervision for reference-conditioned transfer.
 
-A pairwise ranking loss compares the correct reference with a known-wrong style.
+A pairwise ranking loss compares the correct reference with a known-wrong style
+in both RGB and perceptual Lab space. Soft RGB-and-luminance histograms provide
+compact tonal-distribution evidence directly to the deployed predictor.
 A second, same-style reference from another scene supplies a content-invariance
 objective, while a training-only classifier teaches the shared encoder to retain
 FiveK expert-treatment cues. Neither auxiliary path enters the exported graph.

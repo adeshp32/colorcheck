@@ -11,7 +11,12 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
-from onnxruntime.quantization import CalibrationDataReader, QuantFormat, QuantType, quantize_static
+from onnxruntime.quantization import (
+    CalibrationDataReader,
+    QuantFormat,
+    QuantType,
+    quantize_static,
+)
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
 from .dataset import FiveKReferenceDataset, SplitManifest
@@ -139,10 +144,16 @@ def browser_probe_inputs(size: int) -> dict[str, np.ndarray]:
     """Build portable deterministic inputs without embedding photographs."""
     pixel = np.arange(size * size, dtype=np.int64).reshape(size, size)
     source = np.stack(
-        [((pixel * (channel * 2 + 3) + channel * 37) % 251) / 250 for channel in range(3)]
+        [
+            ((pixel * (channel * 2 + 3) + channel * 37) % 251) / 250
+            for channel in range(3)
+        ]
     ).astype(np.float32)
     reference = np.stack(
-        [((pixel * (channel * 2 + 5) + channel * 53 + 19) % 251) / 250 for channel in range(3)]
+        [
+            ((pixel * (channel * 2 + 5) + channel * 53 + 19) % 251) / 250
+            for channel in range(3)
+        ]
     ).astype(np.float32)
     return {"source": source[None], "reference": reference[None]}
 
@@ -179,7 +190,9 @@ def main() -> None:
         required=True,
         help="summary.json produced by the training run that selected this checkpoint",
     )
-    parser.add_argument("--output-dir", type=Path, default=Path(".local/reference-matcher/export"))
+    parser.add_argument(
+        "--output-dir", type=Path, default=Path(".local/reference-matcher/export")
+    )
     parser.add_argument("--calibration-samples", type=int, default=128)
     parser.add_argument("--comparison-samples", type=int, default=64)
     args = parser.parse_args()
@@ -194,8 +207,9 @@ def main() -> None:
     size = config["image_size"]
     example = torch.zeros(1, 3, size, size)
     fp32_path = args.output_dir / "reference-matcher-fp32.onnx"
+    lut_only = LutOnly(model).eval()
     torch.onnx.export(
-        LutOnly(model),
+        lut_only,
         (example, example),
         fp32_path,
         input_names=["source", "reference"],
@@ -205,8 +219,9 @@ def main() -> None:
     )
     onnx.checker.check_model(str(fp32_path))
     quantized_basis_path = args.output_dir / "reference-matcher-uint8-basis.onnx"
+    quantized_lut_only = QuantizedBasisLutOnly(model).eval()
     torch.onnx.export(
-        QuantizedBasisLutOnly(model),
+        quantized_lut_only,
         (example, example),
         quantized_basis_path,
         input_names=["source", "reference"],
@@ -232,7 +247,9 @@ def main() -> None:
     quantize_static(
         model_input=str(preprocessed_path),
         model_output=str(int8_path),
-        calibration_data_reader=FiveKCalibrationReader(calibration, args.calibration_samples),
+        calibration_data_reader=FiveKCalibrationReader(
+            calibration, args.calibration_samples
+        ),
         quant_format=QuantFormat.QDQ,
         activation_type=QuantType.QUInt8,
         weight_type=QuantType.QInt8,
@@ -240,7 +257,9 @@ def main() -> None:
         op_types_to_quantize=["Conv", "MatMul", "Gemm"],
     )
     onnx.checker.check_model(str(int8_path))
-    comparison = compare_sessions(fp32_path, int8_path, calibration, args.comparison_samples)
+    comparison = compare_sessions(
+        fp32_path, int8_path, calibration, args.comparison_samples
+    )
     fp32_bytes = fp32_path.stat().st_size
     int8_bytes = int8_path.stat().st_size
     accepted = (
@@ -259,18 +278,37 @@ def main() -> None:
         "checkpointEpoch": checkpoint["epoch"],
         "validation": checkpoint["validation"],
         "inputs": {"source": [1, 3, size, size], "reference": [1, 3, size, size]},
-        "outputs": {"lut": [1, 3, config["lut_size"], config["lut_size"], config["lut_size"]], "order": "batch,channel,blue,green,red"},
-        "fp32": {"artifact": fp32_path.name, "bytes": fp32_bytes, "sha256": digest(fp32_path)},
-        "int8": {"artifact": int8_path.name, "bytes": int8_bytes, "sha256": digest(int8_path), "format": "INT8 QDQ encoder with UINT8 LUT bases", "calibrationSamples": min(args.calibration_samples, len(calibration))},
+        "outputs": {
+            "lut": [1, 3, config["lut_size"], config["lut_size"], config["lut_size"]],
+            "order": "batch,channel,blue,green,red",
+        },
+        "fp32": {
+            "artifact": fp32_path.name,
+            "bytes": fp32_bytes,
+            "sha256": digest(fp32_path),
+        },
+        "int8": {
+            "artifact": int8_path.name,
+            "bytes": int8_bytes,
+            "sha256": digest(int8_path),
+            "format": "INT8 QDQ encoder with UINT8 LUT bases",
+            "calibrationSamples": min(args.calibration_samples, len(calibration)),
+        },
         "quantizationComparison": comparison,
         "quantizedAccepted": accepted,
         "evaluationSummarySha256": digest(args.evaluation_summary),
         "promotionGates": decision,
         "recommendedArtifact": int8_path.name if decision["deploymentReady"] else None,
         "browserProbe": create_browser_probe(browser_artifact, size),
-        "versions": {"torch": torch.__version__, "onnx": onnx.__version__, "onnxruntime": ort.__version__},
+        "versions": {
+            "torch": torch.__version__,
+            "onnx": onnx.__version__,
+            "onnxruntime": ort.__version__,
+        },
     }
-    (args.output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (args.output_dir / "manifest.json").write_text(
+        json.dumps(manifest, indent=2) + "\n"
+    )
     print(json.dumps(manifest, indent=2))
 
 

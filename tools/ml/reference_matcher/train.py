@@ -35,6 +35,7 @@ from .losses import (
     ReferenceMatchLoss,
     exact_lut_supervision_loss,
     expert_style_classification_loss,
+    perceptual_reference_ranking_loss,
     reference_ranking_loss,
     rgb_to_lab,
     same_style_consistency_loss,
@@ -398,6 +399,12 @@ def parse_arguments() -> argparse.Namespace:
         help="Weight for correct-reference versus wrong-style ranking",
     )
     parser.add_argument(
+        "--perceptual-ranking-weight",
+        type=float,
+        default=0.02,
+        help="Weight for correct-reference ranking measured in perceptual Lab space",
+    )
+    parser.add_argument(
         "--exact-lut-weight",
         type=float,
         default=1.0,
@@ -594,6 +601,7 @@ def main() -> None:
         "testPairs": len(test_data),
         "syntheticTrainingProbability": args.synthetic_probability,
         "referenceRankingWeight": args.ranking_weight,
+        "perceptualReferenceRankingWeight": args.perceptual_ranking_weight,
         "exactLutWeight": args.exact_lut_weight,
         "sameStyleWeight": args.same_style_weight,
         "styleClassificationWeight": args.style_classification_weight,
@@ -609,6 +617,7 @@ def main() -> None:
         style_classifier.train()
         running_loss = 0.0
         running_ranking_loss = 0.0
+        running_perceptual_ranking_loss = 0.0
         running_exact_lut_loss = 0.0
         running_same_style_loss = 0.0
         running_style_classification_loss = 0.0
@@ -661,6 +670,14 @@ def main() -> None:
                     alternate_output.float(), wrong_output.float(), expected.float()
                 )
             ) / 2
+            perceptual_ranking = (
+                perceptual_reference_ranking_loss(
+                    output.float(), wrong_output.float(), expected.float()
+                )
+                + perceptual_reference_ranking_loss(
+                    alternate_output.float(), wrong_output.float(), expected.float()
+                )
+            ) / 2
             expected_lut = batch["expected_lut"].to(device, non_blocking=use_cuda)
             has_exact_lut = batch["has_exact_lut"].to(device, non_blocking=use_cuda)
             exact_lut = (
@@ -680,6 +697,7 @@ def main() -> None:
             loss = (
                 quality_loss
                 + args.ranking_weight * ranking
+                + args.perceptual_ranking_weight * perceptual_ranking
                 + args.exact_lut_weight * exact_lut
                 + args.same_style_weight * same_style
                 + args.style_classification_weight * style_classification
@@ -694,6 +712,9 @@ def main() -> None:
 
             running_loss += loss.item() * source.shape[0]
             running_ranking_loss += ranking.item() * source.shape[0]
+            running_perceptual_ranking_loss += (
+                perceptual_ranking.item() * source.shape[0]
+            )
             running_exact_lut_loss += exact_lut.item() * source.shape[0]
             running_same_style_loss += same_style.item() * source.shape[0]
             running_style_classification_loss += (
@@ -735,6 +756,9 @@ def main() -> None:
             "epoch": epoch,
             "trainLoss": running_loss / len(train_data),
             "referenceRankingLoss": running_ranking_loss / len(train_data),
+            "perceptualReferenceRankingLoss": (
+                running_perceptual_ranking_loss / len(train_data)
+            ),
             "exactLutLoss": running_exact_lut_loss / len(train_data),
             "sameStyleConsistencyLoss": running_same_style_loss / len(train_data),
             "styleClassificationLoss": (
@@ -768,6 +792,7 @@ def main() -> None:
                 "seed": args.seed,
                 "synthetic_probability": args.synthetic_probability,
                 "ranking_weight": args.ranking_weight,
+                "perceptual_ranking_weight": args.perceptual_ranking_weight,
                 "exact_lut_weight": args.exact_lut_weight,
                 "same_style_weight": args.same_style_weight,
                 "style_classification_weight": args.style_classification_weight,

@@ -31,6 +31,7 @@ from tools.ml.reference_matcher.export_onnx import (
 from tools.ml.reference_matcher.losses import (
     exact_lut_supervision_loss,
     expert_style_classification_loss,
+    perceptual_reference_ranking_loss,
     reference_ranking_loss,
     same_style_consistency_loss,
 )
@@ -91,6 +92,19 @@ class ReferenceMatcherTests(unittest.TestCase):
         self.assertEqual(reference_ranking_loss(correct, wrong, expected).item(), 0.0)
         self.assertAlmostEqual(
             reference_ranking_loss(correct, correct, expected).item(), 0.01, places=6
+        )
+
+    def test_perceptual_reference_ranking_rewards_the_correct_style(self):
+        expected = torch.full((2, 3, 4, 4), 0.4)
+        correct = expected.clone()
+        wrong = torch.full_like(expected, 0.7)
+        self.assertEqual(
+            perceptual_reference_ranking_loss(correct, wrong, expected).item(), 0.0
+        )
+        self.assertAlmostEqual(
+            perceptual_reference_ranking_loss(correct, correct, expected).item(),
+            0.25,
+            places=5,
         )
 
     def test_same_style_consistency_and_auxiliary_classifier_are_training_only(self):
@@ -169,6 +183,18 @@ class ReferenceMatcherTests(unittest.TestCase):
         self.assertEqual(lut.shape, (2, 3, 17, 17, 17))
         self.assertEqual(coefficients.shape, (2, 3))
         torch.testing.assert_close(coefficients.sum(1), torch.ones(2))
+
+    def test_soft_color_distribution_is_bounded_and_tone_sensitive(self):
+        model = ReferenceLutModel(basis_count=3, lut_size=17)
+        dark = torch.full((2, 3, 16, 16), 0.1)
+        bright = torch.full((2, 3, 16, 16), 0.9)
+        dark_distribution = model.color_distribution(dark)
+        bright_distribution = model.color_distribution(bright)
+        self.assertEqual(dark_distribution.shape, (2, 32))
+        self.assertTrue(torch.all((dark_distribution >= 0) & (dark_distribution <= 1)))
+        self.assertGreater(
+            (dark_distribution - bright_distribution).abs().mean().item(), 0.1
+        )
 
     def test_lut_accepts_mixed_precision_interpolation_weights(self):
         """CUDA autocast LUTs must work with the loader's float32 image tensors."""
