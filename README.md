@@ -101,6 +101,9 @@ Start with [architecture](docs/architecture.md), then
 [development conventions](docs/development.md). These describe what the code does,
 why responsibilities are separated, and which trade-offs remain.
 
+The private [TST100K pilot](docs/reference-matcher-tst100k-pilot.md) tests whether
+direct triplet supervision improves reference use before any new model is shipped.
+
 The normal editor uses browser APIs. V11 and Quick Enhance lazily load locally
 served ONNX Runtime Web models; there are no remote
 analytics or photo-upload services. Prettier and Playwright are development tools.
