@@ -6,11 +6,13 @@ import {
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
 import { createEnhancementClient } from "./learned-enhancement.js";
+import { createV11ReferenceClient } from "./v11-reference.js";
 import { initializeWorkspaceLayout } from "./workspace-layout.js";
 import { createMaskControls } from "./mask-controls.js";
 import { createCurveEditor } from "./curve-editor.js";
 import { initializeMobileEditor } from "./mobile-editor.js";
 import { COLOR_BANDS } from "./color-mixer.js";
+import { classifyPhoto, decodePhotoFile } from "./photo-decoder.js";
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
@@ -28,10 +30,12 @@ let edits = createDefaultEditSettings(),
   exporting = false;
 const editHistory = createEditHistory(edits);
 const enhancementClient = createEnhancementClient();
+const v11ReferenceClient = createV11ReferenceClient();
 let masking, curveEditor, mobileEditor;
 const adjustmentSettings = () => masking?.currentAdjustments() ?? edits;
-let activeEnhancement = null,
-  enhancing = false;
+const enhancements = new Map();
+let enhancing = false,
+  v11Enhancing = false;
 let worker,
   requests = new Map(),
   rendering = false,
@@ -40,6 +44,84 @@ let worker,
   refineTimer;
 const preview = $("#preview"),
   controls = new Map();
+function enhancementIds(settings) {
+  return new Set(
+    [
+      settings?.enhancementId,
+      ...(settings?.masks ?? []).map((mask) => mask.adjustments.enhancementId),
+    ].filter(Boolean),
+  );
+}
+function usesEnhancement(settings, id = null) {
+  const ids = enhancementIds(settings);
+  return id ? ids.has(id) : ids.size > 0;
+}
+function currentEnhancement(settings = adjustmentSettings()) {
+  return enhancements.get(settings?.enhancementId) ?? null;
+}
+function settingsForScope(scopeId) {
+  if (!scopeId) return edits;
+  return edits.masks?.find((mask) => mask.id === scopeId)?.adjustments ?? null;
+}
+function enhancementScopeLabel(scopeId = $("#adjustment-scope").value) {
+  if (!scopeId) return "whole photo";
+  const option = [...$("#adjustment-scope").options].find(
+    (candidate) => candidate.value === scopeId,
+  );
+  return option?.textContent ?? "selected mask";
+}
+function setEnhancementStatus(message, state = "idle") {
+  $("#enhancement-status").textContent = message;
+  $("#smart-enhance").dataset.state = state;
+  $("#smart-enhance").setAttribute("aria-busy", String(state === "working"));
+}
+function setV11Status(message, state = "idle") {
+  $("#v11-status").textContent = message;
+  $("#v11-enhance-card").dataset.state = state;
+  $("#v11-enhance-card").setAttribute("aria-busy", String(state === "working"));
+}
+function summarizeEnhancement() {
+  if (!source) {
+    setEnhancementStatus("Ready when a photo is open.");
+    return;
+  }
+  const settings = adjustmentSettings();
+  const activeEnhancement = currentEnhancement(settings);
+  if (activeEnhancement) {
+    const suggested = activeEnhancement.assessment.recommendedStrength,
+      strength = settings.enhanceStrength,
+      qualifier = strength === suggested ? "suggested" : "adjusted",
+      summary = `${strength}% ${qualifier} strength · ${Math.round(activeEnhancement.inferenceMs)} ms`;
+    if (activeEnhancement.research) {
+      setEnhancementStatus("V11 is the active model for this area.");
+      setV11Status(
+        `V11 active on ${enhancementScopeLabel()} · ${summary}`,
+        "active",
+      );
+    } else {
+      setEnhancementStatus(
+        `Quick Enhance active on ${enhancementScopeLabel()} · ${summary}`,
+        "active",
+      );
+      setV11Status(
+        reference
+          ? "Reference ready. Run V11 to compare its trained result."
+          : "Add a reference to run the trained V11 model.",
+      );
+    }
+  } else {
+    setEnhancementStatus(
+      usesEnhancement(edits)
+        ? "Ready for this area. Smart Enhance is active on another area."
+        : "Ready to analyze this photo.",
+    );
+    setV11Status(
+      reference
+        ? "Reference ready. V11 can compare both photos."
+        : "Add a reference to run the trained V11 model.",
+    );
+  }
+}
 function showStatus(message) {
   $("#status").textContent = message;
 }
@@ -73,14 +155,14 @@ function renderInWorker(pixels, width, height, settings) {
         width,
         height,
         edits: settings,
-        enhancementLut:
-          activeEnhancement &&
-          (settings.enhancementId === activeEnhancement.id ||
-            settings.masks?.some(
-              (mask) => mask.adjustments.enhancementId === activeEnhancement.id,
-            ))
-            ? activeEnhancement.lut
-            : null,
+        enhancementLut: Object.fromEntries(
+          [...enhancementIds(settings)]
+            .map((enhancementId) => [
+              enhancementId,
+              enhancements.get(enhancementId)?.lut,
+            ])
+            .filter(([, lut]) => lut),
+        ),
       },
       [pixels.buffer],
     );
@@ -171,10 +253,12 @@ function createAdjustmentControl(
     input.addEventListener("change", () => {
       set(Number(input.value) || 0);
       commitEditHistory();
+      if (key === "enhanceStrength") summarizeEnhancement();
     });
   reset.onclick = () => {
     set(value);
     commitEditHistory();
+    if (key === "enhanceStrength") summarizeEnhancement();
   };
   controls.set(key, { slider, number, get });
 }
@@ -350,14 +434,26 @@ function synchronizeControls() {
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
-  $("#enhance").disabled = !source || enhancing || exporting;
+  $("#enhance").disabled = !source || enhancing || v11Enhancing || exporting;
+  $("#enhance-v11").disabled =
+    !source || !reference || enhancing || v11Enhancing || exporting;
+  const selectedEnhancement = currentEnhancement(),
+    currentEnhancementActive = !!selectedEnhancement;
+  $("#enhance").textContent =
+    currentEnhancementActive && !selectedEnhancement.research
+      ? "Analyze again"
+      : "Run Quick Enhance";
+  $("#enhance-v11").textContent =
+    currentEnhancementActive && selectedEnhancement.research
+      ? "Analyze V11 again"
+      : "Run V11 reference match";
+  $("#remove-enhance").hidden = !currentEnhancementActive;
+  $("#remove-enhance").disabled = enhancing || v11Enhancing || exporting;
   for (const input of [
     controls.get("enhanceStrength").slider,
     controls.get("enhanceStrength").number,
   ])
-    input.disabled =
-      !activeEnhancement ||
-      adjustmentSettings().enhancementId !== activeEnhancement.id;
+    input.disabled = !currentEnhancementActive;
   for (const id of ["export", "compare", "reset"])
     $(`#${id}`).disabled = !source;
   $("#output-size").textContent = source
@@ -369,19 +465,7 @@ function synchronizeControls() {
   mobileEditor?.sync();
 }
 async function decodePhoto(file) {
-  if (!file || !["image/jpeg", "image/png", "image/webp"].includes(file.type))
-    throw new Error(
-      "Choose a JPEG, PNG, or WebP photo. HEIC and RAW are not supported yet.",
-    );
-  if (file.size > 50_000_000) throw new Error("Choose a photo below 50 MB.");
-  const bitmap = await createImageBitmap(file, {
-    colorSpaceConversion: "default",
-  });
-  if (bitmap.width * bitmap.height > 24_000_000) {
-    bitmap.close();
-    throw new Error("This first version supports photos up to 24 megapixels.");
-  }
-  return bitmap;
+  return decodePhotoFile(file);
 }
 function createPreviewPixels(bitmap, max = 1200) {
   const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height)),
@@ -397,8 +481,16 @@ let sourceLoad = 0,
 async function openTargetPhoto(file) {
   const ticket = ++sourceLoad;
   enhancementClient.cancel();
+  v11ReferenceClient.cancel();
   try {
-    showStatus("Opening photo…");
+    const format = classifyPhoto(file);
+    showStatus(
+      format === "raw"
+        ? "Developing RAW photo locally…"
+        : format === "heic"
+          ? "Decoding HEIC photo locally…"
+          : "Opening photo…",
+    );
     const bitmap = await decodePhoto(file);
     if (ticket !== sourceLoad) {
       bitmap.close();
@@ -411,9 +503,16 @@ async function openTargetPhoto(file) {
       name: file.name,
       width: bitmap.width,
       height: bitmap.height,
+      format,
       stats: calculateChannelStatistics(pixels.data),
     };
-    activeEnhancement = null;
+    enhancements.clear();
+    setEnhancementStatus("Ready to analyze this photo.");
+    setV11Status(
+      reference
+        ? "Reference ready. V11 can now compare both photos."
+        : "Add a reference to run the trained V11 model.",
+    );
     previewPixels = pixels;
     mobileEditor?.resetView();
     interactionPixels = createPreviewPixels(bitmap, 640);
@@ -422,13 +521,17 @@ async function openTargetPhoto(file) {
     $("#empty").hidden = true;
     preview.hidden = false;
     $("#file-info").textContent =
-      `${file.name} · ${bitmap.width} × ${bitmap.height}`;
+      `${file.name} · ${bitmap.width} × ${bitmap.height}${format === "raw" ? " · RAW developed locally" : ""}`;
     $("#file-info").title = file.name;
     original = false;
     $("#compare").textContent = "Original";
     synchronizeControls();
     renderPreview();
-    showStatus("Ready. Photos stay on this device.");
+    showStatus(
+      format === "raw"
+        ? "Ready. RAW developed locally into the sRGB editor."
+        : "Ready. Photos stay on this device.",
+    );
   } catch (error) {
     showStatus(error.message);
   }
@@ -436,10 +539,13 @@ async function openTargetPhoto(file) {
 
 $("#enhance").onclick = async () => {
   if (!source || enhancing) return;
-  const ticket = sourceLoad;
+  const ticket = sourceLoad,
+    scopeId = $("#adjustment-scope").value,
+    scopeName = enhancementScopeLabel(scopeId);
   enhancing = true;
   synchronizeControls();
   $("#cancel-enhance").hidden = false;
+  setEnhancementStatus("Preparing on-device analysis…", "working");
   try {
     if (source.stats.std.every((v) => v < 0.005))
       throw new Error(
@@ -451,24 +557,33 @@ $("#enhance").onclick = async () => {
     context.drawImage(source.bitmap, 0, 0, 256, 256);
     const pixels = context.getImageData(0, 0, 256, 256).data;
     const result = await enhancementClient.analyze(pixels, (message) => {
-      $("#enhancement-status").textContent = message;
+      setEnhancementStatus(message, "working");
     });
     if (ticket !== sourceLoad) return;
-    const id = `${result.modelId}:${ticket}`;
-    activeEnhancement = { id, ...result };
+    const targetSettings = settingsForScope(scopeId);
+    if (!targetSettings)
+      throw new Error(
+        "The selected mask no longer exists. Run Smart Enhance again.",
+      );
+    const id = `${result.modelId}:${ticket}:${Date.now()}`;
+    enhancements.set(id, { id, ...result });
     applyEdit(() => {
-      adjustmentSettings().enhancementId = id;
-      adjustmentSettings().enhanceStrength =
-        result.assessment.recommendedStrength;
+      targetSettings.enhancementId = id;
+      targetSettings.enhanceStrength = result.assessment.recommendedStrength;
     });
     original = false;
     $("#compare").textContent = "Original";
-    renderPreview();
-    $("#enhancement-status").textContent =
-      `Suggested strength ${result.assessment.recommendedStrength}% · local analysis ${Math.round(result.inferenceMs)} ms`;
+    setEnhancementStatus(
+      `Quick Enhance active on ${scopeName} · ${result.assessment.recommendedStrength}% suggested strength · ${Math.round(result.inferenceMs)} ms`,
+      "active",
+    );
+    setV11Status(
+      reference
+        ? "Reference ready. Run V11 to compare its trained result."
+        : "Add a reference to run the trained V11 model.",
+    );
   } catch (error) {
-    if (ticket === sourceLoad)
-      $("#enhancement-status").textContent = error.message;
+    if (ticket === sourceLoad) setEnhancementStatus(error.message, "error");
   } finally {
     enhancing = false;
     $("#cancel-enhance").hidden = true;
@@ -476,14 +591,26 @@ $("#enhance").onclick = async () => {
   }
 };
 $("#cancel-enhance").onclick = () => enhancementClient.cancel();
+$("#remove-enhance").onclick = () => {
+  const settings = adjustmentSettings(),
+    scopeName = enhancementScopeLabel();
+  if (!settings.enhancementId) return;
+  applyEdit(() => {
+    settings.enhancementId = null;
+    settings.enhanceStrength = 0;
+  });
+  setEnhancementStatus(`Removed from ${scopeName}.`, "idle");
+};
 $("#clear-model-cache").onclick = async () => {
   try {
     await enhancementClient.clearCache();
-    $("#enhancement-status").textContent =
-      "Cached model removed. Current edits are unchanged.";
+    await v11ReferenceClient.clearCache();
+    setEnhancementStatus(
+      "Downloaded model removed. Current edits are unchanged.",
+      usesEnhancement(edits) ? "active" : "idle",
+    );
   } catch {
-    $("#enhancement-status").textContent =
-      "Browser storage could not be cleared.";
+    setEnhancementStatus("Browser storage could not be cleared.", "error");
   }
 };
 for (const id of ["target", "start-file"])
@@ -513,23 +640,84 @@ $("#reference").onchange = async (e) => {
     image.src = canvas.toDataURL();
     image.alt = `Reference: ${file.name}`;
     $("#reference-preview").replaceChildren(image);
-    if (adjustmentSettings().match)
+    const referenceDerivedSettings = [
+        edits,
+        ...(edits.masks ?? []).map((mask) => mask.adjustments),
+      ],
+      hasReferenceDerivedEdit = referenceDerivedSettings.some((settings) => {
+        const result = enhancements.get(settings.enhancementId);
+        return settings.match || result?.research;
+      });
+    if (hasReferenceDerivedEdit)
       applyEdit(() => {
-        for (const settings of [
-          edits,
-          ...(edits.masks ?? []).map((mask) => mask.adjustments),
-        ]) {
+        for (const settings of referenceDerivedSettings) {
           settings.match = null;
           settings.matchColor = 0;
           settings.matchTone = 0;
+          if (enhancements.get(settings.enhancementId)?.research) {
+            settings.enhancementId = null;
+            settings.enhanceStrength = 0;
+          }
         }
       });
     synchronizeControls();
+    setV11Status("Reference ready. V11 can now compare both photos.");
     showStatus("Reference ready.");
   } catch (error) {
     showStatus(error.message);
   }
 };
+$("#enhance-v11").onclick = async () => {
+  if (!source || !reference || v11Enhancing) return;
+  const sourceTicket = sourceLoad,
+    referenceTicket = referenceLoad,
+    scopeId = $("#adjustment-scope").value,
+    scopeName = enhancementScopeLabel(scopeId);
+  v11Enhancing = true;
+  synchronizeControls();
+  $("#cancel-v11").hidden = false;
+  setV11Status("Preparing target and reference…", "working");
+  try {
+    const pixelsFor = (bitmap) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 128;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      context.drawImage(bitmap, 0, 0, 128, 128);
+      return context.getImageData(0, 0, 128, 128).data;
+    };
+    const result = await v11ReferenceClient.analyze(
+      pixelsFor(source.bitmap),
+      pixelsFor(reference),
+      (message) => setV11Status(message, "working"),
+    );
+    if (sourceTicket !== sourceLoad || referenceTicket !== referenceLoad)
+      return;
+    const targetSettings = settingsForScope(scopeId);
+    if (!targetSettings)
+      throw new Error("The selected mask no longer exists. Run V11 again.");
+    const id = `${result.modelId}:${sourceTicket}:${referenceTicket}:${Date.now()}`;
+    enhancements.set(id, { id, ...result });
+    applyEdit(() => {
+      targetSettings.enhancementId = id;
+      targetSettings.enhanceStrength = result.assessment.recommendedStrength;
+    });
+    original = false;
+    $("#compare").textContent = "Original";
+    setV11Status(
+      `V11 active on ${scopeName} · ${result.assessment.recommendedStrength}% guarded strength · ${Math.round(result.inferenceMs)} ms`,
+      "active",
+    );
+    setEnhancementStatus("V11 is the active model for this area.");
+  } catch (error) {
+    if (sourceTicket === sourceLoad && referenceTicket === referenceLoad)
+      setV11Status(error.message, "error");
+  } finally {
+    v11Enhancing = false;
+    $("#cancel-v11").hidden = true;
+    synchronizeControls();
+  }
+};
+$("#cancel-v11").onclick = () => v11ReferenceClient.cancel();
 $("#match").onclick = () => {
   if (!source || !referenceStats) return;
   applyEdit(() => {
@@ -646,6 +834,7 @@ $("#undo").onclick = () => {
   if (settings) {
     edits = settings;
     renderPreview();
+    summarizeEnhancement();
   }
 };
 $("#redo").onclick = () => {
@@ -653,13 +842,16 @@ $("#redo").onclick = () => {
   if (settings) {
     edits = settings;
     renderPreview();
+    summarizeEnhancement();
   }
 };
-$("#reset").onclick = () =>
+$("#reset").onclick = () => {
   applyEdit(() => {
     edits = createDefaultEditSettings();
     $("#ratio").value = "free";
   });
+  summarizeEnhancement();
+};
 $("#compare").onclick = () => {
   original = !original;
   $("#compare").textContent = original ? "Edited" : "Original";
@@ -909,6 +1101,7 @@ masking = createMaskControls({
   drawPhoto: drawTransformedPhoto,
   status: showStatus,
 });
+$("#adjustment-scope").addEventListener("change", summarizeEnhancement);
 initializeWorkspaceLayout(() => {
   positionCrop();
   masking.drawOverlay();
@@ -1025,15 +1218,23 @@ $("#export").onclick = async () => {
                   quality,
                 },
                 edits: settings,
-                enhancement:
-                  settings.enhancementId === activeEnhancement?.id
-                    ? {
-                        modelId: activeEnhancement.modelId,
-                        modelHash: activeEnhancement.modelHash,
-                        coefficients: activeEnhancement.coefficients,
-                        assessment: activeEnhancement.assessment,
-                      }
-                    : null,
+                enhancements: [...enhancementIds(settings)].flatMap((id) => {
+                  const result = enhancements.get(id);
+                  return result
+                    ? [
+                        {
+                          id,
+                          modelId: result.modelId,
+                          modelHash: result.modelHash,
+                          research: !!result.research,
+                          checkpointEpoch: result.checkpointEpoch ?? null,
+                          coefficients: result.coefficients ?? null,
+                          assessment: result.assessment,
+                          evaluation: result.evaluation ?? null,
+                        },
+                      ]
+                    : [];
+                }),
               },
               null,
               2,

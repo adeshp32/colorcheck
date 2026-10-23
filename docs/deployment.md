@@ -34,8 +34,9 @@ only the explicitly vendored browser ML runtime is served when enhancement is us
 `web/_headers` supplies security headers for Pages, including a policy that blocks
 network connections from the editor. Other static hosts need equivalent header
 configuration; this file is not automatically interpreted by every provider.
-ML requires same-origin asset fetching and the `wasm-unsafe-eval` allowance;
-the supplied policy permits these without opening third-party script sources.
+ML and RAW decoding require same-origin asset fetching and the `wasm-unsafe-eval`
+allowance. HEIC decoding creates a local blob worker. The supplied policy permits
+these without opening third-party script sources or network destinations.
 
 ## Existing video domain
 
@@ -54,6 +55,7 @@ timer when retiring that deployment rather than expecting it to migrate the site
 
 - HTTPS, worker loading, styles, icons, and no console errors.
 - Photo and reference selection on real iPhone and Android browsers.
+- HEIC import on iPhone and Chromium, plus representative ProRAW/DNG and camera RAW files.
 - Matching, undo/redo, crop, rotation, comparison, and download behavior.
 - Original-resolution export and transparent PNG handling.
 - No photo-upload requests in the browser network panel.

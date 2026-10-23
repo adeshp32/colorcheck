@@ -2,15 +2,18 @@
 
 ## Responsibility boundaries
 
-The active product separates browser responsibilities, deliberately without a framework
-or a build pipeline. The static `web/` directory is the production artifact.
+The active product separates browser responsibilities without a UI framework.
+The static `web/` directory is the production artifact; codec and ML dependencies
+are prepared into vendored browser assets before they are committed.
 
-| Module                 | Owns                                                                                         | Does not own                   |
-| ---------------------- | -------------------------------------------------------------------------------------------- | ------------------------------ |
-| `editor-controller.js` | File decoding, UI events, edit history, geometry, preview scheduling, download orchestration | Pixel-transform mathematics    |
-| `image-processing.js`  | Channel statistics, bounded reference match, tonal/color/detail transforms                   | DOM, file access, networking   |
-| `render-worker.js`     | Request IDs, transferable buffers, background processing, error responses                    | UI state or stored photographs |
-| `edit-history.js`      | Bounded undo/redo snapshots and redo invalidation                                            | Image buffers or DOM events    |
+| Module                  | Owns                                                                                         | Does not own                   |
+| ----------------------- | -------------------------------------------------------------------------------------------- | ------------------------------ |
+| `editor-controller.js`  | File decoding, UI events, edit history, geometry, preview scheduling, download orchestration | Pixel-transform mathematics    |
+| `image-processing.js`   | Channel statistics, bounded reference match, tonal/color/detail transforms                   | DOM, file access, networking   |
+| `render-worker.js`      | Request IDs, transferable buffers, background processing, error responses                    | UI state or stored photographs |
+| `edit-history.js`       | Bounded undo/redo snapshots and redo invalidation                                            | Image buffers or DOM events    |
+| `photo-decoder.js`      | Format admission and lazy native/HEIC/RAW decoding                                           | Editing or export transforms   |
+| `raw-decoder-worker.js` | LibRaw demosaic, camera white balance, and sRGB development                                  | UI state or adjustment math    |
 
 `index.html` defines the editor's semantic controls. `editor.css` handles
 responsive layout, not image processing. `tools/serve.mjs` only serves local
@@ -66,17 +69,23 @@ Floating tools support pointer dragging, keyboard movement, and resizing;
 positions stay within the viewport. Docking does not recreate controls or reset
 edit state. On narrow screens, right docking resolves to the bottom layout.
 
-Optional ML has three additional boundaries: `learned-enhancement.js` owns the
-lazy worker/cancellation interface, `enhancement-worker.js` owns model loading
-and inference, and `enhancement-lut.js` owns interpolation and clipping assessment.
-They do not replace the reference-statistics engine. Model inference runs once
-per requested analysis; preview/export reuse the transform.
+ML has four additional boundaries. `v11-reference.js` and
+`v11-reference-worker.js` own ColorCheck V11's lazy target/reference analysis;
+`learned-enhancement.js` and `enhancement-worker.js` own the optional upstream
+single-photo enhancer; and `enhancement-lut.js` owns the shared bounded
+interpolation and clipping assessment. Each run produces a reversible LUT edit
+for the whole photo or selected mask. LUTs are retained by model-result ID so
+undo/redo and different masks can refer to different analyses. Neither path
+mutates manual controls or replaces explicit crop, detail, and local-edit
+decisions. Inference runs once per request; preview and original-resolution
+export reuse the transform.
 
 ## Data flow
 
 ```text
 Selected File
-  -> browser ImageBitmap decode
+  -> native ImageBitmap, lazy HEIC decode, or lazy LibRaw development
+  -> camera RAW becomes an 8-bit sRGB ImageBitmap after demosaic
   -> original bitmap retained in browser memory
   -> preview pixels (longest edge at most 1200 pixels)
   -> edit settings + pixels transferred to module worker
@@ -95,6 +104,14 @@ Export
 
 The reference is sampled separately to calculate channel statistics. Only the
 derived matching settings enter the pixel pipeline. No file is sent to an API.
+
+HEIC uses a lazily imported decoder with its own worker. Camera RAW uses a dedicated
+module worker and a locally served LibRaw WebAssembly binary. RAW development uses
+the recorded camera white balance, camera color matrix, AHD demosaicing, highlight
+reconstruction, and sRGB output. This creates a useful camera-aware starting image,
+but the current canvas/pixel pipeline is 8-bit after development. A future true
+high-bit-depth workflow must keep linear 16-bit or floating-point pixels through
+adjustment and export rather than merely changing this decoder.
 
 ## State and concurrency
 

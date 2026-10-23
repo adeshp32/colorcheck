@@ -73,7 +73,7 @@ export function validateEnhancementLut(lut) {
 }
 
 /** Reduce the initial suggestion if it introduces over one percentage point of clipping. */
-export function assessEnhancement(pixels, lut) {
+export function assessEnhancement(pixels, lut, strengths = [35, 25, 15, 0]) {
   validateEnhancementLut(lut);
   const clipped = (rgb) => rgb.some((v) => v <= 0 || v >= 1);
   let count = 0,
@@ -86,7 +86,7 @@ export function assessEnhancement(pixels, lut) {
   }
   if (!count)
     throw new Error("No opaque pixels are available for enhancement.");
-  for (const strength of [35, 25, 15, 0]) {
+  for (const strength of strengths) {
     let after = 0,
       change = 0;
     for (let i = 0; i < pixels.length; i += 4) {

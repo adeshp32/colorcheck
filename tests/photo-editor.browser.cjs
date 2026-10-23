@@ -134,7 +134,7 @@ const { join } = require("node:path");
         () =>
           document
             .querySelector("#enhancement-status")
-            .textContent.includes("Suggested strength"),
+            .textContent.includes("Quick Enhance active"),
         null,
         { timeout: 60000 },
       )
@@ -148,6 +148,24 @@ const { join } = require("node:path");
     await page.waitForFunction(
       (before) => document.querySelector("#preview").toDataURL() !== before,
       beforeEnhancement,
+    );
+    await page.locator("#remove-enhance").click();
+    assert.equal(
+      await page.locator("#slider-enhanceStrength").inputValue(),
+      "0",
+    );
+    await page.locator("#undo").click();
+    assert.ok(
+      Number(await page.locator("#slider-enhanceStrength").inputValue()) > 0,
+      "Smart Enhance removal must be undoable",
+    );
+    assert.equal(
+      await page.locator("#smart-enhance").getAttribute("data-state"),
+      "active",
+    );
+    assert.match(
+      await page.locator("#enhancement-status").innerText(),
+      /Quick Enhance active on whole photo/,
     );
     const browserParity = await page.evaluate(async () => {
       const ort = await import("./vendor/onnxruntime/ort.wasm.min.mjs");
@@ -194,11 +212,92 @@ const { join } = require("node:path");
       browserParity.maximumSampledLutError < 1e-4,
       "Browser ONNX output must match PyTorch gradient fixture",
     );
+    const beforeV11 = await page
+      .locator("#preview")
+      .evaluate((canvas) => canvas.toDataURL());
+    await page.locator("#enhance-v11").click();
+    await page.waitForFunction(
+      () =>
+        document
+          .querySelector("#v11-status")
+          .textContent.includes("V11 active"),
+      null,
+      { timeout: 60000 },
+    );
+    assert.equal(
+      await page.locator("#v11-enhance-card").getAttribute("data-state"),
+      "active",
+    );
+    assert.ok(
+      Number(await page.locator("#slider-enhanceStrength").inputValue()) > 0,
+      "V11 should apply a guarded non-zero suggestion to the fixture",
+    );
+    await page.waitForFunction(
+      (before) => document.querySelector("#preview").toDataURL() !== before,
+      beforeV11,
+    );
+    const v11Parity = await page.evaluate(async () => {
+      const ort = await import("./vendor/onnxruntime/ort.wasm.min.mjs");
+      ort.env.wasm.numThreads = 1;
+      ort.env.wasm.proxy = false;
+      ort.env.wasm.wasmPaths = new URL(
+        "./vendor/onnxruntime/",
+        location.href,
+      ).href;
+      const manifest = await (
+          await fetch("./assets/models/colorcheck-v11/manifest.json")
+        ).json(),
+        session = await ort.InferenceSession.create(
+          `./assets/models/colorcheck-v11/${manifest.artifact}`,
+          { executionProviders: ["wasm"], graphOptimizationLevel: "all" },
+        ),
+        size = 128,
+        makeInput = (reference) => {
+          const input = new Float32Array(3 * size * size);
+          for (let channel = 0; channel < 3; channel++)
+            for (let pixel = 0; pixel < size * size; pixel++)
+              input[channel * size * size + pixel] =
+                ((pixel * (channel * 2 + (reference ? 5 : 3)) +
+                  channel * (reference ? 53 : 37) +
+                  (reference ? 19 : 0)) %
+                  251) /
+                250;
+          return new ort.Tensor("float32", input, [1, 3, size, size]);
+        },
+        start = performance.now(),
+        outputs = await session.run({
+          source: makeInput(false),
+          reference: makeInput(true),
+        }),
+        error = Math.max(
+          ...manifest.browserProbe.sampleIndices.map((index, sample) =>
+            Math.abs(
+              outputs.lut.data[index] -
+                manifest.browserProbe.expectedLutValues[sample],
+            ),
+          ),
+        );
+      await session.release();
+      return {
+        modelHash: manifest.sha256,
+        checkpointEpoch: manifest.checkpointEpoch,
+        maximumSampledLutError: error,
+        inferenceMs: performance.now() - start,
+        evaluation: manifest.evaluation,
+      };
+    });
+    assert.ok(
+      v11Parity.maximumSampledLutError < 1e-4,
+      "V11 browser ONNX output must match the preserved PyTorch checkpoint",
+    );
     fs.writeFileSync(
       join(artifacts, "ml-evaluation.json"),
-      JSON.stringify(browserParity, null, 2),
+      JSON.stringify({ quickEnhance: browserParity, v11: v11Parity }, null, 2),
     );
-    console.log("Browser ML evaluation:", browserParity);
+    console.log("Browser ML evaluation:", {
+      quickEnhance: browserParity,
+      v11: v11Parity,
+    });
     await page.locator("[data-panel=color]").click();
     await page.screenshot({
       path: join(artifacts, "desktop.png"),
@@ -220,12 +319,15 @@ const { join } = require("node:path");
       () => !document.querySelector("#export-dialog").open,
     );
     await page.locator("#target").setInputFiles({
-      name: "unsupported.heic",
-      mimeType: "image/heic",
+      name: "unsupported.bmp",
+      mimeType: "image/bmp",
       buffer: Buffer.from("invalid"),
     });
     await page.waitForTimeout(200);
-    assert.match(await page.locator("#status").innerText(), /HEIC/);
+    assert.match(
+      await page.locator("#status").innerText(),
+      /supported camera RAW/,
+    );
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.locator("[data-panel=color]").click();

@@ -10,6 +10,12 @@ export function createCurveEditor({ getSettings, render, commit }) {
   let channel = "master",
     selected = 0,
     dragging = false;
+  const graph = {
+    left: 20,
+    top: 20,
+    width: canvas.width - 40,
+    height: canvas.height - 40,
+  };
   const points = () =>
     getSettings().curves?.[channel] ??
     (channel === "master"
@@ -32,43 +38,71 @@ export function createCurveEditor({ getSettings, render, commit }) {
   function draw() {
     const p = points();
     selected = Math.min(selected, p.length - 1);
-    context.clearRect(0, 0, 320, 240);
-    context.strokeStyle = "#9196a455";
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.strokeStyle = "#9196a42f";
     context.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-      const x = 16 + i * 72,
-        y = 16 + i * 52;
+    for (let i = 1; i < 4; i++) {
+      const x = graph.left + (i * graph.width) / 4,
+        y = graph.top + (i * graph.height) / 4;
       context.beginPath();
-      context.moveTo(x, 16);
-      context.lineTo(x, 224);
-      context.moveTo(16, y);
-      context.lineTo(304, y);
+      context.moveTo(x, graph.top);
+      context.lineTo(x, graph.top + graph.height);
+      context.moveTo(graph.left, y);
+      context.lineTo(graph.left + graph.width, y);
       context.stroke();
     }
-    context.strokeStyle = {
+
+    context.setLineDash([5, 6]);
+    context.strokeStyle = "#9196a45c";
+    context.beginPath();
+    context.moveTo(graph.left, graph.top + graph.height);
+    context.lineTo(graph.left + graph.width, graph.top);
+    context.stroke();
+    context.setLineDash([]);
+
+    const color = {
       master: "#7878ed",
       red: "#e95967",
       green: "#41b58d",
       blue: "#548ef1",
     }[channel];
-    context.lineWidth = 2;
-    context.beginPath();
-    for (let x = 0; x <= 288; x++) {
-      const y = 224 - sampleCurve(p, x / 288) * 208;
-      x ? context.lineTo(x + 16, y) : context.moveTo(x + 16, y);
+    const curve = new Path2D();
+    for (let x = 0; x <= graph.width; x++) {
+      const y =
+        graph.top +
+        graph.height -
+        sampleCurve(p, x / graph.width) * graph.height;
+      x ? curve.lineTo(x + graph.left, y) : curve.moveTo(x + graph.left, y);
     }
-    context.stroke();
+    const fill = new Path2D(curve);
+    fill.lineTo(graph.left + graph.width, graph.top + graph.height);
+    fill.lineTo(graph.left, graph.top + graph.height);
+    fill.closePath();
+    const gradient = context.createLinearGradient(
+      0,
+      graph.top,
+      0,
+      graph.top + graph.height,
+    );
+    gradient.addColorStop(0, `${color}24`);
+    gradient.addColorStop(1, `${color}03`);
+    context.fillStyle = gradient;
+    context.fill(fill);
+    context.strokeStyle = color;
+    context.lineWidth = 3;
+    context.lineCap = "round";
+    context.lineJoin = "round";
+    context.stroke(curve);
+    context.lineCap = "butt";
     p.forEach((point, i) => {
+      const x = graph.left + point.x * graph.width,
+        y = graph.top + graph.height - point.y * graph.height;
       context.beginPath();
-      context.arc(
-        16 + point.x * 288,
-        224 - point.y * 208,
-        i === selected ? 7 : 5,
-        0,
-        Math.PI * 2,
-      );
-      context.fillStyle = i === selected ? "#5454e8" : "#fff";
+      context.arc(x, y, i === selected ? 9 : 6, 0, Math.PI * 2);
+      context.fillStyle = i === selected ? color : "#fff";
       context.fill();
+      context.strokeStyle = i === selected ? "#fff" : color;
+      context.lineWidth = i === selected ? 3 : 2;
       context.stroke();
     });
     input.value = Math.round(p[selected].x * 255);
@@ -82,20 +116,13 @@ export function createCurveEditor({ getSettings, render, commit }) {
   }
   function position(event) {
     const box = canvas.getBoundingClientRect();
+    const canvasX = ((event.clientX - box.left) / box.width) * canvas.width,
+      canvasY = ((event.clientY - box.top) / box.height) * canvas.height;
     return {
-      x: Math.max(
-        0,
-        Math.min(
-          1,
-          (((event.clientX - box.left) / box.width) * 320 - 16) / 288,
-        ),
-      ),
+      x: Math.max(0, Math.min(1, (canvasX - graph.left) / graph.width)),
       y: Math.max(
         0,
-        Math.min(
-          1,
-          (224 - ((event.clientY - box.top) / box.height) * 240) / 208,
-        ),
+        Math.min(1, (graph.top + graph.height - canvasY) / graph.height),
       ),
     };
   }
@@ -106,7 +133,10 @@ export function createCurveEditor({ getSettings, render, commit }) {
     let closest = -1,
       distance = 24;
     p.forEach((point, i) => {
-      const d = Math.hypot((point.x - at.x) * 288, (point.y - at.y) * 208);
+      const d = Math.hypot(
+        (point.x - at.x) * graph.width,
+        (point.y - at.y) * graph.height,
+      );
       if (d < distance) {
         distance = d;
         closest = i;

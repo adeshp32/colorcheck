@@ -82,6 +82,23 @@ test("same transform is used by preview/export engine and alpha survives", () =>
   assert.ok(result.data[0] > pixels[0]);
   assert.equal(result.data[3], 100);
 });
+test("model IDs select the correct learned LUT for independent edit scopes", () => {
+  const pixels = new Uint8ClampedArray([128, 128, 128, 255]),
+    warm = createDefaultEditSettings(),
+    cool = createDefaultEditSettings(),
+    transforms = {
+      warm: new Float32Array(3 * 33 ** 3).fill(0.8),
+      cool: new Float32Array(3 * 33 ** 3).fill(0.2),
+    };
+  Object.assign(warm, { enhancementId: "warm", enhanceStrength: 100 });
+  Object.assign(cool, { enhancementId: "cool", enhanceStrength: 100 });
+  assert.ok(
+    applyPhotoAdjustments(pixels, 1, 1, warm, transforms).data[0] > 128,
+  );
+  assert.ok(
+    applyPhotoAdjustments(pixels, 1, 1, cool, transforms).data[0] < 128,
+  );
+});
 test("learned LUT composes with the complete pixel tool stack and local masks", () => {
   const width = 16,
     height = 16,

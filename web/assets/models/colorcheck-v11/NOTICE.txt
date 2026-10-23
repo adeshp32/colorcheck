@@ -1,0 +1,9 @@
+ColorCheck V11 Reference Research Model
+
+This model was trained by ColorCheck on the MIT-Adobe FiveK dataset for
+non-commercial research and analysis. Dataset photographs are not included.
+
+The checkpoint improved general held-out correction measurements, but it did
+not pass ColorCheck's correct-reference discrimination gate. The website offers
+it only as an optional research comparison and does not present it as the
+production reference matcher.

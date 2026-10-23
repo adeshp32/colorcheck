@@ -7,9 +7,13 @@ Use HTTPS in production so module workers load reliably.
 
 ## Working baseline
 
-- JPEG, PNG, and WebP input; up to 50 MB compressed and 24 megapixels decoded.
+- JPEG, PNG, WebP, and HEIC/HEIF input up to 50 MB.
+- Camera RAW input up to 120 MB, including DNG/Apple ProRAW and common Canon,
+  Nikon, Sony, Fujifilm, Olympus, Panasonic, Pentax, and Sigma extensions.
+- Decoded photos up to 50 megapixels.
 - Optional reference image with independent palette and tonal matching strength.
-- Optional pretrained enhancement, with adjustable strength and sampled clipping checks.
+- ColorCheck V11 research matching and optional upstream enhancement, both with
+  adjustable strength, model integrity validation, and sampled clipping checks.
 - Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
 - Eight overlapping color ranges with independent hue, saturation, and lightness.
 - Warmth, tint, saturation, vibrance, B&W, and global/shadow/midtone/highlight grading.
@@ -23,21 +27,26 @@ Use HTTPS in production so module workers load reliably.
 Matching uses bounded channel statistics, not a trained aesthetic model or semantic
 understanding. Unrelated subjects can produce an unsuitable match; adjust its two
 strength controls independently. Correction cannot recover clipped detail.
-The separate enhancement model is pretrained upstream, not trained by ColorCheck.
+Quick Enhance is pretrained upstream. ColorCheck V11 was trained by this project
+but remains experimental because it did not pass its held-out reference-discrimination gate.
 Its integration is technically tested; real-photo quality improvement is not yet established.
 Preview and export share the pixel engine. Sharpening operates at each render's
 pixel scale, so its apparent detail differs between a scaled preview and a
 full-resolution export. Use exported images to judge fine detail.
 
-This baseline exports sRGB browser-canvas images. It does not preserve camera RAW,
-HDR, high-bit-depth data, embedded color profiles, or original EXIF metadata.
+This baseline exports sRGB browser-canvas images. RAW files are decoded from sensor
+data, demosaiced, and developed with camera white balance and camera color data,
+but the resulting editor pipeline is 8-bit sRGB. It does not preserve RAW sensor
+precision, HDR, high-bit-depth data, embedded color profiles, or original EXIF metadata.
 Browser color conversion must be tested with real tagged photographs before
 claiming professional color accuracy. JPEG and WebP export are lossy; PNG is
 lossless relative to the rendered 8-bit image, not the original camera data.
 
 The decoded-pixel limit is an admission limit, not a performance guarantee.
-Mobile browser memory and performance vary. Extremely large dimensions can fail
-during browser decoding before the image's dimensions can be checked.
+Mobile browser memory and performance vary. Large RAW files are presently a
+desktop-oriented workflow because decode, demosaic, preview, and export can hold
+several full image buffers. Extremely large dimensions can fail during browser
+decoding before the image's dimensions can be checked.
 
 No healing, automatic segmentation, denoising model, or upscaler is shipped yet.
 These should be added with measured

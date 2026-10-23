@@ -12,11 +12,15 @@
     "test": "node --test tests/*.test.mjs",
     "test:browser": "node tests/photo-editor.browser.cjs",
     "test:reference-model": "node tests/reference-matcher.browser.cjs",
+    "prepare:codecs": "node tools/prepare-image-codecs.mjs",
     "prepare:ml": "node tools/prepare-ml-runtime.mjs",
     "format": "prettier --write web/src web/styles web/index.html tests tools/*.mjs docs README.md package.json .github",
     "format:check": "prettier --check web/src web/styles web/index.html tests tools/*.mjs docs README.md package.json .github"
   },
   "devDependencies": {
+    "@colorhythm/libraw-wasm": "^1.1.1",
+    "esbuild": "^0.25.12",
+    "heic-to": "^1.6.6",
     "onnxruntime-web": "1.30.0",
     "playwright": "1.64.0",
     "prettier": "3.9.10"

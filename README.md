@@ -9,7 +9,9 @@ Python backend, account, or photo-upload service is required.
 ## What works today
 
 - Independent palette and tone matching strengths.
-- Optional learned enhancement, using an upstream PyTorch model exported to ONNX.
+- Featured ColorCheck V11 reference-conditioned research model, trained in
+  PyTorch and exported to ONNX for guarded, adjustable browser inference.
+- Optional Quick Enhance, using an upstream PyTorch model exported to ONNX.
 - Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
 - Eight-range hue, saturation, and lightness mixing, globally or inside masks.
 - Film-grain overlay with adjustable strength and size, globally or inside masks.
@@ -19,10 +21,16 @@ Python backend, account, or photo-upload service is required.
 - Local radial and linear masks with inside/outside selection, feathering,
   add/subtract/intersect shapes, and color/luminance refinement.
 - Fixed mobile image canvas with overlay tool menus, focused sliders, zoom/pan, and fullscreen.
+- Local HEIC/HEIF decoding for default iPhone photos.
+- Local camera RAW development for DNG/ProRAW and common Canon, Nikon, Sony,
+  Fujifilm, Olympus, Panasonic, Pentax, and Sigma formats.
 - Full-resolution JPEG, PNG, or WebP export and optional JSON settings report.
 
-JPEG/PNG/WebP input is limited to 50 MB and 24 megapixels. This baseline is an
-8-bit sRGB editor, not a RAW developer or an image-restoration system.
+JPEG/PNG/WebP/HEIC input is limited to 50 MB, camera RAW input to 120 MB, and
+decoded photos to 50 megapixels. RAW files are genuinely decoded and demosaiced
+with LibRaw, camera white balance, and camera color data. The developed image then
+enters the existing 8-bit sRGB adjustment engine; edits do not yet retain the
+sensor's original 12/14/16-bit precision.
 Reference matching is statistical and adjustable; it does not guarantee an exact
 match between unrelated scenes. Read [quality and compatibility](docs/quality-and-compatibility.md).
 
@@ -36,7 +44,9 @@ npm run dev
 ```
 
 Open `http://127.0.0.1:8012/`. Node is needed for development tooling, not for
-production image processing. The browser executes the photo editor.
+production image processing. The browser executes the photo editor. Do not open
+`web/index.html` through a `file://` URL: browser module and worker security rules
+prevent the editor runtime and local codecs from loading correctly there.
 
 ```sh
 npm test
@@ -52,6 +62,9 @@ web/                         Deploy this directory as a static website
   index.html                 Accessible editor layout and tool controls
   src/
     editor-controller.js     Files, edit history, controls, preview, and export
+    photo-decoder.js          Native, HEIC, and camera RAW decode routing
+    raw-decoder-worker.js     Local LibRaw demosaic and sRGB development
+    v11-reference-worker.js   Verified target/reference V11 ONNX inference
     image-processing.js      Pure pixel transforms and reference statistics
     edit-history.js          Bounded, isolated undo/redo settings snapshots
     masking.js               Source-coordinate mask coverage and range refinement
@@ -65,6 +78,8 @@ web/                         Deploy this directory as a static website
   styles/editor.css          Mobile-first layout and desktop inspector
   assets/icons/              Locally served Lucide icons and license
   assets/brand/              Original ColorCheck wordmark, unchanged
+  vendor/heic/               Lazy HEIC decoder and license
+  vendor/libraw/             Lazy camera RAW decoder, WASM, and licenses
   _headers                   Cloudflare Pages security headers
 tests/
   image-processing.test.mjs   Pixel invariants and correction bounds
@@ -85,13 +100,13 @@ Start with [architecture](docs/architecture.md), then
 [development conventions](docs/development.md). These describe what the code does,
 why responsibilities are separated, and which trade-offs remain.
 
-The normal editor uses browser APIs. Optional learned enhancement lazily loads
-locally served ONNX Runtime Web and a pretrained model; there are no remote
+The normal editor uses browser APIs. V11 and Quick Enhance lazily load locally
+served ONNX Runtime Web models; there are no remote
 analytics or photo-upload services. Prettier and Playwright are development tools.
 Icons are from Lucide; licenses accompany all third-party assets.
 
-See [learned enhancement](docs/learned-enhancement.md) for the PyTorch export,
-model provenance, download sizes, numerical checks, and current quality limits.
+See [learned enhancement](docs/learned-enhancement.md) for both models' PyTorch
+provenance, exports, download sizes, numerical checks, and current quality limits.
 The export and validation job also has a separate [Docker workflow](docs/ml-container.md).
 Docker is developer tooling, not a hosting dependency for the editor.
 

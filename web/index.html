@@ -28,7 +28,7 @@
             Photo<input
               id="target"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f"
           /></label>
           <label class="file-button secondary"
             ><img
@@ -38,7 +38,7 @@
             Reference<input
               id="reference"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f"
           /></label>
           <span id="file-info"></span>
           <button id="export" disabled>Export</button>
@@ -51,8 +51,8 @@
               >Open photo<input
                 id="start-file"
                 type="file"
-                accept="image/jpeg,image/png,image/webp" /></label
-            ><small>JPEG · PNG · WebP</small>
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f" /></label
+            ><small>JPEG · PNG · WebP · HEIC · camera RAW</small>
           </div>
           <canvas
             id="preview"
@@ -165,13 +165,13 @@
           <button
             data-panel="match"
             aria-selected="true"
-            title="Reference matching"
+            title="Smart enhancement and reference matching"
           >
             <img
               class="icon"
               src="./assets/icons/icon-wand-sparkles.svg"
               alt=""
-            /><span>Match</span></button
+            /><span>Smart</span></button
           ><button data-panel="light" title="Light and tone">
             <img class="icon" src="./assets/icons/icon-sun.svg" alt="" /><span
               >Light</span
@@ -275,31 +275,80 @@
             </div>
           </section>
           <section data-section="match">
-            <h2>Reference match</h2>
+            <h2>Smart edits</h2>
+            <div
+              class="smart-enhance research-enhance featured-model"
+              id="v11-enhance-card"
+              data-state="idle"
+            >
+              <div class="smart-enhance-heading">
+                <div>
+                  <h3>ColorCheck V11</h3>
+                  <span>Your trained reference-conditioned model</span>
+                </div>
+                <span class="model-badge research-badge"
+                  >Featured research</span
+                >
+              </div>
+              <p>
+                Learns a guarded 3D color transform from the target and
+                reference. V11 improved held-out correction metrics; reference
+                discrimination remains experimental.
+              </p>
+              <div class="smart-enhance-actions">
+                <button id="enhance-v11" disabled>
+                  Run V11 reference match
+                </button>
+                <button id="cancel-v11" hidden>Cancel</button>
+              </div>
+              <p class="note" id="v11-status" role="status" aria-live="polite">
+                Add a target and reference to run V11.
+              </p>
+            </div>
+            <div
+              class="smart-enhance quick-enhance"
+              id="smart-enhance"
+              data-state="idle"
+            >
+              <div class="smart-enhance-heading">
+                <div>
+                  <h3>Quick Enhance</h3>
+                  <span>Optional single-photo suggestion</span>
+                </div>
+                <span class="model-badge">On-device ML</span>
+              </div>
+              <p>
+                Builds a conservative look without a reference. Manual controls
+                remain available afterward.
+              </p>
+              <div class="smart-enhance-actions">
+                <button id="enhance" disabled>Run Quick Enhance</button>
+                <button id="cancel-enhance" hidden>Cancel</button>
+              </div>
+            </div>
+            <div class="model-result-controls">
+              <div id="enhancement-controls"></div>
+              <button id="remove-enhance" hidden>Remove active model</button>
+              <p
+                class="note"
+                id="enhancement-status"
+                role="status"
+                aria-live="polite"
+              >
+                Ready when a photo is open.
+              </p>
+              <details class="model-options">
+                <summary>Model storage</summary>
+                <button id="clear-model-cache">Clear downloaded models</button>
+              </details>
+            </div>
+            <h3 class="section-label">Reference match</h3>
             <div id="reference-preview"><span>No reference selected</span></div>
             <button id="match" disabled>Match reference</button>
             <div id="match-controls"></div>
             <p class="note" id="match-note">
               Reference matching is adjustable, not an exact recreation.
             </p>
-            <h3>Learned enhancement</h3>
-            <button id="enhance" disabled>Analyze photo</button>
-            <button id="cancel-enhance" hidden>Cancel analysis</button>
-            <div id="enhancement-controls"></div>
-            <p
-              class="note"
-              id="enhancement-status"
-              role="status"
-              aria-live="polite"
-            >
-              Experimental · on-device · pretrained
-            </p>
-            <button
-              id="clear-model-cache"
-              title="Remove cached enhancement model"
-            >
-              Clear model cache
-            </button>
           </section>
           <section data-section="light" hidden>
             <h2>Light &amp; tone</h2>
@@ -309,7 +358,7 @@
               <h3>Tone curve</h3>
               <canvas
                 id="curve-preview"
-                width="320"
+                width="360"
                 height="240"
                 aria-label="Tone curve"
                 tabindex="0"
@@ -326,7 +375,7 @@
                 ><button data-channel="blue" aria-pressed="false">Blue</button>
               </div>
               <details id="curve-point-options" open>
-                <summary>Point controls</summary>
+                <summary>Selected point</summary>
                 <select id="curve">
                   <option value="custom" disabled>Custom curve</option>
                   <option value="linear">Linear</option>

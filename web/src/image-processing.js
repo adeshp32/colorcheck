@@ -99,6 +99,10 @@ export function applyPhotoAdjustments(
   enhancementLut = null,
   collectHistogram = true,
 ) {
+  const activeEnhancementLut =
+    enhancementLut instanceof Float32Array
+      ? enhancementLut
+      : (enhancementLut?.[edits.enhancementId] ?? null);
   const out = new Uint8ClampedArray(data.length),
     grades = Object.entries(edits.grades)
       .filter(([, g]) => g.amount && g.saturation)
@@ -131,12 +135,12 @@ export function applyPhotoAdjustments(
     let r = data[i] / 255,
       g = data[i + 1] / 255,
       b = data[i + 2] / 255;
-    if (enhancementLut && edits.enhanceStrength > 0) {
+    if (activeEnhancementLut && edits.enhanceStrength > 0) {
       blendEnhancementInto(
         r,
         g,
         b,
-        enhancementLut,
+        activeEnhancementLut,
         edits.enhanceStrength,
         enhanced,
       );

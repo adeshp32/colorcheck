@@ -15,11 +15,16 @@ runtime import graph. Dependencies are pinned in `package-lock.json`.
 
 ```sh
 npm ci
+npm run prepare:codecs
 npm run dev
 npm run format
 npm test
 npm run test:browser
 ```
+
+Use the URL printed by `npm run dev`. Opening `web/index.html` directly through
+`file://` displays the static markup but does not provide a valid origin for the
+module workers and local codec assets.
 
 The browser test starts and stops its own static server on an ephemeral port.
 For an installed Chrome browser, use `PHOTO_BROWSER_CHANNEL=chrome npm run test:browser`.
@@ -30,7 +35,9 @@ CI installs Playwright Chromium and runs formatting, engine, and browser checks.
 Engine tests cover neutral edits, identical-reference matching, transparency,
 exposure, monochrome, bounded gain, and monotonic curves. Browser tests exercise
 file selection, matching, editing history, wheel keyboard input, cropped export,
-unsupported formats, mobile overflow, and the absence of upload requests.
+unsupported formats, format classification, mobile overflow, and the absence of
+upload requests. `tools/validate-raw-import.mjs` accepts a local camera file for
+an optional real-browser RAW decode and adjustment check while the dev server runs.
 
 Generated fixtures test software behavior, not photographic quality. Real-device
 testing, tagged-color image comparisons, large-image memory profiling, and visual
@@ -41,8 +48,9 @@ quality evaluation remain separate requirements.
 An accurate implementation summary is:
 
 > A static, privacy-oriented photo editor that uses bounded reference statistics
-> for adjustable color matching. A pure pixel engine runs in a browser worker;
-> non-destructive settings drive both preview and full-resolution export.
+> for adjustable color matching. Native, HEIC, and camera RAW inputs are decoded
+> locally; a pure pixel engine runs in a browser worker, and non-destructive
+> settings drive both preview and full-resolution export.
 
-Do not describe the current matching algorithm as trained ML, claim professional
-RAW/HDR support, or imply that browser tests prove all-device reliability.
+Do not describe the current matching algorithm as trained ML, claim a high-bit-depth
+RAW/HDR adjustment pipeline, or imply that browser tests prove all-device reliability.

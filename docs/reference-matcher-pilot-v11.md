@@ -2,7 +2,7 @@
 
 ## Decision
 
-Do not deploy this checkpoint. V11 strengthened validation conditioning and
+Do not promote this checkpoint as the validated production matcher. V11 strengthened validation conditioning and
 general correction quality, but the strict held-out test did not establish a
 dependable advantage from the correct real-photo reference.
 
@@ -38,5 +38,7 @@ image generator:
 3. Train on 12,000 pairs over five epochs with a larger share of real expert edits.
 4. Preserve the same 500-pair held-out controls and predeclared deployment gates.
 
-The v11 checkpoint and dataset remain outside Git. This report records aggregate
-measurements and the resulting decision.
+The original PyTorch checkpoint and dataset remain outside Git. A browser-ready
+FP32 ONNX export is included as a clearly labeled, guarded research comparison;
+it is not promoted as the validated production matcher. This report records the
+aggregate measurements and resulting decision.
