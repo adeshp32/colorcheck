@@ -17,10 +17,11 @@ Python backend, account, or photo-upload service is required.
 - Film-grain overlay with adjustable strength and size, globally or inside masks.
 - Warmth, tint, saturation, vibrance, monochrome, and four tonal grading ranges.
 - Crop, aspect-ratio presets, rotation, flip, sharpening, and vignette.
-- Numeric controls, individual resets, before/after comparison, and undo/redo.
+- Numeric controls, individual resets, hold-to-view-original comparison, and undo/redo.
 - Local radial and linear masks with inside/outside selection, feathering,
   add/subtract/intersect shapes, and color/luminance refinement.
-- Fixed mobile image canvas with overlay tool menus, focused sliders, zoom/pan, and fullscreen.
+- Neutral dark canvas with an image-first mobile workspace, three-state tool sheets,
+  tap-to-hide preview mode, compact zoom controls, pan, and fullscreen.
 - Local HEIC/HEIF decoding for default iPhone photos.
 - Local camera RAW development for DNG/ProRAW and common Canon, Nikon, Sony,
   Fujifilm, Olympus, Panasonic, Pentax, and Sigma formats.

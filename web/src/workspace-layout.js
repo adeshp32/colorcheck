@@ -21,9 +21,11 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     viewer = document.querySelector("#viewer"),
     preview = document.querySelector("#preview"),
     grip = document.querySelector("#panel-grip"),
+    showTools = document.querySelector("#show-tools"),
     mobile = matchMedia("(max-width: 760px)");
   let mode = mobile.matches ? "bottom" : "right",
-    drag = null;
+    drag = null,
+    sheetDrag = null;
   const buttons = [...document.querySelectorAll("[data-dock-mode]")];
   function toggleAdjustment(label) {
     if (!mobile.matches) return;
@@ -68,15 +70,19 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
       }
     });
   }
-  layout.dataset.tray = mobile.matches ? "closed" : "open";
+  function setTray(state) {
+    layout.dataset.tray = state;
+    showTools.hidden = !(mobile.matches && state === "hidden");
+    updateExpanded();
+    onPreviewLayout();
+  }
+  setTray(mobile.matches ? "closed" : "open");
   for (const button of document.querySelectorAll("[data-panel]"))
     button.addEventListener("click", () => {
       if (!mobile.matches) return;
       const same = layout.dataset.activeTool === button.dataset.panel;
-      layout.dataset.tray =
-        same && layout.dataset.tray === "open" ? "closed" : "open";
+      setTray(same && layout.dataset.tray === "open" ? "closed" : "open");
       layout.dataset.activeTool = button.dataset.panel;
-      updateExpanded();
     });
   function updateExpanded() {
     document
@@ -93,9 +99,9 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
       );
   }
   document.querySelector("#close-tools").onclick = () => {
-    layout.dataset.tray = "closed";
-    updateExpanded();
+    setTray("closed");
   };
+  showTools.onclick = () => setTray("closed");
 
   function fitPreview() {
     const fitted = fitPreviewDimensions(
@@ -143,6 +149,15 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   grip.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    if (mobile.matches) {
+      sheetDrag = {
+        id: event.pointerId,
+        y: event.clientY,
+        state: layout.dataset.tray,
+      };
+      grip.setPointerCapture(event.pointerId);
+      return;
+    }
     const previous = panel.getBoundingClientRect();
     if (mode !== "floating") {
       dock("floating");
@@ -160,13 +175,31 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     grip.setPointerCapture(event.pointerId);
   });
   grip.addEventListener("pointermove", (event) => {
+    if (sheetDrag?.id === event.pointerId) {
+      panel.style.setProperty(
+        "--panel-drag-y",
+        `${Math.max(-48, event.clientY - sheetDrag.y)}px`,
+      );
+      return;
+    }
     if (!drag) return;
     panel.style.left = `${drag.left + event.clientX - drag.x}px`;
     panel.style.top = `${drag.top + event.clientY - drag.y}px`;
     keepVisible();
   });
   for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
-    grip.addEventListener(name, () => {
+    grip.addEventListener(name, (event) => {
+      if (sheetDrag?.id === event.pointerId) {
+        const delta = event.clientY - sheetDrag.y;
+        panel.style.removeProperty("--panel-drag-y");
+        const previous = sheetDrag.state;
+        sheetDrag = null;
+        if (delta < -55) setTray("open");
+        else if (delta > 150 || (previous === "closed" && delta > 70))
+          setTray("hidden");
+        else if (delta > 45) setTray("closed");
+        return;
+      }
       drag = null;
     });
   grip.addEventListener("keydown", (event) => {
@@ -198,9 +231,8 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   });
   addEventListener("scroll", keepVisible, { passive: true });
   mobile.addEventListener("change", () => {
-    layout.dataset.tray = mobile.matches ? "closed" : "open";
+    setTray(mobile.matches ? "closed" : "open");
     dock(mobile.matches ? "bottom" : "right");
-    updateExpanded();
     adjustmentAccessibility();
   });
   dock(mode);

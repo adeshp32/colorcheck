@@ -489,6 +489,29 @@ const { join } = require("node:path");
     const beforeMask = await samples();
     const toolStripBefore = await maskPage.locator(".tools").boundingBox();
     assert.equal(await maskPage.locator(".social-footer a").isVisible(), true);
+    await maskPage.locator("[data-panel=light]").click();
+    const panelGrip = await maskPage.locator("#panel-grip").boundingBox();
+    await maskPage.mouse.move(
+      panelGrip.x + panelGrip.width / 2,
+      panelGrip.y + panelGrip.height / 2,
+    );
+    await maskPage.mouse.down();
+    await maskPage.mouse.move(
+      panelGrip.x + panelGrip.width / 2,
+      panelGrip.y + panelGrip.height / 2 + 180,
+    );
+    await maskPage.mouse.up();
+    assert.equal(
+      await maskPage.locator("#editor-layout").getAttribute("data-tray"),
+      "hidden",
+      "Dragging the sheet down should reveal the hidden state",
+    );
+    assert.equal(await maskPage.locator("#show-tools").isVisible(), true);
+    await maskPage.locator("#show-tools").click();
+    assert.equal(
+      await maskPage.locator("#editor-layout").getAttribute("data-tray"),
+      "closed",
+    );
     await maskPage.locator("[data-panel=mask]").click();
     await maskPage.locator("#add-radial").click();
     assert.equal(await maskPage.locator("#adjustment-scope option").count(), 2);
@@ -591,6 +614,18 @@ const { join } = require("node:path");
       true,
     );
     assert.equal(await maskPage.locator("#slider-contrast").isVisible(), false);
+    await maskPage
+      .getByRole("button", { name: "Collapse adjustment", exact: true })
+      .click();
+    assert.equal(
+      await maskPage
+        .locator(".single-adjustment")
+        .getAttribute("data-sheet-state"),
+      "peek",
+    );
+    await maskPage
+      .getByRole("button", { name: "Expand adjustment", exact: true })
+      .click();
     assert.deepEqual(
       await maskPage.locator("#viewer").boundingBox(),
       viewerBefore,
@@ -647,6 +682,9 @@ const { join } = require("node:path");
     await maskPage.locator("#redo").click();
     await waitForCenter(afterMask.center);
     assert.deepEqual((await samples()).center, afterMask.center);
+    await maskPage
+      .getByRole("button", { name: "Back to tools", exact: true })
+      .click();
     await maskPage.locator("[data-panel=mask]").click();
     await maskPage.locator("#mask-invert").check();
     await waitForCenter(beforeMask.center);
@@ -710,6 +748,32 @@ const { join } = require("node:path");
       0,
       "Tools should not require page scrolling",
     );
+    const previewBox = await maskPage.locator("#preview").boundingBox();
+    await maskPage.mouse.click(
+      previewBox.x + previewBox.width * 0.2,
+      previewBox.y + previewBox.height * 0.2,
+    );
+    await maskPage.waitForTimeout(350);
+    assert.equal(
+      await maskPage
+        .locator("body")
+        .evaluate((node) => node.classList.contains("preview-mode")),
+      true,
+    );
+    await maskPage.mouse.click(
+      previewBox.x + previewBox.width * 0.2,
+      previewBox.y + previewBox.height * 0.2,
+    );
+    await maskPage.waitForTimeout(350);
+    assert.equal(
+      await maskPage
+        .locator("body")
+        .evaluate((node) => node.classList.contains("preview-mode")),
+      false,
+    );
+    await maskPage
+      .getByRole("button", { name: "View controls", exact: true })
+      .click();
     await maskPage
       .getByRole("button", { name: "Zoom in", exact: true })
       .click();
@@ -723,6 +787,19 @@ const { join } = require("node:path");
     await maskPage
       .getByRole("button", { name: "Fit image", exact: true })
       .click();
+    const compare = maskPage.getByRole("button", {
+      name: "Hold to view original",
+      exact: true,
+    });
+    const compareBounds = await compare.boundingBox();
+    await maskPage.mouse.move(
+      compareBounds.x + compareBounds.width / 2,
+      compareBounds.y + compareBounds.height / 2,
+    );
+    await maskPage.mouse.down();
+    assert.equal(await compare.getAttribute("aria-pressed"), "true");
+    await maskPage.mouse.up();
+    assert.equal(await compare.getAttribute("aria-pressed"), "false");
     assert.deepEqual(
       await maskPage.locator("#viewer").boundingBox(),
       viewerBefore,

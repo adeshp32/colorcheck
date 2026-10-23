@@ -21,7 +21,9 @@ export function initializeMobileEditor({
     panX = 0,
     panY = 0,
     gesture = null,
-    lastTap = 0;
+    lastTap = 0,
+    tapTimer = null,
+    sheetDrag = null;
   const pointers = new Map(),
     dock = make("section", "single-adjustment"),
     heading = make("div", "single-adjustment-heading"),
@@ -40,6 +42,7 @@ export function initializeMobileEditor({
   dock.setAttribute("aria-label", "Active adjustment");
   const back = make("button"),
     done = make("button"),
+    sheetToggle = make("button", "sheet-toggle"),
     overlayToggle = make("button", "region-button");
   overlayToggle.title = "Show mask overlay";
   overlayToggle.setAttribute("aria-label", "Show mask overlay");
@@ -57,7 +60,11 @@ export function initializeMobileEditor({
   back.title = "Back to tools";
   back.setAttribute("aria-label", "Back to tools");
   done.textContent = "Done";
-  heading.append(back, title, overlayToggle, done);
+  sheetToggle.textContent = "⌄";
+  sheetToggle.title = "Collapse adjustment";
+  sheetToggle.setAttribute("aria-label", "Collapse adjustment");
+  sheetToggle.setAttribute("aria-expanded", "true");
+  heading.append(back, title, overlayToggle, sheetToggle, done);
   dock.append(heading, content);
   layout.append(dock);
   function restore() {
@@ -68,6 +75,7 @@ export function initializeMobileEditor({
       marker = null;
     }
     dock.hidden = true;
+    dock.dataset.sheetState = "hidden";
   }
   function close() {
     restore();
@@ -83,6 +91,11 @@ export function initializeMobileEditor({
     content.append(node);
     title.textContent = name;
     dock.hidden = false;
+    dock.dataset.sheetState = "expanded";
+    sheetToggle.textContent = "⌄";
+    sheetToggle.title = "Collapse adjustment";
+    sheetToggle.setAttribute("aria-label", "Collapse adjustment");
+    sheetToggle.setAttribute("aria-expanded", "true");
     layout.dataset.tray = "adjustment";
     sync();
   }
@@ -91,6 +104,39 @@ export function initializeMobileEditor({
     layout.dataset.tray = "open";
   };
   done.onclick = close;
+  sheetToggle.onclick = () => {
+    const expanded = dock.dataset.sheetState === "expanded";
+    dock.dataset.sheetState = expanded ? "peek" : "expanded";
+    sheetToggle.textContent = expanded ? "⌃" : "⌄";
+    sheetToggle.title = expanded ? "Expand adjustment" : "Collapse adjustment";
+    sheetToggle.setAttribute("aria-label", sheetToggle.title);
+    sheetToggle.setAttribute("aria-expanded", String(!expanded));
+    onViewChange();
+  };
+  heading.addEventListener("pointerdown", (event) => {
+    if (!media.matches || event.target.closest("button")) return;
+    sheetDrag = { id: event.pointerId, y: event.clientY };
+    heading.setPointerCapture(event.pointerId);
+  });
+  heading.addEventListener("pointermove", (event) => {
+    if (sheetDrag?.id !== event.pointerId) return;
+    dock.style.setProperty(
+      "--sheet-drag-y",
+      `${Math.max(-32, event.clientY - sheetDrag.y)}px`,
+    );
+  });
+  for (const eventName of ["pointerup", "pointercancel", "lostpointercapture"])
+    heading.addEventListener(eventName, (event) => {
+      if (sheetDrag?.id !== event.pointerId) return;
+      const delta = event.clientY - sheetDrag.y;
+      dock.style.removeProperty("--sheet-drag-y");
+      sheetDrag = null;
+      if (delta > 150) close();
+      else if (delta > 45 && dock.dataset.sheetState === "expanded")
+        sheetToggle.click();
+      else if (delta < -45 && dock.dataset.sheetState === "peek")
+        sheetToggle.click();
+    });
   $("#close-tools").addEventListener("click", close);
   for (const button of document.querySelectorAll("[data-panel]"))
     button.addEventListener("click", restore);
@@ -203,10 +249,22 @@ export function initializeMobileEditor({
   };
 
   const viewControls = make("div", "view-controls"),
+    viewToggle = make("button", "view-controls-toggle"),
+    viewMenu = make("div", "view-controls-menu"),
     zoomOut = make("button"),
     zoomIn = make("button"),
     fit = make("button"),
     fullscreen = make("button");
+  viewToggle.textContent = "View";
+  viewToggle.title = "View controls";
+  viewToggle.setAttribute("aria-label", "View controls");
+  viewToggle.setAttribute("aria-expanded", "false");
+  viewMenu.hidden = true;
+  viewToggle.onclick = () => {
+    const expanded = viewToggle.getAttribute("aria-expanded") !== "true";
+    viewToggle.setAttribute("aria-expanded", String(expanded));
+    viewMenu.hidden = !expanded;
+  };
   zoomOut.textContent = "−";
   zoomOut.title = "Zoom out";
   zoomOut.setAttribute("aria-label", "Zoom out");
@@ -223,7 +281,8 @@ export function initializeMobileEditor({
   fullIcon.src = "./assets/icons/icon-maximize.svg";
   fullIcon.alt = "";
   fullscreen.append(fullIcon);
-  viewControls.append(zoomOut, fit, zoomIn, fullscreen);
+  viewMenu.append(zoomOut, fit, zoomIn, fullscreen);
+  viewControls.append(viewToggle, viewMenu);
   viewer.append(viewControls);
   function paintView() {
     const width = parseFloat(preview.style.width) || 0,
@@ -236,6 +295,7 @@ export function initializeMobileEditor({
     viewer.style.setProperty("--view-x", `${panX}px`);
     viewer.style.setProperty("--view-y", `${panY}px`);
     fit.textContent = zoom === 1 ? "Fit" : `${Math.round(zoom * 100)}%`;
+    viewToggle.textContent = zoom === 1 ? "View" : `${Math.round(zoom * 100)}%`;
     zoomOut.disabled = zoom <= 1;
     zoomIn.disabled = zoom >= 6;
     onViewChange();
@@ -251,6 +311,7 @@ export function initializeMobileEditor({
   fullscreen.onclick = async () => {
     const entering = !document.body.classList.contains("image-fullscreen");
     if (entering) {
+      document.body.classList.remove("preview-mode");
       document.body.classList.add("image-fullscreen");
       try {
         if (layout.requestFullscreen) await layout.requestFullscreen();
@@ -346,9 +407,21 @@ export function initializeMobileEditor({
     ) {
       const now = performance.now();
       if (now - lastTap < 300) {
+        clearTimeout(tapTimer);
+        tapTimer = null;
         setZoom(zoom > 1 ? 1 : 2);
         lastTap = 0;
-      } else lastTap = now;
+      } else {
+        lastTap = now;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => {
+          document.body.classList.toggle("preview-mode");
+          viewMenu.hidden = true;
+          viewToggle.setAttribute("aria-expanded", "false");
+          onViewChange();
+          tapTimer = null;
+        }, 300);
+      }
     }
     if (pointers.size < 2) gesture = null;
     if (!pointers.size) delete viewer.dataset.navigation;
@@ -387,6 +460,7 @@ export function initializeMobileEditor({
       zoom = 1;
       panX = panY = 0;
       returnButton.hidden = true;
+      document.body.classList.remove("preview-mode");
       close();
       paintView();
     },

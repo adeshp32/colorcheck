@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="dark" />
     <title>ColorCheck Photos</title>
     <link rel="stylesheet" href="./styles/editor.css" />
     <script type="module" src="./src/editor-controller.js"></script>
@@ -73,6 +73,29 @@
             role="group"
             aria-label="Crop selection"
           ></div>
+          <button
+            id="compare"
+            class="compare-hold"
+            disabled
+            title="Hold to view original"
+            aria-label="Hold to view original"
+            aria-pressed="false"
+          >
+            <img class="icon" src="./assets/icons/icon-eye.svg" alt="" />
+          </button>
+          <button
+            id="show-tools"
+            class="show-tools"
+            hidden
+            aria-label="Show editing tools"
+            title="Show editing tools"
+          >
+            <img
+              class="icon"
+              src="./assets/icons/icon-panel-bottom.svg"
+              alt=""
+            /><span>Tools</span>
+          </button>
         </div>
         <div class="transport">
           <button id="undo" title="Undo" aria-label="Undo" disabled>
@@ -87,7 +110,6 @@
               src="./assets/icons/icon-redo-2.svg"
               alt=""
             /></button
-          ><button id="compare" disabled>Original</button
           ><button id="reset" disabled>Reset edits</button
           ><span id="status" role="status" aria-live="polite"
             >Photos stay on this device.</span
@@ -106,8 +128,8 @@
           <span>Tools</span>
           <button
             id="close-tools"
-            aria-label="Close tool controls"
-            title="Close controls"
+            aria-label="Collapse tool controls"
+            title="Collapse controls"
           >
             ×
           </button>

@@ -37,12 +37,15 @@ state; edits, mask names, and geometry are undoable. This release does not inclu
 brush painting, automatic subject segmentation, or hair matting.
 
 On mobile the image workspace fills the viewport above a compact tool strip.
-Tool menus overlay the workspace without resizing the photo. Selecting an adjustment
-portals its existing DOM control into a compact floating sheet; Done restores it.
-`mobile-editor.js` owns these portals, region shortcuts, fit/zoom/pan, and fullscreen
-(with a CSS fallback where native fullscreen is unavailable). The page itself need
-not scroll to perform an edit. The tool strip stays anchored at the bottom, menus
-open upward over at most 40% of the viewport, and only the menu's contents scroll.
+Tool menus overlay the workspace without resizing the photo. The main tray supports
+hidden, peek, and expanded positions. Selecting an adjustment portals its existing
+DOM control into a matching three-state bottom sheet; Done restores it.
+`mobile-editor.js` owns these portals, region shortcuts, compact view controls,
+fit/zoom/pan, tap-to-hide preview mode, and fullscreen (with a CSS fallback where
+native fullscreen is unavailable). The page itself need not scroll to perform an
+edit. The tool strip stays anchored at the bottom, menus open upward over at most
+40% of the viewport, and only the menu's contents scroll. Holding the eye control
+temporarily reveals the unedited photo without changing edit history.
 The compact LinkedIn footer remains visible below the tool strip outside fullscreen.
 When a mask is selected for editing, two-finger gestures resize/rotate its geometry,
 not the image. Radial edge handles and linear endpoints also support one-finger

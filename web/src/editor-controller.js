@@ -524,7 +524,7 @@ async function openTargetPhoto(file) {
       `${file.name} · ${bitmap.width} × ${bitmap.height}${format === "raw" ? " · RAW developed locally" : ""}`;
     $("#file-info").title = file.name;
     original = false;
-    $("#compare").textContent = "Original";
+    $("#compare").setAttribute("aria-pressed", "false");
     synchronizeControls();
     renderPreview();
     showStatus(
@@ -572,7 +572,7 @@ $("#enhance").onclick = async () => {
       targetSettings.enhanceStrength = result.assessment.recommendedStrength;
     });
     original = false;
-    $("#compare").textContent = "Original";
+    $("#compare").setAttribute("aria-pressed", "false");
     setEnhancementStatus(
       `Quick Enhance active on ${scopeName} · ${result.assessment.recommendedStrength}% suggested strength · ${Math.round(result.inferenceMs)} ms`,
       "active",
@@ -702,7 +702,7 @@ $("#enhance-v11").onclick = async () => {
       targetSettings.enhanceStrength = result.assessment.recommendedStrength;
     });
     original = false;
-    $("#compare").textContent = "Original";
+    $("#compare").setAttribute("aria-pressed", "false");
     setV11Status(
       `V11 active on ${scopeName} · ${result.assessment.recommendedStrength}% guarded strength · ${Math.round(result.inferenceMs)} ms`,
       "active",
@@ -852,12 +852,28 @@ $("#reset").onclick = () => {
   });
   summarizeEnhancement();
 };
-$("#compare").onclick = () => {
-  original = !original;
-  $("#compare").textContent = original ? "Edited" : "Original";
-  $("#compare").setAttribute("aria-pressed", String(original));
+function showOriginal(show) {
+  if (!source || original === show) return;
+  original = show;
+  $("#compare").setAttribute("aria-pressed", String(show));
   renderPreview();
-};
+}
+$("#compare").addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  event.currentTarget.setPointerCapture(event.pointerId);
+  showOriginal(true);
+});
+for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
+  $("#compare").addEventListener(event, () => showOriginal(false));
+$("#compare").addEventListener("keydown", (event) => {
+  if (["Enter", " "].includes(event.key)) {
+    event.preventDefault();
+    showOriginal(true);
+  }
+});
+$("#compare").addEventListener("keyup", (event) => {
+  if (["Enter", " "].includes(event.key)) showOriginal(false);
+});
 $("#bw").onchange = (e) =>
   applyEdit(() => {
     adjustmentSettings().bw = e.target.checked;
