@@ -19,10 +19,24 @@ from tools.ml.tst100k.data import TripletDataset, _download_one, scene_id, scene
 from tools.ml.tst100k.fresh_evaluation import fresh_rows
 from tools.ml.tst100k.prepare_v4 import FINAL_COUNT, select_final_rows
 from tools.ml.tst100k.review import example_groups, render_group
-from tools.ml.tst100k.train import evaluate, train_epoch
+from tools.ml.tst100k.train import edit_emphasis_loss, evaluate, train_epoch
+from tools.ml.tst100k.train_v4 import validation_gates
 
 
 class TstPilotTests(unittest.TestCase):
+    def test_v4_loss_and_validation_gates(self):
+        source = torch.zeros(2, 3, 4, 4)
+        expected = torch.stack((torch.full((3, 4, 4), 0.05), torch.full((3, 4, 4), 0.3)))
+        self.assertEqual(float(edit_emphasis_loss(expected, expected, source)), 0)
+        self.assertGreater(float(edit_emphasis_loss(source, expected, source)), 0)
+        baseline = {"model": {"deltaE2000": {"mean": 10.0}, "ssim": {"mean": 0.90}, "clippingPercent": {"mean": 2.0}}}
+        candidate = {
+            "model": {"deltaE2000": {"mean": 10.05}, "ssim": {"mean": 0.896}, "clippingPercent": {"mean": 2.8}},
+            "modelVsWrongReference": {"mean": 0.2},
+        }
+        self.assertTrue(all(validation_gates(candidate, baseline, 8.0, 8.6, 59).values()))
+        self.assertFalse(validation_gates(candidate, baseline, 8.2, 8.6, 59)["strongEditGain"])
+
     def test_v4_final_set_excludes_every_prior_scene(self):
         rows = [
             {
@@ -155,6 +169,8 @@ class TstPilotTests(unittest.TestCase):
             record = train_epoch(model, loader, optimizer, scaler, torch.device("cpu"), 1)
             self.assertTrue(np.isfinite(record["loss"]))
             self.assertFalse(torch.equal(before, model.basis))
+            emphasized = train_epoch(model, loader, optimizer, scaler, torch.device("cpu"), 2, emphasize_edits=True)
+            self.assertTrue(np.isfinite(emphasized["loss"]))
             report = evaluate(model, loader, torch.device("cpu"), 42)
             self.assertEqual(report["model"]["deltaE2000"]["n"], 4)
             self.assertEqual(report["model"]["ssim"]["n"], 4)

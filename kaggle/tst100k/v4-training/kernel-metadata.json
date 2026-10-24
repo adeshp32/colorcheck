@@ -1,0 +1,16 @@
+{
+  "id": "adides567/colorcheck-tst100k-v4-training",
+  "title": "ColorCheck TST100K v4 Strong-Edit Training",
+  "code_file": "colorcheck-tst100k-v4.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "adides567/colorcheck-tst100k-expanded-validation",
+    "adides567/colorcheck-tst100k-v4-preflight"
+  ]
+}

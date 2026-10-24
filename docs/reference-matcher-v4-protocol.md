@@ -16,7 +16,7 @@ test images and scores must not choose a v4 checkpoint or tune its weights.
   33-cube LUT architecture. Never train on its 320 test triplets or the later
   160-scene fresh audit.
 - Run four more epochs with AdamW learning rate `0.0001`, batch size 8, two
-  image-loading workers, and the same mixed-precision policy. Keep the v3
+  image-loading workers, random seed `9103`, and the same mixed-precision policy. Keep the v3
   reconstruction, perceptual color, structural, smoothness, monotonicity,
   wrong-reference ranking, and neutral-reference losses unchanged.
 - Add exactly two training-only terms. For each image, measure the mean absolute
@@ -59,6 +59,10 @@ expert edit matches each target's scene and that its reference is different.
 Write the selected rows and a manifest checksum before training. If fewer
 than 256 eligible rows exist, stop and revise the protocol before any GPU use;
 do not reduce the count after viewing model results.
+
+The CPU preflight passed with 256 unique targets, 59 strong-edit validation
+targets, and sealed manifest SHA-256
+`a1f9bdb468707e729703e4b8915283d0314b82b355ffb87e1d3cf94afa740b8a`.
 
 The reproducible preflight is generated with
 `python -m tools.ml.tst100k.build_v4_preflight_notebook` and runs privately as

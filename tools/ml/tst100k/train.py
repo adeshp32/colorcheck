@@ -103,7 +103,22 @@ def evaluate(model: ReferenceLutModel, loader: DataLoader, device: torch.device,
     return results
 
 
-def train_epoch(model, loader, optimizer, scaler, device, epoch: int) -> dict:
+def edit_emphasis_loss(output: torch.Tensor, expected: torch.Tensor, source: torch.Tensor) -> torch.Tensor:
+    """Give stronger expert edits more weight without changing inference.
+
+    The batch-relative weights are bounded and renormalized. The channel-mean
+    term asks the LUT to reach the intended global shift, not invent geometry.
+    """
+    edit_size = (expected - source).abs().flatten(1).mean(1).detach()
+    weights = (0.75 + edit_size / edit_size.mean().clamp_min(1e-6)).clamp(0.75, 2.0)
+    weights = weights / weights.mean()
+    per_image = (output - expected).abs().flatten(1).mean(1)
+    weighted_pixel = (weights * per_image).mean()
+    channel_mean = (output.mean(dim=(2, 3)) - expected.mean(dim=(2, 3))).abs().mean()
+    return 0.25 * weighted_pixel + 0.25 * channel_mean
+
+
+def train_epoch(model, loader, optimizer, scaler, device, epoch: int, *, emphasize_edits: bool = False) -> dict:
     """Update the model using real triplets and explicit reference controls."""
     model.train()
     criterion = ReferenceMatchLoss()
@@ -127,6 +142,8 @@ def train_epoch(model, loader, optimizer, scaler, device, epoch: int) -> dict:
                 neutral_lut, _ = model(source, source)
                 identity = (apply_lut(source, neutral_lut).float() - source).abs().mean()
             loss = reconstruction + 2 * ranking + 0.25 * identity
+            if emphasize_edits:
+                loss = loss + edit_emphasis_loss(output, expected, source)
         scaler.scale(loss).backward()
         scaler.unscale_(optimizer)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
