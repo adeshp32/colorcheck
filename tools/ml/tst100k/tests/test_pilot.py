@@ -16,10 +16,38 @@ from torch.utils.data import DataLoader
 
 from tools.ml.reference_matcher.model import ReferenceLutModel
 from tools.ml.tst100k.data import TripletDataset, _download_one, scene_id, scene_split, select_triplets
+from tools.ml.tst100k.review import example_groups, render_group
 from tools.ml.tst100k.train import evaluate, train_epoch
 
 
 class TstPilotTests(unittest.TestCase):
+    def test_visual_review_shows_weak_random_and_strong_scenes(self):
+        scores = [{"scene": str(index), "gain": float(index)} for index in range(20)]
+        groups = example_groups(scores)
+        self.assertEqual(groups["worst"], ["0", "1", "2", "3"])
+        self.assertEqual(groups["best"], ["16", "17", "18", "19"])
+        self.assertEqual(len(set(sum(groups.values(), []))), 12)
+
+    def test_visual_review_renders_side_by_side_sheet(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            rows = []
+            for index in range(2):
+                paths = {
+                    "content": f"content_images/00/{index:05d}.png",
+                    "reference": f"style_images/000/{index + 10:05d}_1000.png",
+                    "gt": f"style_images/000/{index:05d}_1000.png",
+                }
+                for path in paths.values():
+                    file = root / path
+                    file.parent.mkdir(parents=True, exist_ok=True)
+                    Image.new("RGB", (16, 16), (80 + index, 100, 120)).save(file)
+                rows.append(paths)
+            destination = root / "review.png"
+            render_group(ReferenceLutModel(lut_size=5), rows, root, ["00000", "00001"], destination)
+            with Image.open(destination) as sheet:
+                self.assertEqual(sheet.size, (1280, 604))
+
     def test_rate_limit_pauses_all_image_requests_before_retry(self):
         class Pacer:
             waits = 0

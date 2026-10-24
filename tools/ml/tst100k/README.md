@@ -36,6 +36,11 @@ requests, shares the host's retry delay across workers, and reports progress.
 It also reports SSIM, edge error, and clipping so that
 reduced color error cannot silently mask a structural or tonal regression.
 
+`python -m tools.ml.tst100k.build_review_notebook` generates a separate
+CPU-only Kaggle audit. It mounts the successful training run's output, scores
+every held-out test image, and produces side-by-side sheets for weak, fixed-
+random, and strong cases. The sheets are review artifacts, not training data.
+
 TST100K combines third-party research datasets and is restricted to
 non-commercial academic research by its [dataset card](https://huggingface.co/datasets/ToneStyle/TST100K).
 Its terms do not replace those of the underlying sources. No image or checkpoint
