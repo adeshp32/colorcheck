@@ -1,7 +1,7 @@
 # Reference matcher research run log
 
-Kaggle account: `adides567`. All runs are private. Training uses a Tesla T4
-GPU; the visual and fresh-scene audits use CPU only.
+Kaggle account: `adides567`. All runs are private. Training requests a GPU;
+the visual and fresh-scene audits use CPU only.
 Elapsed times below are the last timestamps in Kaggle execution logs, so they
 are estimates rather than billing records. The user's October 23 estimate of
 20 GPU-hours remaining is the budget baseline. Reserve at least two hours.
@@ -15,13 +15,16 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`           |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.       |
 | Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`        |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.     |
 | V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`            |            7 min | Passed: sealed 256-target holdout; 59/160 validation targets meet the strong-edit definition. |
-| V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |          pending | Running with a 2.5-hour cap; no final-holdout images are opened.                              |
+| V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
 
-Conservative spend against the stated 20-hour baseline: **about 88 minutes**
-for the second and third expanded attempts, leaving about 18 hours 32 minutes
-before the two-hour reserve. The pilot and first attempt may have already been
+Conservative spend against the stated 20-hour baseline: **about 136 minutes**
+for the second and third expanded attempts plus v4, leaving about 17 hours
+44 minutes before the two-hour reserve. The pilot and first attempt may have
+already been
 reflected in the user's remaining-hours estimate; count them again if Kaggle's
-own usage page shows otherwise. Do not launch simultaneous GPU runs.
+own usage page shows otherwise. These are wall-clock estimates, not billed GPU
+hours; the v4 kernel metadata requested GPU but its output log did not name the
+actual device or report remaining quota. Do not launch simultaneous GPU runs.
 
 Version 3's scene-disjoint test has 320 targets. Mean Delta E 2000 is 9.60 for
 the trained model, 11.38 for the current statistics matcher, 10.86 for the
@@ -86,5 +89,18 @@ The v4 preflight used Kaggle CPU and no GPU time. The holdout manifest has 256
 unique target scenes, no target/reference scene collision, and SHA-256
 `a1f9bdb468707e729703e4b8915283d0314b82b355ffb87e1d3cf94afa740b8a`.
 The old validation split contains 59 strong edits under the protocol's 0.08
-mean RGB-change rule, above its minimum of 20. The GPU training run may start
-without opening the sealed holdout.
+mean RGB-change rule, above its minimum of 20. These checks allowed the GPU
+training run to proceed without opening the sealed holdout.
+
+The private v4 GPU run completed on October 24 (approximately 08:11-08:59 UTC,
+based on its 2,861-second execution log and completion check). Validation
+selected epoch 4 using the frozen rule. On the 59 strong-edit validation
+targets, mean Delta E 2000 improved from **11.865 (v3) to 11.606 (v4)**: a
+**0.258** gain, below the predeclared **0.5** minimum. The other validation
+gates passed: overall Delta E 8.909 to 8.806, SSIM 0.9171 to 0.9161,
+clipping 1.42% to 1.22%, and correct-reference advantage 1.304 (positive).
+The overall decision is **fail** because all gates were required. The sealed
+256-scene final holdout remains unopened. Do not use it to rehabilitate this
+checkpoint, and do not promote v4 to the site. A new experiment requires a
+new predeclared objective and validation decision, with a separate untouched
+final holdout if it reaches final testing.
