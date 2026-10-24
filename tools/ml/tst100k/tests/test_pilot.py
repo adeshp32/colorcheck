@@ -16,11 +16,32 @@ from torch.utils.data import DataLoader
 
 from tools.ml.reference_matcher.model import ReferenceLutModel
 from tools.ml.tst100k.data import TripletDataset, _download_one, scene_id, scene_split, select_triplets
+from tools.ml.tst100k.fresh_evaluation import fresh_rows
 from tools.ml.tst100k.review import example_groups, render_group
 from tools.ml.tst100k.train import evaluate, train_epoch
 
 
 class TstPilotTests(unittest.TestCase):
+    def test_fresh_evaluation_excludes_old_targets_and_references(self):
+        rows = [
+            {
+                "content": f"content_images/00/{index:05d}.jpg",
+                "reference": f"style_images/000/{index + 100:05d}_1000.png",
+                "gt": f"style_images/000/{index:05d}_1000.png",
+            }
+            for index in range(8)
+        ]
+        old = {"train": [rows[0]], "validation": [rows[1]], "test": [rows[2]]}
+        candidates = rows + [
+            {**rows[3], "reference": rows[0]["content"]},
+            {**rows[4], "content": rows[1]["reference"]},
+        ]
+        selected = fresh_rows(candidates, old, 5, seed=7)
+        self.assertEqual({scene_id(row["content"]) for row in selected}, {f"{i:05d}" for i in range(3, 8)})
+        excluded = {"00000", "00001", "00002", "00100", "00101", "00102"}
+        self.assertTrue(all(scene_id(row[key]) not in excluded for row in selected for key in ("content", "reference")))
+        self.assertEqual(selected, fresh_rows(candidates, old, 5, seed=7))
+
     def test_visual_review_shows_weak_random_and_strong_scenes(self):
         scores = [{"scene": str(index), "gain": float(index)} for index in range(20)]
         groups = example_groups(scores)

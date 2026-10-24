@@ -1,6 +1,7 @@
 # Reference matcher research run log
 
-Kaggle account: `adides567`. All runs are private and use a Tesla T4 GPU.
+Kaggle account: `adides567`. All runs are private. Training uses a Tesla T4
+GPU; the visual and fresh-scene audits use CPU only.
 Elapsed times below are the last timestamps in Kaggle execution logs, so they
 are estimates rather than billing records. The user's October 23 estimate of
 20 GPU-hours remaining is the budget baseline. Reserve at least two hours.
@@ -11,7 +12,8 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Expanded validation, first attempt  | `colorcheck-tst100k-expanded-validation/1` |            1 min | Stopped before training: only 499 scene-disjoint test pairs available for a request of 512. |
 | Expanded validation, second attempt | `colorcheck-tst100k-expanded-validation/2` |           13 min | Stopped before training: upstream image host returned HTTP 429.                             |
 | Expanded validation, paced attempt  | `colorcheck-tst100k-expanded-validation/3` |           75 min | Completed: 1024/160/320 pairs; all three predeclared color gates passed.                    |
-| Held-out visual audit (CPU only)     | `colorcheck-tst100k-visual-review/1`       |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.     |
+| Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`       |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.     |
+| Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`    |          pending | Running: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.     |
 
 Conservative spend against the stated 20-hour baseline: **about 88 minutes**
 for the second and third expanded attempts, leaving about 18 hours 32 minutes
@@ -29,8 +31,8 @@ are benchmark measurements at 128 px, not a claim about full-resolution
 photographic quality or browser performance. A visual review, export parity,
 and mobile performance check remain required before deployment.
 
-Next: generate representative visual comparisons from held-out images, check
-failure cases, and only then decide whether to promote a browser checkpoint.
+Next: inspect the fresh-scene audit, then determine whether the failure cases
+justify a new training objective. No browser checkpoint has been promoted.
 
 The private `colorcheck-tst100k-visual-review/1` run mounted version 3's
 checkpoint and test split. It used Kaggle CPU, so it did not spend the GPU
@@ -48,3 +50,11 @@ audit, not a way to select model settings.
 **Decision:** promising research checkpoint, not a drop-in replacement. Do not
 deploy until a fresh evaluation confirms improvement, failure cases have a
 documented fallback, and ONNX/browser parity and phone performance pass.
+
+The fresh-scene audit is an additional same-dataset evaluation, not a wholly
+independent dataset. It uses a frozen checkpoint and excludes every scene in
+the prior training, validation, and test partitions from both target and
+reference positions. Its 160 triplets are ranked reproducibly with seed 3091.
+It compares the model with the unchanged image, current statistics matcher,
+and wrong-reference control; it reports Delta E 2000, SSIM, edge error, and
+clipping, plus weak/random/strong visual examples. No GPU time is spent.
