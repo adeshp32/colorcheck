@@ -13,7 +13,7 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Expanded validation, second attempt | `colorcheck-tst100k-expanded-validation/2` |           13 min | Stopped before training: upstream image host returned HTTP 429.                             |
 | Expanded validation, paced attempt  | `colorcheck-tst100k-expanded-validation/3` |           75 min | Completed: 1024/160/320 pairs; all three predeclared color gates passed.                    |
 | Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`       |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.     |
-| Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`    |          pending | Running: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.     |
+| Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`    |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.   |
 
 Conservative spend against the stated 20-hour baseline: **about 88 minutes**
 for the second and third expanded attempts, leaving about 18 hours 32 minutes
@@ -31,8 +31,9 @@ are benchmark measurements at 128 px, not a claim about full-resolution
 photographic quality or browser performance. A visual review, export parity,
 and mobile performance check remain required before deployment.
 
-Next: inspect the fresh-scene audit, then determine whether the failure cases
-justify a new training objective. No browser checkpoint has been promoted.
+Next: define a validation-only strategy for large intended color and brightness
+changes, then test a newly trained candidate against a separate final holdout.
+No browser checkpoint has been promoted.
 
 The private `colorcheck-tst100k-visual-review/1` run mounted version 3's
 checkpoint and test split. It used Kaggle CPU, so it did not spend the GPU
@@ -57,4 +58,23 @@ the prior training, validation, and test partitions from both target and
 reference positions. Its 160 triplets are ranked reproducibly with seed 3091.
 It compares the model with the unchanged image, current statistics matcher,
 and wrong-reference control; it reports Delta E 2000, SSIM, edge error, and
-clipping, plus weak/random/strong visual examples. No GPU time is spent.
+clipping, plus weak/random/strong visual examples. No GPU time was spent.
+
+The run excluded **2,553 prior scenes** before selecting 160 fresh targets.
+Mean Delta E 2000 was 9.16 for the trained model, 10.52 for the current
+matcher, 10.56 for unchanged images, and 10.49 with wrong references. Paired
+model-versus-current improvement was 1.36 (95% bootstrap interval 0.52 to
+2.31); correct-versus-wrong-reference improvement was 1.33 (0.99 to 1.66).
+Mean SSIM was 0.921 versus 0.889, edge error 0.0093 versus 0.0105, and
+clipping 1.10% versus 11.90%. However, the model was worse than the current
+matcher on **72 of 160** scenes (45%). The weak-case sheet again shows output
+that stays near the source when the expected edit has a stronger cast or
+brightness change. The random sheet has mixed quality; the strong sheet shows
+clear avoidance of the current matcher's clipping and heavy color casts.
+
+**Research conclusion:** the average improvement and reference sensitivity
+replicate on untouched scenes, but the 45% per-image loss rate is too high for
+an automatic replacement. This same-dataset audit does not establish
+real-world generalization. Pause further training until a failure-oriented
+objective and untouched final evaluation are predeclared; do not tune against
+either completed test set.
