@@ -17,11 +17,30 @@ from torch.utils.data import DataLoader
 from tools.ml.reference_matcher.model import ReferenceLutModel
 from tools.ml.tst100k.data import TripletDataset, _download_one, scene_id, scene_split, select_triplets
 from tools.ml.tst100k.fresh_evaluation import fresh_rows
+from tools.ml.tst100k.prepare_v4 import FINAL_COUNT, select_final_rows
 from tools.ml.tst100k.review import example_groups, render_group
 from tools.ml.tst100k.train import evaluate, train_epoch
 
 
 class TstPilotTests(unittest.TestCase):
+    def test_v4_final_set_excludes_every_prior_scene(self):
+        rows = [
+            {
+                "content": f"content_images/00/{index:05d}.jpg",
+                "reference": f"style_images/000/{index + 10000:05d}_1000.png",
+                "gt": f"style_images/000/{index:05d}_1000.png",
+            }
+            for index in range(300)
+        ]
+        old = {"train": rows[:8], "validation": rows[8:12], "test": rows[12:16]}
+        audit = rows[16:24]
+        final = select_final_rows(rows, old, audit)
+        self.assertEqual(len(final), FINAL_COUNT)
+        self.assertEqual(final, select_final_rows(rows, old, audit))
+        seen = {scene_id(row[key]) for sample in (*old.values(), audit) for row in sample for key in ("content", "reference")}
+        self.assertTrue(all(scene_id(row[key]) not in seen for row in final for key in ("content", "reference")))
+        self.assertEqual(len({scene_id(row["content"]) for row in final}), FINAL_COUNT)
+
     def test_fresh_evaluation_excludes_old_targets_and_references(self):
         rows = [
             {

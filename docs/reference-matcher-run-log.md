@@ -14,6 +14,7 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Expanded validation, paced attempt  | `colorcheck-tst100k-expanded-validation/3` |           75 min | Completed: 1024/160/320 pairs; all three predeclared color gates passed.                    |
 | Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`       |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.     |
 | Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`    |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.   |
+| V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`        |          pending | Selects a new 256-target holdout and counts strong-edit validation scenes before GPU use.   |
 
 Conservative spend against the stated 20-hour baseline: **about 88 minutes**
 for the second and third expanded attempts, leaving about 18 hours 32 minutes
@@ -31,8 +32,9 @@ are benchmark measurements at 128 px, not a claim about full-resolution
 photographic quality or browser performance. A visual review, export parity,
 and mobile performance check remain required before deployment.
 
-Next: define a validation-only strategy for large intended color and brightness
-changes, then test a newly trained candidate against a separate final holdout.
+Next: follow the predeclared [v4 protocol](reference-matcher-v4-protocol.md),
+starting with its CPU preflight, then test a candidate against its sealed final
+holdout only after validation passes.
 No browser checkpoint has been promoted.
 
 The private `colorcheck-tst100k-visual-review/1` run mounted version 3's
