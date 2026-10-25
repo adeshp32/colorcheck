@@ -18,6 +18,7 @@ are estimates rather than billing records. The user's October 23 estimate of
 | V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
 | Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`     |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                   |
 | Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                       |
+| Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`   |          pending | Started October 25 from `e2e89e2`; frozen selector, one-time 256-scene evaluation.           |
 
 Conservative spend against the stated 20-hour baseline: **about 185 minutes**
 for the second and third expanded attempts, v4, and selector validation.
@@ -140,4 +141,6 @@ correct-reference advantage of 2.993 Delta E, improved mean SSIM from 0.8853
 to 0.9124, and reduced mean clipping from 13.87% to 9.09%. All six validation
 gates passed. The selector coefficient file has 33 features and is marked
 research-only. This is a **validation candidate**, not independent final
-evidence or a deployment decision. The 256 final images remain unopened.
+evidence or a deployment decision. The 256 final images remained unopened
+until the separate private final audit was launched on October 25. No result
+from that audit may be used to change the selector, threshold, or checkpoint.
