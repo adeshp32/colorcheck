@@ -16,6 +16,8 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`        |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.     |
 | V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`            |            7 min | Passed: sealed 256-target holdout; 59/160 validation targets meet the strong-edit definition. |
 | V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
+| Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`     |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                   |
+| Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |          pending | Frozen v3 and statistics candidates on 1024/256 new scenes; final photos remain sealed.       |
 
 Conservative spend against the stated 20-hour baseline: **about 136 minutes**
 for the second and third expanded attempts plus v4, leaving about 17 hours
@@ -104,3 +106,23 @@ The overall decision is **fail** because all gates were required. The sealed
 checkpoint, and do not promote v4 to the site. A new experiment requires a
 new predeclared objective and validation decision, with a separate untouched
 final holdout if it reaches final testing.
+
+The [deployment-oriented selector experiment](reference-matcher-deployment-experiment.md)
+began with private Kaggle CPU preflight version 1 on October 24 local time.
+Its execution log ends at about 27 seconds. It reserved 1,024 training, 256
+validation, and 256 final target scenes. An independent local check confirmed
+zero overlap among the partitions and zero overlap with all **3,366** scenes
+used by v3 train/validation/test, the fresh audit, or the sealed v4 holdout.
+The pinned dataset revision is `63bf13833b75407c862d608c3d81281d0a35b61f`.
+Full split checksum: `5cf65a621ca1c33475a1f3579b22caa4f0e3f33ec563df176202950e7272afa8`;
+final-partition checksum: `a0e8940a69c494bef7648949364d6fefe0a7187ef0ab575d41a0a54d280fe399`.
+No selector model has been fitted, and no final images have been opened. Kaggle's
+status endpoint still reported RUNNING after the output and completion log were
+available; the artifacts themselves are complete and hash-verified.
+
+The selector validation notebook is generated from the checked-in Python
+modules, requests one GPU session, and has a 2.5-hour execution cap. GPU is
+used only to produce frozen candidate outputs and evaluation metrics; the
+regularized logistic selector is fitted on the new training partition. Its
+regularization and decision threshold are chosen only from the 256 validation
+targets under the predeclared gates. No final-partition photos are staged.

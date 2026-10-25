@@ -1,0 +1,16 @@
+{
+  "id": "adides567/colorcheck-tst100k-selector-validation",
+  "title": "ColorCheck TST100K Selector Validation",
+  "code_file": "colorcheck-selector-validation.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "adides567/colorcheck-tst100k-expanded-validation",
+    "adides567/colorcheck-tst100k-selector-preflight"
+  ]
+}
