@@ -17,12 +17,12 @@ are estimates rather than billing records. The user's October 23 estimate of
 | V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`            |            7 min | Passed: sealed 256-target holdout; 59/160 validation targets meet the strong-edit definition. |
 | V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
 | Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`     |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                   |
-| Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |          pending | Frozen v3 and statistics candidates on 1024/256 new scenes; final photos remain sealed.       |
+| Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                       |
 
-Conservative spend against the stated 20-hour baseline: **about 136 minutes**
-for the second and third expanded attempts plus v4, leaving about 17 hours
-44 minutes before the two-hour reserve. The pilot and first attempt may have
-already been
+Conservative spend against the stated 20-hour baseline: **about 185 minutes**
+for the second and third expanded attempts, v4, and selector validation.
+That leaves about 16 hours 55 minutes total, or 14 hours 55 minutes spendable
+after preserving a two-hour reserve. The pilot and first attempt may have already been
 reflected in the user's remaining-hours estimate; count them again if Kaggle's
 own usage page shows otherwise. These are wall-clock estimates, not billed GPU
 hours; the v4 kernel metadata requested GPU but its output log did not name the
@@ -126,3 +126,18 @@ used only to produce frozen candidate outputs and evaluation metrics; the
 regularized logistic selector is fitted on the new training partition. Its
 regularization and decision threshold are chosen only from the 256 validation
 targets under the predeclared gates. No final-partition photos are staged.
+
+The private selector validation run completed on October 25. Kaggle's execution
+log ends at about 2,949 seconds (49 minutes), including paced staging of 3,834
+files (2.60 GB); it used a Tesla T4. The model used 968 non-tied training labels
+and 241 non-tied validation labels. Validation log loss chose `C=0.1`; the
+predeclared threshold search selected `0.60`. On all 256 validation targets,
+the selected output beat the unchanged statistics matcher by **1.963 mean
+Delta E 2000** (paired 95% bootstrap interval **1.403 to 2.578**). It was no
+more than 0.5 Delta E worse on **91.4%** of targets; 5.5% had a loss greater
+than 2.0 Delta E. It chose the LUT for 40.6% of targets, retained a positive
+correct-reference advantage of 2.993 Delta E, improved mean SSIM from 0.8853
+to 0.9124, and reduced mean clipping from 13.87% to 9.09%. All six validation
+gates passed. The selector coefficient file has 33 features and is marked
+research-only. This is a **validation candidate**, not independent final
+evidence or a deployment decision. The 256 final images remain unopened.
