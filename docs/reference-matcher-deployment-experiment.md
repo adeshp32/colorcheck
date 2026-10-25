@@ -43,11 +43,13 @@ the exact feature schema, normalization statistics, coefficient vector, and
 random seed. A linear selector is deliberately small enough to port to plain
 JavaScript and check numerically against Python; no server inference is needed.
 
-Fit coefficients on the selector training partition only. Use validation only
-to choose one of three predeclared regularization strengths (`C` = 0.1, 1,
-10), then calibrate a conservative decision threshold. Select the threshold
-that maximizes validation mean Delta E gain over always using statistics
-matching, subject to all of these validation constraints:
+Fit coefficients on the selector training partition only. Use validation
+binary log loss to choose one of three predeclared regularization strengths
+(`C` = 0.1, 1, 10), breaking ties toward stronger regularization. Then test
+decision thresholds `0.50, 0.55, ..., 0.95` on the same validation partition;
+choose the threshold with the greatest validation mean Delta E gain over
+always using statistics matching, breaking ties toward the higher threshold.
+The chosen threshold must satisfy all of these validation constraints:
 
 1. At least 90% of photos are no more than 0.5 Delta E worse than statistics
    matching; report the full worse-than-2.0 tail as well.
