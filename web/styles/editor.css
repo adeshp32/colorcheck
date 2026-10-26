@@ -901,31 +901,8 @@ select {
 #enhancement-status {
   margin: 8px 0 0;
 }
-.research-enhance {
-  background: color-mix(in srgb, var(--surface) 97%, #18a6a6);
-}
-.featured-model {
-  border-width: 2px;
-  box-shadow: 0 8px 22px color-mix(in srgb, #18a6a6 9%, transparent);
-}
 .quick-enhance {
   margin-top: 10px;
-}
-.research-enhance[data-state="active"] {
-  border-color: #168f8f;
-}
-.research-badge {
-  background: color-mix(in srgb, #18a6a6 14%, var(--surface));
-  color: #6de2de;
-}
-#enhance-v11 {
-  flex: 1;
-  background: #087f7f;
-  border-color: #087f7f;
-  color: #fff;
-}
-#v11-status {
-  margin: 8px 0 0;
 }
 .model-options {
   margin-top: 10px;

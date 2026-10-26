@@ -52,7 +52,7 @@
                 id="start-file"
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f" /></label
-            ><small>JPEG · PNG · WebP · HEIC · camera RAW</small>
+            ><small>JPEG · PNG · WebP · HEIC · RAW</small>
           </div>
           <canvas
             id="preview"
@@ -298,35 +298,27 @@
           </section>
           <section data-section="match">
             <h2>Matcher</h2>
-            <div
-              class="smart-enhance research-enhance featured-model"
-              id="v11-enhance-card"
-              data-state="idle"
-            >
-              <div class="smart-enhance-heading">
-                <div>
-                  <h3>ColorCheck V11</h3>
-                  <span>Your trained reference-conditioned model</span>
-                </div>
-                <span class="model-badge research-badge"
-                  >Featured research</span
-                >
-              </div>
-              <p>
-                Learns a guarded 3D color transform from the target and
-                reference. V11 improved held-out correction metrics; reference
-                discrimination remains experimental.
-              </p>
-              <div class="smart-enhance-actions">
-                <button id="enhance-v11" disabled>
-                  Run V11 reference match
-                </button>
-                <button id="cancel-v11" hidden>Cancel</button>
-              </div>
-              <p class="note" id="v11-status" role="status" aria-live="polite">
-                Add a target and reference to run V11.
-              </p>
+            <h3 class="section-label">Reference match</h3>
+            <div id="reference-preview"><span>No reference selected</span></div>
+            <button id="match" disabled>Match reference</button>
+            <div id="match-controls"></div>
+            <div class="commands">
+              <button id="prepare-v11-assist" disabled>
+                Enable V11 assist
+              </button>
+              <button id="cancel-v11-assist" hidden>Cancel</button>
             </div>
+            <p
+              class="note"
+              id="match-assist-status"
+              role="status"
+              aria-live="polite"
+            >
+              Optional research model. The current matcher remains the default.
+            </p>
+            <p class="note" id="match-note">
+              Reference matching is adjustable, not an exact recreation.
+            </p>
             <div
               class="smart-enhance quick-enhance"
               id="smart-enhance"
@@ -364,27 +356,6 @@
                 <button id="clear-model-cache">Clear downloaded models</button>
               </details>
             </div>
-            <h3 class="section-label">Reference match</h3>
-            <div id="reference-preview"><span>No reference selected</span></div>
-            <button id="match" disabled>Match reference</button>
-            <div id="match-controls"></div>
-            <div class="commands">
-              <button id="prepare-v11-assist" disabled>
-                Enable V11 assist
-              </button>
-              <button id="cancel-v11-assist" hidden>Cancel</button>
-            </div>
-            <p
-              class="note"
-              id="match-assist-status"
-              role="status"
-              aria-live="polite"
-            >
-              Optional research model. The current matcher remains the default.
-            </p>
-            <p class="note" id="match-note">
-              Reference matching is adjustable, not an exact recreation.
-            </p>
           </section>
           <section data-section="light" hidden>
             <h2>Light &amp; tone</h2>

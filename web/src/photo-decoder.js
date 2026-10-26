@@ -117,7 +117,7 @@ export async function decodePhotoFile(file) {
   const format = classifyPhoto(file);
   if (format === "unsupported")
     throw new Error(
-      "Choose a JPEG, PNG, WebP, HEIC, HEIF, or supported camera RAW photo.",
+      "Choose a JPEG, PNG, WebP, HEIC, HEIF, or supported RAW photo.",
     );
   const fileLimit = format === "raw" ? 120_000_000 : 50_000_000;
   if (file.size > fileLimit)

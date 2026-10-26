@@ -55,6 +55,17 @@ const { join } = require("node:path");
       requests.push({ method: r.method(), url: r.url() }),
     );
     await page.goto(url);
+    assert.equal(await page.locator("#v11-enhance-card").count(), 0);
+    assert.ok(
+      await page.evaluate(
+        () =>
+          document
+            .querySelector("#match-note")
+            .compareDocumentPosition(document.querySelector("#smart-enhance")) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+      "Quick Enhance should follow reference matching",
+    );
     const bytes = await page.evaluate(() => {
       const c = document.createElement("canvas");
       c.width = 800;
@@ -258,30 +269,6 @@ const { join } = require("node:path");
       browserParity.maximumSampledLutError < 1e-4,
       "Browser ONNX output must match PyTorch gradient fixture",
     );
-    const beforeV11 = await page
-      .locator("#preview")
-      .evaluate((canvas) => canvas.toDataURL());
-    await page.locator("#enhance-v11").click();
-    await page.waitForFunction(
-      () =>
-        document
-          .querySelector("#v11-status")
-          .textContent.includes("V11 active"),
-      null,
-      { timeout: 60000 },
-    );
-    assert.equal(
-      await page.locator("#v11-enhance-card").getAttribute("data-state"),
-      "active",
-    );
-    assert.ok(
-      Number(await page.locator("#slider-enhanceStrength").inputValue()) > 0,
-      "V11 should apply a guarded non-zero suggestion to the fixture",
-    );
-    await page.waitForFunction(
-      (before) => document.querySelector("#preview").toDataURL() !== before,
-      beforeV11,
-    );
     const v11Parity = await page.evaluate(async () => {
       const ort = await import("./vendor/onnxruntime/ort.wasm.min.mjs");
       ort.env.wasm.numThreads = 1;
@@ -370,10 +357,7 @@ const { join } = require("node:path");
       buffer: Buffer.from("invalid"),
     });
     await page.waitForTimeout(200);
-    assert.match(
-      await page.locator("#status").innerText(),
-      /supported camera RAW/,
-    );
+    assert.match(await page.locator("#status").innerText(), /supported RAW/);
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
       await page.locator("[data-panel=color]").click();

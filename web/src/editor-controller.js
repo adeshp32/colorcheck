@@ -82,11 +82,6 @@ function setEnhancementStatus(message, state = "idle") {
   $("#smart-enhance").dataset.state = state;
   $("#smart-enhance").setAttribute("aria-busy", String(state === "working"));
 }
-function setV11Status(message, state = "idle") {
-  $("#v11-status").textContent = message;
-  $("#v11-enhance-card").dataset.state = state;
-  $("#v11-enhance-card").setAttribute("aria-busy", String(state === "working"));
-}
 function summarizeEnhancement() {
   if (!source) {
     setEnhancementStatus("Ready when a photo is open.");
@@ -99,33 +94,15 @@ function summarizeEnhancement() {
       strength = settings.enhanceStrength,
       qualifier = strength === suggested ? "suggested" : "adjusted",
       summary = `${strength}% ${qualifier} strength · ${Math.round(activeEnhancement.inferenceMs)} ms`;
-    if (activeEnhancement.research) {
-      setEnhancementStatus("V11 is the active model for this area.");
-      setV11Status(
-        `V11 active on ${enhancementScopeLabel()} · ${summary}`,
-        "active",
-      );
-    } else {
-      setEnhancementStatus(
-        `Quick Enhance active on ${enhancementScopeLabel()} · ${summary}`,
-        "active",
-      );
-      setV11Status(
-        reference
-          ? "Reference ready. Run V11 to compare its trained result."
-          : "Add a reference to run the trained V11 model.",
-      );
-    }
+    setEnhancementStatus(
+      `Quick Enhance active on ${enhancementScopeLabel()} · ${summary}`,
+      "active",
+    );
   } else {
     setEnhancementStatus(
       usesEnhancement(edits)
         ? "Ready for this area. Smart Enhance is active on another area."
         : "Ready to analyze this photo.",
-    );
-    setV11Status(
-      reference
-        ? "Reference ready. V11 can compare both photos."
-        : "Add a reference to run the trained V11 model.",
     );
   }
 }
@@ -470,18 +447,12 @@ function synchronizeControls() {
   for (const input of [assistControl.slider, assistControl.number])
     input.disabled = !assist || v11Enhancing;
   $("#enhance").disabled = !source || enhancing || v11Enhancing || exporting;
-  $("#enhance-v11").disabled =
-    !source || !reference || enhancing || v11Enhancing || exporting;
   const selectedEnhancement = currentEnhancement(),
     currentEnhancementActive = !!selectedEnhancement;
   $("#enhance").textContent =
     currentEnhancementActive && !selectedEnhancement.research
       ? "Analyze again"
       : "Run Quick Enhance";
-  $("#enhance-v11").textContent =
-    currentEnhancementActive && selectedEnhancement.research
-      ? "Analyze V11 again"
-      : "Run V11 reference match";
   $("#remove-enhance").hidden = !currentEnhancementActive;
   $("#remove-enhance").disabled = enhancing || v11Enhancing || exporting;
   for (const input of [
@@ -550,11 +521,6 @@ async function openTargetPhoto(file) {
     };
     enhancements.clear();
     setEnhancementStatus("Ready to analyze this photo.");
-    setV11Status(
-      reference
-        ? "Reference ready. V11 can now compare both photos."
-        : "Add a reference to run the trained V11 model.",
-    );
     previewPixels = pixels;
     mobileEditor?.resetView();
     interactionPixels = createPreviewPixels(bitmap, 640);
@@ -620,11 +586,6 @@ $("#enhance").onclick = async () => {
     setEnhancementStatus(
       `Quick Enhance active on ${scopeName} · ${result.assessment.recommendedStrength}% suggested strength · ${Math.round(result.inferenceMs)} ms`,
       "active",
-    );
-    setV11Status(
-      reference
-        ? "Reference ready. Run V11 to compare its trained result."
-        : "Add a reference to run the trained V11 model.",
     );
   } catch (error) {
     if (ticket === sourceLoad) setEnhancementStatus(error.message, "error");
@@ -708,7 +669,6 @@ $("#reference").onchange = async (e) => {
         }
       });
     synchronizeControls();
-    setV11Status("Reference ready. V11 can now compare both photos.");
     $("#match-assist-status").textContent =
       "Optional research model. The current matcher remains the default.";
     showStatus("Reference ready.");
@@ -716,52 +676,6 @@ $("#reference").onchange = async (e) => {
     showStatus(error.message);
   }
 };
-$("#enhance-v11").onclick = async () => {
-  if (!source || !reference || v11Enhancing) return;
-  const sourceTicket = sourceLoad,
-    referenceTicket = referenceLoad,
-    scopeId = $("#adjustment-scope").value,
-    scopeName = enhancementScopeLabel(scopeId);
-  v11Enhancing = true;
-  synchronizeControls();
-  $("#cancel-v11").hidden = false;
-  setV11Status("Preparing target and reference…", "working");
-  try {
-    const result = await v11ReferenceClient.analyze(
-      v11PixelsFor(source.bitmap),
-      v11PixelsFor(reference),
-      (message) => setV11Status(message, "working"),
-    );
-    if (sourceTicket !== sourceLoad || referenceTicket !== referenceLoad)
-      return;
-    const targetSettings = settingsForScope(scopeId);
-    if (!targetSettings)
-      throw new Error("The selected mask no longer exists. Run V11 again.");
-    const id = `${result.modelId}:${sourceTicket}:${referenceTicket}:${Date.now()}`;
-    enhancements.set(id, { id, ...result });
-    applyEdit(() => {
-      targetSettings.enhancementId = id;
-      targetSettings.enhanceStrength = result.assessment.recommendedStrength;
-      targetSettings.matchV11Id = null;
-      targetSettings.matchV11Strength = 0;
-    });
-    original = false;
-    $("#compare").setAttribute("aria-pressed", "false");
-    setV11Status(
-      `V11 active on ${scopeName} · ${result.assessment.recommendedStrength}% guarded strength · ${Math.round(result.inferenceMs)} ms`,
-      "active",
-    );
-    setEnhancementStatus("V11 is the active model for this area.");
-  } catch (error) {
-    if (sourceTicket === sourceLoad && referenceTicket === referenceLoad)
-      setV11Status(error.message, "error");
-  } finally {
-    v11Enhancing = false;
-    $("#cancel-v11").hidden = true;
-    synchronizeControls();
-  }
-};
-$("#cancel-v11").onclick = () => v11ReferenceClient.cancel();
 $("#prepare-v11-assist").onclick = async () => {
   if (!source || !reference || !adjustmentSettings().match || v11Enhancing)
     return;
