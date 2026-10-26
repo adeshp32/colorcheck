@@ -22,6 +22,7 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     preview = document.querySelector("#preview"),
     grip = document.querySelector("#panel-grip"),
     showTools = document.querySelector("#show-tools"),
+    restoreTools = document.querySelector("#restore-tools"),
     mobile = matchMedia("(max-width: 760px)");
   let mode = mobile.matches ? "bottom" : "right",
     drag = null,
@@ -99,7 +100,19 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
       );
   }
   document.querySelector("#close-tools").onclick = () => {
-    setTray("closed");
+    if (mobile.matches) {
+      setTray("closed");
+      return;
+    }
+    layout.dataset.toolVisibility = "hidden";
+    restoreTools.hidden = false;
+    fitPreview();
+  };
+  restoreTools.onclick = () => {
+    layout.dataset.toolVisibility = "open";
+    restoreTools.hidden = true;
+    dock("right");
+    document.querySelector("#close-tools").focus();
   };
   showTools.onclick = () => setTray("closed");
 
@@ -115,10 +128,6 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     onPreviewLayout();
   }
   function keepVisible() {
-    if (mode === "right" && !mobile.matches) {
-      panel.style.top = `${Math.max(8, 64 - scrollY)}px`;
-      return;
-    }
     if (mode !== "floating") return;
     const bounds = panel.getBoundingClientRect();
     panel.style.left = `${Math.max(8, Math.min(bounds.left, innerWidth - bounds.width - 8))}px`;
@@ -231,6 +240,8 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   });
   addEventListener("scroll", keepVisible, { passive: true });
   mobile.addEventListener("change", () => {
+    layout.dataset.toolVisibility = "open";
+    restoreTools.hidden = true;
     setTray(mobile.matches ? "closed" : "open");
     dock(mobile.matches ? "bottom" : "right");
     adjustmentAccessibility();

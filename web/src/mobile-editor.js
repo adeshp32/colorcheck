@@ -23,7 +23,8 @@ export function initializeMobileEditor({
     gesture = null,
     lastTap = 0,
     tapTimer = null,
-    sheetDrag = null;
+    sheetDrag = null,
+    photoDismiss = null;
   const pointers = new Map(),
     dock = make("section", "single-adjustment"),
     heading = make("div", "single-adjustment-heading"),
@@ -76,6 +77,7 @@ export function initializeMobileEditor({
     }
     dock.hidden = true;
     dock.dataset.sheetState = "hidden";
+    delete viewer.dataset.toolSwipe;
   }
   function close() {
     restore();
@@ -92,6 +94,8 @@ export function initializeMobileEditor({
     title.textContent = name;
     dock.hidden = false;
     dock.dataset.sheetState = "expanded";
+    if (!maskIsActive() && $("#crop-box").hidden)
+      viewer.dataset.toolSwipe = "true";
     sheetToggle.textContent = "⌄";
     sheetToggle.title = "Collapse adjustment";
     sheetToggle.setAttribute("aria-label", "Collapse adjustment");
@@ -336,6 +340,19 @@ export function initializeMobileEditor({
       if (event.target.closest("button") || !hasPhoto()) return;
       if (maskIsActive()) return;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (
+        media.matches &&
+        active &&
+        zoom === 1 &&
+        $("#crop-box").hidden &&
+        (event.target === preview || event.target === viewer)
+      )
+        photoDismiss = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          used: false,
+        };
       const values = [...pointers.values()];
       if (values.length === 2) {
         viewer.dataset.navigation = "true";
@@ -370,6 +387,25 @@ export function initializeMobileEditor({
     (event) => {
       if (!pointers.has(event.pointerId)) return;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (photoDismiss?.id === event.pointerId && !photoDismiss.used) {
+        const dx = event.clientX - photoDismiss.x,
+          dy = event.clientY - photoDismiss.y;
+        if (!photoDismiss.captured && dy > 12 && dy > Math.abs(dx) * 1.3) {
+          viewer.setPointerCapture(event.pointerId);
+          photoDismiss.captured = true;
+        }
+        if (dy > 75 && dy > Math.abs(dx) * 1.3 && pointers.size === 1) {
+          photoDismiss.used = true;
+          restore();
+          layout.dataset.tray = "hidden";
+          $("#show-tools").hidden = false;
+          document.body.classList.add("image-fullscreen");
+          fullscreen.setAttribute("aria-pressed", "true");
+          onViewChange();
+          event.preventDefault();
+          return;
+        }
+      }
       if (!gesture) return;
       const values = [...pointers.values()];
       if (values.length === 2 && gesture.distance) {
@@ -398,10 +434,13 @@ export function initializeMobileEditor({
   );
   function endPointer(event) {
     const start = pointers.get(event.pointerId);
+    const dismissed = photoDismiss?.id === event.pointerId && photoDismiss.used;
+    if (photoDismiss?.id === event.pointerId) photoDismiss = null;
     pointers.delete(event.pointerId);
     if (
       event.type === "pointerup" &&
       start &&
+      !dismissed &&
       !gesture &&
       event.target === preview
     ) {
@@ -447,6 +486,9 @@ export function initializeMobileEditor({
   });
   function sync() {
     viewControls.hidden = !hasPhoto();
+    if (media.matches && active && !maskIsActive() && $("#crop-box").hidden)
+      viewer.dataset.toolSwipe = "true";
+    else delete viewer.dataset.toolSwipe;
     const scope = $("#adjustment-scope"),
       name = scope.selectedOptions[0]?.text ?? "Whole photo";
     dock.dataset.scope = name;

@@ -6,19 +6,19 @@ Elapsed times below are the last timestamps in Kaggle execution logs, so they
 are estimates rather than billing records. The user's October 23 estimate of
 20 GPU-hours remaining is the budget baseline. Reserve at least two hours.
 
-| Run                                 | Kaggle version                                 | Approximate time | Outcome                                                                                       |
-| ----------------------------------- | ---------------------------------------------- | ---------------: | --------------------------------------------------------------------------------------------- |
-| TST100K pilot                       | `colorcheck-tst100k-reference-pilot/1`         |           11 min | Correct-reference and identity gains passed; current-matcher confidence gate failed.          |
-| Expanded validation, first attempt  | `colorcheck-tst100k-expanded-validation/1`     |            1 min | Stopped before training: only 499 scene-disjoint test pairs available for a request of 512.   |
-| Expanded validation, second attempt | `colorcheck-tst100k-expanded-validation/2`     |           13 min | Stopped before training: upstream image host returned HTTP 429.                               |
-| Expanded validation, paced attempt  | `colorcheck-tst100k-expanded-validation/3`     |           75 min | Completed: 1024/160/320 pairs; all three predeclared color gates passed.                      |
-| Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`           |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.       |
-| Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`        |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.     |
-| V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`            |            7 min | Passed: sealed 256-target holdout; 59/160 validation targets meet the strong-edit definition. |
-| V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
-| Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`     |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                   |
-| Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                       |
-| Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`   |           11 min | Passed all six locked numerical gates on 256 untouched scenes; visual weak cases block promotion. |
+| Run                                 | Kaggle version                                 | Approximate time | Outcome                                                                                           |
+| ----------------------------------- | ---------------------------------------------- | ---------------: | ------------------------------------------------------------------------------------------------- |
+| TST100K pilot                       | `colorcheck-tst100k-reference-pilot/1`         |           11 min | Correct-reference and identity gains passed; current-matcher confidence gate failed.              |
+| Expanded validation, first attempt  | `colorcheck-tst100k-expanded-validation/1`     |            1 min | Stopped before training: only 499 scene-disjoint test pairs available for a request of 512.       |
+| Expanded validation, second attempt | `colorcheck-tst100k-expanded-validation/2`     |           13 min | Stopped before training: upstream image host returned HTTP 429.                                   |
+| Expanded validation, paced attempt  | `colorcheck-tst100k-expanded-validation/3`     |           75 min | Completed: 1024/160/320 pairs; all three predeclared color gates passed.                          |
+| Held-out visual audit (CPU only)    | `colorcheck-tst100k-visual-review/1`           |           15 min | Completed: 12 contact-sheet examples and per-scene comparison for all 320 test targets.           |
+| Fresh-scene audit (CPU only)        | `colorcheck-tst100k-fresh-evaluation/1`        |           19 min | Completed: frozen checkpoint on 160 targets, excluding all prior target/reference scenes.         |
+| V4 protocol preflight (CPU only)    | `colorcheck-tst100k-v4-preflight/1`            |            7 min | Passed: sealed 256-target holdout; 59/160 validation targets meet the strong-edit definition.     |
+| V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                    |
+| Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`      |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                       |
+| Selector validation (GPU-assisted)  | `colorcheck-tst100k-selector-validation/1`     |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                          |
+| Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`    |           11 min | Passed all six locked numerical gates on 256 untouched scenes; visual weak cases block promotion. |
 
 Conservative spend against the stated 20-hour baseline: **about 196 minutes**
 for the second and third expanded attempts, v4, selector validation, and final audit.

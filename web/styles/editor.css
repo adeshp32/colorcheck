@@ -244,6 +244,30 @@ aside {
     top: 64px;
     width: 340px;
   }
+  main[data-tool-visibility="hidden"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  main[data-tool-visibility="hidden"] aside {
+    display: none;
+  }
+  main[data-tool-visibility="hidden"] #restore-tools {
+    display: grid;
+    place-items: center;
+    position: fixed;
+    top: 76px;
+    right: 12px;
+    z-index: 6;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 7px;
+  }
+  #close-tools {
+    display: block;
+    margin-left: 0;
+    font-size: 24px;
+  }
   main[data-dock="bottom"] aside {
     position: fixed;
     left: 0;
@@ -274,6 +298,9 @@ aside {
   display: flex;
   margin-left: auto;
   gap: 2px;
+}
+#restore-tools {
+  display: none;
 }
 .panel-docks [aria-pressed="true"] {
   border-color: var(--accent);
@@ -333,7 +360,7 @@ main[data-dock="floating"] aside {
   gap: 2px;
 }
 #close-tools {
-  display: none;
+  display: block;
 }
 .adjustment-scope {
   padding: 8px 16px;
@@ -516,6 +543,10 @@ main[data-dock="floating"] aside {
   box-shadow: 0 8px 24px #0008;
   backdrop-filter: blur(12px);
 }
+.show-tools[hidden],
+#restore-tools[hidden] {
+  display: none !important;
+}
 .return-adjustment {
   position: absolute;
   bottom: 12px;
@@ -602,6 +633,9 @@ main:fullscreen {
   display: none;
 }
 @media (max-width: 760px) {
+  .viewer[data-tool-swipe="true"] {
+    touch-action: none;
+  }
   main,
   main[data-dock="bottom"],
   main[data-dock="floating"],
@@ -642,18 +676,18 @@ main:fullscreen {
     display: none;
   }
   .single-adjustment-content #curve-preview {
-    width: min(100%, 360px);
-    max-width: 360px;
+    width: min(100%, 320px);
+    max-width: 320px;
     height: auto;
-    aspect-ratio: 3/2;
+    aspect-ratio: 1;
     margin: 0 auto;
   }
   .single-adjustment-content #curve-channels {
-    max-width: 360px;
+    max-width: 320px;
     margin: 8px auto 0;
   }
   .single-adjustment-content #curve-point-options {
-    max-width: 360px;
+    max-width: 320px;
     margin: 6px auto 0;
   }
   .single-adjustment-content > div > .region-button {
@@ -934,6 +968,11 @@ select {
   width: 100%;
   display: block;
   margin-top: 8px;
+}
+#curve-preview {
+  height: auto;
+  aspect-ratio: 1;
+  touch-action: none;
 }
 #histogram {
   background: #17171a;
@@ -1337,6 +1376,9 @@ dialog::backdrop {
 .preview-mode .show-tools {
   display: none !important;
 }
+.preview-mode #restore-tools {
+  display: none !important;
+}
 .preview-mode main,
 .preview-mode .workspace {
   height: 100dvh !important;
@@ -1364,6 +1406,7 @@ dialog::backdrop {
   }
   main[data-tray="hidden"] aside {
     pointer-events: none;
+    visibility: hidden;
     transform: translateY(120%);
   }
   main[data-tray="adjustment"] aside {

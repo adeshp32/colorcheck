@@ -48,12 +48,19 @@ function enhancementIds(settings) {
   return new Set(
     [
       settings?.enhancementId,
+      settings?.matchV11Id,
       ...(settings?.masks ?? []).map((mask) => mask.adjustments.enhancementId),
+      ...(settings?.masks ?? []).map((mask) => mask.adjustments.matchV11Id),
     ].filter(Boolean),
   );
 }
 function usesEnhancement(settings, id = null) {
-  const ids = enhancementIds(settings);
+  const ids = new Set(
+    [
+      settings?.enhancementId,
+      ...(settings?.masks ?? []).map((mask) => mask.adjustments.enhancementId),
+    ].filter(Boolean),
+  );
   return id ? ids.has(id) : ids.size > 0;
 }
 function currentEnhancement(settings = adjustmentSettings()) {
@@ -226,7 +233,7 @@ function createAdjustmentControl(
             ? quality
             : adjustmentSettings()[key];
   const set = (v, interactive = false) => {
-    v = clamp(v, min, max);
+    v = clamp(v, min, key === "matchV11Strength" ? Number(slider.max) : max);
     if (key.startsWith("grade-"))
       adjustmentSettings().grades[range][key.slice(6)] = v;
     else if (key.startsWith("mix-")) {
@@ -241,6 +248,10 @@ function createAdjustmentControl(
     else adjustmentSettings()[key] = v;
     slider.value = get();
     number.value = get();
+    if (key === "matchV11Strength")
+      $("#match-assist-status").textContent = v
+        ? `V11 contributes ${v}% of the matched look.`
+        : "V11 assist is off. The current matcher is unchanged.";
     if (key === "quality") synchronizeControls();
     else renderPreview(interactive);
   };
@@ -312,6 +323,13 @@ createAdjustmentControl(
   "#match-controls",
   "matchTone",
   "Tone strength",
+  0,
+  100,
+);
+createAdjustmentControl(
+  "#match-controls",
+  "matchV11Strength",
+  "V11 assist (experimental)",
   0,
   100,
 );
@@ -421,6 +439,11 @@ function synchronizeControls() {
       "aria-pressed",
       String(button.dataset.colorBand === colorBand),
     );
+  const assist = enhancements.get(adjustmentSettings().matchV11Id);
+  const assistControl = controls.get("matchV11Strength");
+  const assistLimit = assist?.assessment?.recommendedStrength ?? 100;
+  assistControl.slider.max = assistLimit;
+  assistControl.number.max = assistLimit;
   for (const control of controls.values()) {
     control.slider.value = control.get();
     control.number.value = Number(control.get()).toFixed(
@@ -434,6 +457,18 @@ function synchronizeControls() {
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
+  $("#prepare-v11-assist").disabled =
+    !source ||
+    !reference ||
+    !adjustmentSettings().match ||
+    enhancing ||
+    v11Enhancing ||
+    exporting;
+  $("#prepare-v11-assist").textContent = assist
+    ? "Analyze V11 assist again"
+    : "Enable V11 assist";
+  for (const input of [assistControl.slider, assistControl.number])
+    input.disabled = !assist || v11Enhancing;
   $("#enhance").disabled = !source || enhancing || v11Enhancing || exporting;
   $("#enhance-v11").disabled =
     !source || !reference || enhancing || v11Enhancing || exporting;
@@ -475,6 +510,13 @@ function createPreviewPixels(bitmap, max = 1200) {
   const context = canvas.getContext("2d", { willReadFrequently: true });
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+function v11PixelsFor(bitmap) {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 128;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(bitmap, 0, 0, 128, 128);
+  return context.getImageData(0, 0, 128, 128).data;
 }
 let sourceLoad = 0,
   referenceLoad = 0;
@@ -570,6 +612,8 @@ $("#enhance").onclick = async () => {
     applyEdit(() => {
       targetSettings.enhancementId = id;
       targetSettings.enhanceStrength = result.assessment.recommendedStrength;
+      targetSettings.matchV11Id = null;
+      targetSettings.matchV11Strength = 0;
     });
     original = false;
     $("#compare").setAttribute("aria-pressed", "false");
@@ -622,6 +666,7 @@ $("#reference").onchange = async (e) => {
   const file = e.target.files[0];
   e.target.value = "";
   const ticket = ++referenceLoad;
+  v11ReferenceClient.cancel();
   try {
     const bitmap = await decodePhoto(file);
     if (ticket !== referenceLoad) {
@@ -646,7 +691,7 @@ $("#reference").onchange = async (e) => {
       ],
       hasReferenceDerivedEdit = referenceDerivedSettings.some((settings) => {
         const result = enhancements.get(settings.enhancementId);
-        return settings.match || result?.research;
+        return settings.match || settings.matchV11Id || result?.research;
       });
     if (hasReferenceDerivedEdit)
       applyEdit(() => {
@@ -654,6 +699,8 @@ $("#reference").onchange = async (e) => {
           settings.match = null;
           settings.matchColor = 0;
           settings.matchTone = 0;
+          settings.matchV11Id = null;
+          settings.matchV11Strength = 0;
           if (enhancements.get(settings.enhancementId)?.research) {
             settings.enhancementId = null;
             settings.enhanceStrength = 0;
@@ -662,6 +709,8 @@ $("#reference").onchange = async (e) => {
       });
     synchronizeControls();
     setV11Status("Reference ready. V11 can now compare both photos.");
+    $("#match-assist-status").textContent =
+      "Optional research model. The current matcher remains the default.";
     showStatus("Reference ready.");
   } catch (error) {
     showStatus(error.message);
@@ -678,16 +727,9 @@ $("#enhance-v11").onclick = async () => {
   $("#cancel-v11").hidden = false;
   setV11Status("Preparing target and reference…", "working");
   try {
-    const pixelsFor = (bitmap) => {
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = 128;
-      const context = canvas.getContext("2d", { willReadFrequently: true });
-      context.drawImage(bitmap, 0, 0, 128, 128);
-      return context.getImageData(0, 0, 128, 128).data;
-    };
     const result = await v11ReferenceClient.analyze(
-      pixelsFor(source.bitmap),
-      pixelsFor(reference),
+      v11PixelsFor(source.bitmap),
+      v11PixelsFor(reference),
       (message) => setV11Status(message, "working"),
     );
     if (sourceTicket !== sourceLoad || referenceTicket !== referenceLoad)
@@ -700,6 +742,8 @@ $("#enhance-v11").onclick = async () => {
     applyEdit(() => {
       targetSettings.enhancementId = id;
       targetSettings.enhanceStrength = result.assessment.recommendedStrength;
+      targetSettings.matchV11Id = null;
+      targetSettings.matchV11Strength = 0;
     });
     original = false;
     $("#compare").setAttribute("aria-pressed", "false");
@@ -718,6 +762,57 @@ $("#enhance-v11").onclick = async () => {
   }
 };
 $("#cancel-v11").onclick = () => v11ReferenceClient.cancel();
+$("#prepare-v11-assist").onclick = async () => {
+  if (!source || !reference || !adjustmentSettings().match || v11Enhancing)
+    return;
+  const sourceTicket = sourceLoad,
+    referenceTicket = referenceLoad,
+    scopeId = $("#adjustment-scope").value,
+    targetSettings = settingsForScope(scopeId);
+  const existing = enhancements.get(targetSettings.enhancementId);
+  v11Enhancing = true;
+  $("#cancel-v11-assist").hidden = false;
+  $("#match-assist-status").textContent = "Preparing V11 assist locally…";
+  synchronizeControls();
+  try {
+    const result = existing?.research
+      ? existing
+      : await v11ReferenceClient.analyze(
+          v11PixelsFor(source.bitmap),
+          v11PixelsFor(reference),
+          (message) => ($("#match-assist-status").textContent = message),
+        );
+    if (sourceTicket !== sourceLoad || referenceTicket !== referenceLoad)
+      return;
+    if (!settingsForScope(scopeId)?.match) return;
+    const limit = Math.floor(result.assessment.recommendedStrength);
+    if (limit < 1)
+      throw new Error(
+        "V11 did not pass its strength guardrail for this photo.",
+      );
+    const id = existing?.research
+      ? existing.id
+      : `${result.modelId}:${sourceTicket}:${referenceTicket}:${Date.now()}`;
+    enhancements.set(id, { id, ...result });
+    applyEdit(() => {
+      targetSettings.matchV11Id = id;
+      targetSettings.matchV11Strength = Math.min(25, limit);
+      targetSettings.enhancementId = null;
+      targetSettings.enhanceStrength = 0;
+    });
+    $("#match-assist-status").textContent =
+      `V11 assist active. Strength is capped at ${limit}% for this photo.`;
+  } catch (error) {
+    if (sourceTicket === sourceLoad && referenceTicket === referenceLoad)
+      $("#match-assist-status").textContent =
+        `${error.message} The current matcher is unchanged.`;
+  } finally {
+    v11Enhancing = false;
+    $("#cancel-v11-assist").hidden = true;
+    synchronizeControls();
+  }
+};
+$("#cancel-v11-assist").onclick = () => v11ReferenceClient.cancel();
 $("#match").onclick = () => {
   if (!source || !referenceStats) return;
   applyEdit(() => {

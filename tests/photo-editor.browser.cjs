@@ -91,6 +91,52 @@ const { join } = require("node:path");
     await page.locator("#match").click();
     await page.waitForTimeout(200);
     assert.equal(await page.locator("#slider-matchColor").inputValue(), "65");
+    const baselineMatch = await page
+      .locator("#preview")
+      .evaluate((canvas) => canvas.toDataURL());
+    await page.locator("#prepare-v11-assist").click();
+    await page.waitForFunction(
+      () => {
+        const status = document.querySelector(
+          "#match-assist-status",
+        ).textContent;
+        return (
+          status.includes("V11 assist active") ||
+          status.includes("The current matcher is unchanged")
+        );
+      },
+      null,
+      { timeout: 60000 },
+    );
+    assert.match(
+      await page.locator("#match-assist-status").innerText(),
+      /V11 assist active/,
+      "The V11 assist fixture should exercise successful inference",
+    );
+    if (
+      (await page.locator("#match-assist-status").innerText()).includes(
+        "active",
+      )
+    ) {
+      assert.ok(
+        Number(await page.locator("#slider-matchV11Strength").inputValue()) > 0,
+      );
+      await page.locator("#slider-matchV11Strength").evaluate((input) => {
+        input.value = "0";
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+      await page.waitForFunction(
+        (expected) =>
+          document.querySelector("#preview").toDataURL() === expected,
+        baselineMatch,
+      );
+    } else {
+      assert.equal(
+        await page.locator("#slider-matchV11Strength").inputValue(),
+        "0",
+      );
+    }
     await page.locator("[data-panel=light]").click();
     await page.locator("#slider-exposure").evaluate((el) => {
       el.value = "1";
@@ -420,11 +466,16 @@ const { join } = require("node:path");
     await layoutPage.evaluate(() => scrollTo(0, 150));
     await layoutPage.waitForFunction(
       () =>
-        document.querySelector("#editing-tools").getBoundingClientRect().top >=
-          0 &&
-        document.querySelector("#editing-tools").getBoundingClientRect().top <=
-          64,
+        Math.round(
+          document.querySelector("#editing-tools").getBoundingClientRect().top,
+        ) === 64,
     );
+    await layoutPage.locator("#close-tools").click();
+    assert.equal(await layoutPage.locator("#editing-tools").isVisible(), false);
+    assert.equal(await layoutPage.locator("#restore-tools").isVisible(), true);
+    await layoutPage.locator("#restore-tools").click();
+    assert.equal(await layoutPage.locator("#editing-tools").isVisible(), true);
+    assert.equal(await layoutPage.locator("#restore-tools").isVisible(), false);
     await layoutPage.evaluate(() => scrollTo(0, 0));
     await layoutPage.locator("[data-dock-mode=bottom]").click();
     await layoutPage.screenshot({ path: join(artifacts, "bottom-tools.png") });
@@ -808,6 +859,10 @@ const { join } = require("node:path");
     await maskPage.locator("#open-curves").click();
     await maskPage.locator("[data-channel=red]").click();
     const curve = await maskPage.locator("#curve-preview").boundingBox();
+    assert.ok(
+      Math.abs(curve.width - curve.height) < 2,
+      "Mobile curve graph should remain square",
+    );
     await maskPage.mouse.click(
       curve.x + curve.width * 0.5,
       curve.y + curve.height * 0.3,
@@ -990,6 +1045,44 @@ const { join } = require("node:path");
       expectedGrain,
       "Grain PNG export must exactly match full-resolution processing",
     );
+    const grainPhoto = await grainPage.locator("#preview").boundingBox();
+    await grainPage.mouse.move(
+      grainPhoto.x + grainPhoto.width / 2,
+      grainPhoto.y + grainPhoto.height / 3,
+    );
+    await grainPage.mouse.down();
+    await grainPage.mouse.move(
+      grainPhoto.x + grainPhoto.width / 2,
+      grainPhoto.y + grainPhoto.height / 3 + 100,
+      { steps: 6 },
+    );
+    await grainPage.mouse.up();
+    assert.equal(
+      await grainPage.locator("#editor-layout").getAttribute("data-tray"),
+      "hidden",
+      "Swiping down on the photo should tuck away the active mobile tool",
+    );
+    assert.equal(
+      await grainPage
+        .locator("body")
+        .evaluate((body) => body.classList.contains("image-fullscreen")),
+      true,
+    );
+    assert.equal(
+      await grainPage.locator("#slider-grainSize").inputValue(),
+      "2",
+    );
+    assert.equal(await grainPage.locator("#show-tools").isVisible(), true);
+    assert.equal(await grainPage.locator("#editing-tools").isVisible(), false);
+    assert.equal(
+      await grainPage.locator(".single-adjustment").isVisible(),
+      false,
+    );
+    await grainPage.screenshot({
+      path: join(artifacts, "mobile-photo-swipe-fullscreen.png"),
+    });
+    await grainPage.locator("#show-tools").click();
+    assert.equal(await grainPage.locator("#editing-tools").isVisible(), true);
     await grainPage.close();
     assert.deepEqual(errors, []);
     const fallback = await browser.newPage();

@@ -187,13 +187,13 @@
           <button
             data-panel="match"
             aria-selected="true"
-            title="Smart enhancement and reference matching"
+            title="Reference matcher and optional enhancements"
           >
             <img
               class="icon"
               src="./assets/icons/icon-wand-sparkles.svg"
               alt=""
-            /><span>Smart</span></button
+            /><span>Matcher</span></button
           ><button data-panel="light" title="Light and tone">
             <img class="icon" src="./assets/icons/icon-sun.svg" alt="" /><span
               >Light</span
@@ -297,7 +297,7 @@
             </div>
           </section>
           <section data-section="match">
-            <h2>Smart edits</h2>
+            <h2>Matcher</h2>
             <div
               class="smart-enhance research-enhance featured-model"
               id="v11-enhance-card"
@@ -368,6 +368,20 @@
             <div id="reference-preview"><span>No reference selected</span></div>
             <button id="match" disabled>Match reference</button>
             <div id="match-controls"></div>
+            <div class="commands">
+              <button id="prepare-v11-assist" disabled>
+                Enable V11 assist
+              </button>
+              <button id="cancel-v11-assist" hidden>Cancel</button>
+            </div>
+            <p
+              class="note"
+              id="match-assist-status"
+              role="status"
+              aria-live="polite"
+            >
+              Optional research model. The current matcher remains the default.
+            </p>
             <p class="note" id="match-note">
               Reference matching is adjustable, not an exact recreation.
             </p>
@@ -380,8 +394,8 @@
               <h3>Tone curve</h3>
               <canvas
                 id="curve-preview"
-                width="360"
-                height="240"
+                width="320"
+                height="320"
                 aria-label="Tone curve"
                 tabindex="0"
               ></canvas>
@@ -534,6 +548,14 @@
           </section>
         </div>
       </aside>
+      <button
+        id="restore-tools"
+        hidden
+        aria-label="Restore editing tools"
+        title="Restore editing tools"
+      >
+        <img class="icon" src="./assets/icons/icon-panel-right.svg" alt="" />
+      </button>
     </main>
     <section class="product-info" aria-label="About ColorCheck">
       <p>

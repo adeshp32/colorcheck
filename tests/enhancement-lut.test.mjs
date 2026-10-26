@@ -99,6 +99,29 @@ test("model IDs select the correct learned LUT for independent edit scopes", () 
     applyPhotoAdjustments(pixels, 1, 1, cool, transforms).data[0] < 128,
   );
 });
+test("V11 assist blends independent reference-match candidates without stacking them", () => {
+  const pixels = new Uint8ClampedArray([128, 128, 128, 255]);
+  const settings = createDefaultEditSettings();
+  settings.match = {
+    source: [128 / 255, 128 / 255, 128 / 255],
+    reference: [0.6, 0.6, 0.6],
+    gain: [1, 1, 1],
+  };
+  settings.matchColor = 100;
+  settings.matchV11Id = "v11";
+  const luts = { v11: new Float32Array(3 * 33 ** 3).fill(0.75) };
+  const render = () => applyPhotoAdjustments(pixels, 1, 1, settings, luts).data;
+  const fallback = render()[0];
+  settings.matchV11Strength = 50;
+  const halfway = render()[0];
+  settings.matchV11Strength = 100;
+  const learned = render()[0];
+  assert.ok(fallback < halfway && halfway < learned);
+  assert.ok(Math.abs(halfway - (fallback + learned) / 2) <= 1);
+  assert.equal(render()[3], 255);
+  delete luts.v11;
+  assert.equal(render()[0], fallback, "Missing model uses the current matcher");
+});
 test("learned LUT composes with the complete pixel tool stack and local masks", () => {
   const width = 16,
     height = 16,

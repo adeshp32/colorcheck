@@ -123,7 +123,8 @@ export function hasLocalAdjustments(edits) {
     ].some((key) => edits[key] !== 0) ||
     edits.bw ||
     edits.curve !== "linear" ||
-    (edits.match && (edits.matchColor || edits.matchTone)) ||
+    (edits.match &&
+      (edits.matchColor || edits.matchTone || edits.matchV11Strength)) ||
     Object.values(edits.grades).some(
       (grade) => grade.amount && grade.saturation,
     )

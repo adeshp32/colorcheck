@@ -28,6 +28,8 @@ export function createDefaultEditSettings() {
     matchColor: 0,
     matchTone: 0,
     match: null,
+    matchV11Id: null,
+    matchV11Strength: 0,
     rotation: 0,
     flip: false,
     crop: { x: 0, y: 0, w: 100, h: 100 },
@@ -103,6 +105,10 @@ export function applyPhotoAdjustments(
     enhancementLut instanceof Float32Array
       ? enhancementLut
       : (enhancementLut?.[edits.enhancementId] ?? null);
+  const matchV11Lut =
+    enhancementLut instanceof Float32Array
+      ? null
+      : (enhancementLut?.[edits.matchV11Id] ?? null);
   const out = new Uint8ClampedArray(data.length),
     grades = Object.entries(edits.grades)
       .filter(([, g]) => g.amount && g.saturation)
@@ -150,18 +156,29 @@ export function applyPhotoAdjustments(
     }
     if (edits.match) {
       const m = edits.match;
-      r =
+      const matchedR =
         r +
         (m.reference[0] - m.source[0]) * matchColor +
         (r - m.source[0]) * (m.gain[0] - 1) * matchTone;
-      g =
+      const matchedG =
         g +
         (m.reference[1] - m.source[1]) * matchColor +
         (g - m.source[1]) * (m.gain[1] - 1) * matchTone;
-      b =
+      const matchedB =
         b +
         (m.reference[2] - m.source[2]) * matchColor +
         (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
+      if (matchV11Lut && edits.matchV11Strength > 0) {
+        blendEnhancementInto(r, g, b, matchV11Lut, 100, enhanced);
+        const strength = clamp(edits.matchV11Strength / 100);
+        r = matchedR + (enhanced[0] - matchedR) * strength;
+        g = matchedG + (enhanced[1] - matchedG) * strength;
+        b = matchedB + (enhanced[2] - matchedB) * strength;
+      } else {
+        r = matchedR;
+        g = matchedG;
+        b = matchedB;
+      }
     }
     r *= exposure;
     g *= exposure;
