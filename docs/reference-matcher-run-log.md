@@ -18,11 +18,11 @@ are estimates rather than billing records. The user's October 23 estimate of
 | V4 strong-edit training (GPU)       | `colorcheck-tst100k-v4-strong-edit-training/1` |           48 min | Completed; selected epoch 4, but the predeclared strong-edit gain gate failed.                 |
 | Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`     |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                   |
 | Selector validation (GPU-assisted) | `colorcheck-tst100k-selector-validation/1`    |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                       |
-| Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`   |          pending | Started October 25 from `e2e89e2`; frozen selector, one-time 256-scene evaluation.           |
+| Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`   |           11 min | Passed all six locked numerical gates on 256 untouched scenes; visual weak cases block promotion. |
 
-Conservative spend against the stated 20-hour baseline: **about 185 minutes**
-for the second and third expanded attempts, v4, and selector validation.
-That leaves about 16 hours 55 minutes total, or 14 hours 55 minutes spendable
+Conservative spend against the stated 20-hour baseline: **about 196 minutes**
+for the second and third expanded attempts, v4, selector validation, and final audit.
+That leaves about 16 hours 44 minutes total, or 14 hours 44 minutes spendable
 after preserving a two-hour reserve. The pilot and first attempt may have already been
 reflected in the user's remaining-hours estimate; count them again if Kaggle's
 own usage page shows otherwise. These are wall-clock estimates, not billed GPU
@@ -144,3 +144,44 @@ research-only. This is a **validation candidate**, not independent final
 evidence or a deployment decision. The 256 final images remained unopened
 until the separate private final audit was launched on October 25. No result
 from that audit may be used to change the selector, threshold, or checkpoint.
+
+The separate one-time final audit completed on October 25, using a Tesla T4.
+The private execution log ends at about 683 seconds (11 minutes), including
+paced staging of 768 files (506 MB) on Kaggle. The frozen v3 checkpoint,
+selector coefficients, feature schema, and threshold of 0.60 were unchanged.
+The final manifest checksum matched
+`a0e8940a69c494bef7648949364d6fefe0a7187ef0ab575d41a0a54d280fe399`.
+All six predeclared **numerical** gates passed on 256 untouched target scenes:
+
+- Mean Delta E 2000 was **8.765** for the selector, **10.725** for the current
+  statistics matcher, **8.828** for always using v3, and **9.978** for the
+  unchanged photo. Selector gain over statistics was **1.960**, paired 95%
+  bootstrap interval **1.349 to 2.576**. Its additional average gain over
+  always using v3 was only **0.063** Delta E.
+- The correct reference beat a wrong reference by **3.740** Delta E on average
+  (paired interval **3.036 to 4.478**). The LUT was selected on **37.1%** of
+  photos; the rest fell back to statistics matching.
+- **90.6%** of photos were no more than 0.5 Delta E worse than statistics,
+  just above the locked 90% gate. **5.1%** lost more than 2.0 Delta E. Among
+  256 photos, 68 improved versus statistics, 27 worsened, and 161 tied exactly
+  because the selector chose the statistics fallback.
+- Mean SSIM was **0.9133** versus **0.8854** for statistics. Mean clipping was
+  **8.87%** versus **13.92%**. Edge MAE was **0.00890** versus **0.00946**.
+
+The three private contact sheets (four worst, four fixed-random, four best)
+were inspected at 256-pixel review size. The strongest cases avoid visible
+overexposure, heavy casts, or crushed shadows from the statistics candidate.
+The weak sheet exposes a serious tail: scene `02010` is **16.23 Delta E worse**
+than statistics. Its selected LUT stays near the green source while the
+reference/expected look is pink-purple; other weak examples also under-transfer
+the intended look. These are genuine failure cases, not a numerical artifact
+to conceal. The contact sheets are research material, not public dataset copies.
+
+**Decision:** the frozen selector is a credible research candidate with an
+independently replicated mean improvement, but this is **not** a production
+promotion. The small incremental mean gain over always-v3, near-threshold
+nonregression rate, severe individual miss, 128-pixel benchmark, unknown
+full-resolution appearance, missing browser parity and phone benchmarks,
+and dataset-use review remain. Do not tune this selector against the opened
+final partition. Any next model experiment needs a newly declared protocol
+and genuinely new validation/final scenes. The live editor remains unchanged.
