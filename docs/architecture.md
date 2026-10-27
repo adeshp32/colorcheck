@@ -46,7 +46,7 @@ native fullscreen is unavailable). The page itself need not scroll to perform an
 edit. The tool strip stays anchored at the bottom, menus open upward over at most
 40% of the viewport, and only the menu's contents scroll. Holding the eye control
 temporarily reveals the unedited photo without changing edit history.
-The compact LinkedIn footer remains visible below the tool strip outside fullscreen.
+The compact portfolio footer remains visible below the tool strip outside fullscreen.
 When a mask is selected for editing, two-finger gestures resize/rotate its geometry,
 not the image. Radial edge handles and linear endpoints also support one-finger
 dragging. Geometry gestures commit one undo entry. Outside mask editing, pinch

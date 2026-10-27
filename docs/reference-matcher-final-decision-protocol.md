@@ -35,7 +35,7 @@ a substantial intended color or brightness change. V4 already tried
 strong-edit-weighted LUT training and failed its predeclared validation gate;
 do not repeat it. Freeze both candidate image methods. Fit a small linear
 quantile regressor on the existing 33 browser-available features to predict a
-*lower bound* on v3's Delta E advantage over statistics. This makes a severe
+_lower bound_ on v3's Delta E advantage over statistics. This makes a severe
 loss costly in training, instead of treating every winning photo equally as
 the binary logistic selector does. The training target is the expert-scored
 advantage, but neither expert pixels nor expert-derived values enter inference.
@@ -73,7 +73,7 @@ protocol. Require at least 40 strong edits in validation; otherwise stop.
 Only after validation selects one checkpoint and passes all gates, evaluate
 the sealed final partition once with the same gates. Do not change the
 checkpoint, weights, or rules after looking at final results. Passing the
-128-pixel benchmark creates a *review candidate*, not a deployed feature.
+128-pixel benchmark creates a _review candidate_, not a deployed feature.
 Before replacing V11 assist, inspect original-resolution exports with a human
 reviewer; establish Python/ONNX/browser pixel parity and integrity; measure
 phone memory, latency, and failure fallback; and verify dataset-use conditions.

@@ -379,6 +379,11 @@ const { join } = require("node:path");
     layoutPage.on("pageerror", (error) => errors.push(error.message));
     await layoutPage.goto(url);
     assert.equal(await layoutPage.locator(".social-footer a svg").count(), 1);
+    assert.equal(
+      await layoutPage.locator(".social-footer a").getAttribute("href"),
+      "https://adideshpande.dev/",
+    );
+    assert.equal(await layoutPage.locator("#close-tools").isVisible(), false);
     async function assertPreviewFits() {
       await layoutPage.waitForFunction(() => {
         const image = document
@@ -454,10 +459,6 @@ const { join } = require("node:path");
           document.querySelector("#editing-tools").getBoundingClientRect().top,
         ) === 64,
     );
-    await layoutPage.locator("#close-tools").click();
-    assert.equal(await layoutPage.locator("#editing-tools").isVisible(), false);
-    assert.equal(await layoutPage.locator("#restore-tools").isVisible(), true);
-    await layoutPage.locator("#restore-tools").click();
     assert.equal(await layoutPage.locator("#editing-tools").isVisible(), true);
     assert.equal(await layoutPage.locator("#restore-tools").isVisible(), false);
     await layoutPage.evaluate(() => scrollTo(0, 0));

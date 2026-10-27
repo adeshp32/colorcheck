@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 154 40" role="img" aria-labelledby="title description">
   <title id="title">colorcheck.</title>
-  <desc id="description">Lowercase ColorCheck wordmark with a violet-to-ice reverse gradient and a small period.</desc>
+  <desc id="description">Lowercase ColorCheck wordmark with an ice-to-violet gradient and a small period.</desc>
   <defs>
     <linearGradient id="wordmark-gradient" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#3434bd"/>
-      <stop offset="0.52" stop-color="#5c5cff"/>
-      <stop offset="1" stop-color="#aeb4ff"/>
+      <stop offset="0" stop-color="#aeb4ff"/>
+      <stop offset="0.48" stop-color="#5c5cff"/>
+      <stop offset="1" stop-color="#3434bd"/>
     </linearGradient>
     <linearGradient id="period-gradient" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#3f3fce"/>
-      <stop offset="1" stop-color="#8f96ff"/>
+      <stop offset="0" stop-color="#8f96ff"/>
+      <stop offset="1" stop-color="#3f3fce"/>
     </linearGradient>
   </defs>
   <text

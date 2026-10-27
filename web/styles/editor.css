@@ -44,7 +44,6 @@ body {
 .social-footer svg {
   width: 24px;
   height: 24px;
-  fill: currentColor;
 }
 button,
 input,
@@ -263,11 +262,6 @@ aside {
     min-height: 36px;
     padding: 7px;
   }
-  #close-tools {
-    display: block;
-    margin-left: 0;
-    font-size: 24px;
-  }
   main[data-dock="bottom"] aside {
     position: fixed;
     left: 0;
@@ -360,7 +354,7 @@ main[data-dock="floating"] aside {
   gap: 2px;
 }
 #close-tools {
-  display: block;
+  display: none;
 }
 .adjustment-scope {
   padding: 8px 16px;
@@ -1278,7 +1272,7 @@ dialog::backdrop {
   .social-footer a {
     width: 28px;
     height: 26px;
-    color: #0a66c2;
+    color: var(--accent);
   }
   .social-footer svg {
     width: 20px;

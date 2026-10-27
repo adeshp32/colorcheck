@@ -78,7 +78,7 @@ web/                         Deploy this directory as a static website
     render-worker.js         Background-thread processing message boundary
   styles/editor.css          Mobile-first layout and desktop inspector
   assets/icons/              Locally served Lucide icons and license
-  assets/brand/              Original ColorCheck wordmark, unchanged
+  assets/brand/              ColorCheck wordmark
   vendor/heic/               Lazy HEIC decoder and license
   vendor/libraw/             Lazy camera RAW decoder, WASM, and licenses
   _headers                   Cloudflare Pages security headers
