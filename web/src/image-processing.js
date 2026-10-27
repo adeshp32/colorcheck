@@ -2,6 +2,7 @@ import { blendEnhancementInto } from "./enhancement-lut.js";
 import { buildCurveTable, lookupCurve } from "./tone-curves.js";
 import { prepareColorMix, mixColorInto } from "./color-mixer.js";
 import { grainAt } from "./film-grain.js";
+import { buildHistogramMaps } from "./histogram-match.js";
 import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
@@ -27,6 +28,7 @@ export function createDefaultEditSettings() {
     curve: "linear",
     matchColor: 0,
     matchTone: 0,
+    matchDistributionStrength: 0,
     match: null,
     matchV11Id: null,
     matchV11Strength: 0,
@@ -68,6 +70,17 @@ export function calculateReferenceMatch(source, reference) {
     ),
     source: source.mean,
     reference: reference.mean,
+  };
+}
+/** Add a three-channel 256-entry quantile transform to an existing match. */
+export function calculateDistributionMatch(
+  sourcePixels,
+  referencePixels,
+  match,
+) {
+  return {
+    ...match,
+    distributionMaps: buildHistogramMaps(sourcePixels, referencePixels),
   };
 }
 export function hueToRgb(hue) {
@@ -135,6 +148,12 @@ export function applyPhotoAdjustments(
     tintGreen = (edits.tint / 100) * 0.06,
     matchColor = edits.matchColor / 100,
     matchTone = edits.matchTone / 100,
+    matchDistributionStrength = clamp(
+      (edits.matchDistributionStrength || 0) / 100,
+    ),
+    distributionMaps = matchDistributionStrength
+      ? edits.match?.distributionMaps
+      : null,
     enhanced = new Float64Array(3);
   // Scalars avoid allocating multiple RGB arrays and callbacks for every pixel.
   for (let i = 0; i < data.length; i += 4) {
@@ -168,16 +187,37 @@ export function applyPhotoAdjustments(
         b +
         (m.reference[2] - m.source[2]) * matchColor +
         (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
+      const detailR = distributionMaps
+        ? clamp(
+            distributionMaps[0][Math.round(clamp(r) * 255)] / 255 - r,
+            -0.12,
+            0.12,
+          ) * matchDistributionStrength
+        : 0;
+      const detailG = distributionMaps
+        ? clamp(
+            distributionMaps[1][Math.round(clamp(g) * 255)] / 255 - g,
+            -0.12,
+            0.12,
+          ) * matchDistributionStrength
+        : 0;
+      const detailB = distributionMaps
+        ? clamp(
+            distributionMaps[2][Math.round(clamp(b) * 255)] / 255 - b,
+            -0.12,
+            0.12,
+          ) * matchDistributionStrength
+        : 0;
       if (matchV11Lut && edits.matchV11Strength > 0) {
         blendEnhancementInto(r, g, b, matchV11Lut, 100, enhanced);
         const strength = clamp(edits.matchV11Strength / 100);
-        r = matchedR + (enhanced[0] - matchedR) * strength;
-        g = matchedG + (enhanced[1] - matchedG) * strength;
-        b = matchedB + (enhanced[2] - matchedB) * strength;
+        r = matchedR + detailR + (enhanced[0] - matchedR) * strength;
+        g = matchedG + detailG + (enhanced[1] - matchedG) * strength;
+        b = matchedB + detailB + (enhanced[2] - matchedB) * strength;
       } else {
-        r = matchedR;
-        g = matchedG;
-        b = matchedB;
+        r = matchedR + detailR;
+        g = matchedG + detailG;
+        b = matchedB + detailB;
       }
     }
     r *= exposure;

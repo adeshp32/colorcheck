@@ -1,0 +1,9 @@
+# Distribution detail
+
+ColorCheck's Matcher still defaults to its bounded mean-and-spread transfer. The optional **Distribution detail (experimental)** control adds a tonal refinement inspired by the histogram matching (HM) method in [Christopher Hahne's color-matcher](https://github.com/hahnec/color-matcher). It starts at zero, so existing results do not change.
+
+The editor counts visible red, green, and blue values in each image, builds cumulative distributions, and maps each target level to a reference level at the same percentile. Each channel uses a 256-entry lookup table. The mapping is built once from preview-sized pixels; preview and full-resolution export then use the same tables. The contribution is limited to 0.12 in normalized RGB per channel (about 31 of 255 levels) and scaled by the user's control. Transparent pixels do not influence the tables. The existing palette, tone, V11 assist, and manual controls remain available.
+
+This is a browser-native implementation of the method, not a Python dependency or a claim that the full upstream HM-MVGD-HM compound is present. The upstream repository is GPL-3.0; its repository and method are credited here. No source code from that repository was copied into this implementation. Any future direct code import needs its own license and distribution review, including the scope of any permission granted by its author.
+
+Unit tests establish identity behavior, a known nonlinear mapping, bounded opt-in output, and alpha preservation. The browser regression covers upload, matching, editing, and export. **These checks do not establish better photographic quality.** Before changing the default, compare the candidate with the current matcher on a fresh scene-disjoint set, using unchanged images, wrong references, color error, SSIM, clipping, and representative side-by-side review. Keep a human review gate for skin, neutral surfaces, shadow detail, and strong color casts.

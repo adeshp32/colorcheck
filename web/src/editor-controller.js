@@ -2,6 +2,7 @@ import {
   createDefaultEditSettings,
   calculateChannelStatistics,
   calculateReferenceMatch,
+  calculateDistributionMatch,
   clamp,
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
@@ -307,6 +308,13 @@ createAdjustmentControl(
 );
 createAdjustmentControl(
   "#match-controls",
+  "matchDistributionStrength",
+  "Distribution detail (experimental)",
+  0,
+  100,
+);
+createAdjustmentControl(
+  "#match-controls",
   "matchV11Strength",
   "V11 assist (experimental)",
   0,
@@ -492,7 +500,8 @@ function v11PixelsFor(bitmap) {
   return context.getImageData(0, 0, 128, 128).data;
 }
 let sourceLoad = 0,
-  referenceLoad = 0;
+  referenceLoad = 0,
+  referencePixels = null;
 async function openTargetPhoto(file) {
   const ticket = ++sourceLoad;
   enhancementClient.cancel();
@@ -638,6 +647,7 @@ $("#reference").onchange = async (e) => {
     }
     const pixels = createPreviewPixels(bitmap, 500);
     referenceStats = calculateChannelStatistics(pixels.data);
+    referencePixels = pixels.data;
     reference?.close();
     reference = bitmap;
     const canvas = document.createElement("canvas");
@@ -732,9 +742,10 @@ $("#cancel-v11-assist").onclick = () => v11ReferenceClient.cancel();
 $("#match").onclick = () => {
   if (!source || !referenceStats) return;
   applyEdit(() => {
-    adjustmentSettings().match = calculateReferenceMatch(
-      source.stats,
-      referenceStats,
+    adjustmentSettings().match = calculateDistributionMatch(
+      previewPixels.data,
+      referencePixels,
+      calculateReferenceMatch(source.stats, referenceStats),
     );
     adjustmentSettings().matchColor = 65;
     adjustmentSettings().matchTone = 45;

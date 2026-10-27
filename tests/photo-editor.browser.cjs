@@ -123,6 +123,10 @@ const { join } = require("node:path");
     await page.locator("#match").click();
     await page.waitForTimeout(200);
     assert.equal(await page.locator("#slider-matchColor").inputValue(), "65");
+    assert.equal(
+      await page.locator("#slider-matchDistributionStrength").inputValue(),
+      "0",
+    );
     const baselineMatch = await page
       .locator("#preview")
       .evaluate((canvas) => canvas.toDataURL());
