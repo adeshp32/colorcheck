@@ -130,7 +130,7 @@ def _download_one(root: Path, relative: str, max_bytes: int, pacer: RequestPacer
             return size
         except HTTPError as error:
             temporary.unlink(missing_ok=True)
-            if error.code != 429 or attempt == 6:
+            if error.code not in (429, 502, 503, 504) or attempt == 6:
                 raise
             retry_after = error.headers.get("Retry-After")
             try:
@@ -139,7 +139,7 @@ def _download_one(root: Path, relative: str, max_bytes: int, pacer: RequestPacer
                 delay = 0.0
             delay = min(300.0, max(delay, 20.0 * 2**attempt))
             pacer.pause_for(delay)
-            print(f"Rate limited by data host; pausing image requests for {delay:.0f}s", flush=True)
+            print(f"Data host HTTP {error.code}; pausing image requests for {delay:.0f}s", flush=True)
         except (URLError, OSError, ValueError) as error:
             temporary.unlink(missing_ok=True)
             if attempt == 6 or isinstance(error, ValueError):
