@@ -1,4 +1,4 @@
-"""Generate a private CPU-only Kaggle pilot from reviewed repository files."""
+"""Generate a private GPU-assisted Kaggle pilot from reviewed repository files."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ def build() -> dict:
         cell("markdown", "# ColorCheck adaptive deterministic matcher\n\n"
              "Fit palette and tone strengths from TST100K expert edits. The current "
              "browser matcher is the baseline; only preflight training and validation "
-             "images are opened. The final partition stays sealed. This is a CPU pilot, "
+             "images are opened. The final partition stays sealed. This is a GPU-assisted pilot, "
              "not a deployment decision."),
         cell("code", "from pathlib import Path\nimport numpy, sklearn, torch\n"
              "for directory in ('tools', 'tools/ml', 'tools/ml/tst100k'):\n"
@@ -25,6 +25,16 @@ def build() -> dict:
     for name in ("data.py", "prepare_v4.py", "prepare_selector.py", "adaptive_rules_core.py", "train_adaptive_rules.py"):
         source = (ROOT / "tools/ml/tst100k" / name).read_text()
         cells.append(cell("code", f"%%writefile /kaggle/working/tools/ml/tst100k/{name}\n{source}"))
+    cells.append(cell("code", "import numpy as np, torch\n"
+                      "from tools.ml.tst100k.adaptive_rules_core import training_label\n"
+                      "from tools.ml.tst100k.train_adaptive_rules import gpu_training_label\n"
+                      "assert torch.cuda.is_available(), 'Enable a GPU accelerator'\n"
+                      "rng = np.random.default_rng(718)\n"
+                      "for _ in range(4):\n"
+                      "    source, reference, expert = rng.random((3, 3, 16, 16))\n"
+                      "    np.testing.assert_allclose(gpu_training_label(source, reference, expert), "
+                      "training_label(source, reference, expert))\n"
+                      "print('GPU label search matches the NumPy reference')\n"))
     cells.append(cell("code", "import subprocess, sys\n"
                       "subprocess.run([sys.executable, '-m', 'tools.ml.tst100k.train_adaptive_rules'], "
                       "cwd='/kaggle/working', check=True, timeout=5400)\n"))

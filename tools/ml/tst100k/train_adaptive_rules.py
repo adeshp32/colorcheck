@@ -10,11 +10,12 @@ import json
 from pathlib import Path
 
 import numpy as np
+import torch
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 
 from .adaptive_rules_core import (
-    BASELINE, FEATURE_NAMES, clipping, features, gain_interval, match, training_label,
+    BASELINE, FEATURE_NAMES, STRENGTHS, clipping, features, gain_interval, match,
 )
 from .data import DATASET_REVISION, TripletDataset, stage_images
 from .prepare_selector import checksum
@@ -24,6 +25,36 @@ PREFLIGHT = "colorcheck-tst100k-final-decision-preflight"
 EXPECTED_MANIFEST_SHA256 = "b7c4b0a0977c2cdf6d998351d9fcc4a95d5b18eb4070defa6b6ac5637c1fee08"
 COUNTS = {"train": 192, "validation": 64}
 REGULARIZATION = (1.0, 10.0, 100.0)
+
+
+def gpu_training_label(source: np.ndarray, reference: np.ndarray,
+                       expert: np.ndarray) -> np.ndarray:
+    """Score the fixed strength grid in parallel; the expert is never a model input."""
+    device = torch.device("cuda")
+    source_t, reference_t, expert_t = (
+        torch.as_tensor(image, dtype=torch.float32, device=device)
+        for image in (source, reference, expert)
+    )
+    values = torch.tensor(STRENGTHS, device=device)
+    palette, tone = torch.meshgrid(values, values, indexing="ij")
+    strengths = torch.stack((palette.flatten(), tone.flatten()), dim=1)
+    source_mean = source_t.mean((1, 2))[:, None, None]
+    reference_mean = reference_t.mean((1, 2))[:, None, None]
+    gain = (reference_t.std((1, 2), unbiased=False)
+            / source_t.std((1, 2), unbiased=False).clamp_min(0.015)).clamp(0.65, 1.5)
+    proposed = (source_t[None]
+                + (reference_mean - source_mean)[None] * strengths[:, 0, None, None, None]
+                + ((source_t - source_mean) * (gain - 1)[:, None, None])[None]
+                * strengths[:, 1, None, None, None]).clamp(0, 1)
+    error = (proposed - expert_t).abs().mean((1, 2, 3))
+    clipped = ((proposed <= 1 / 255) | (proposed >= 254 / 255)).any(dim=1).float().mean((1, 2))
+    original = ((source_t <= 1 / 255) | (source_t >= 254 / 255)).any(dim=0).float().mean()
+    baseline = torch.as_tensor(BASELINE, device=device)
+    score = error + 0.03 * (clipped - original).clamp_min(0) \
+        + 0.003 * (strengths - baseline).abs().sum(dim=1)
+    return strengths[score.argmin()].cpu().numpy().astype(np.float64)
+
+
 def rows_as_arrays(rows: list[dict], root: Path) -> list[tuple[np.ndarray, ...]]:
     """Small 64-pixel aligned images; never stage the full dataset locally."""
     dataset = TripletDataset(rows, root, 64)
@@ -84,6 +115,9 @@ def score_validation(
 
 
 def main() -> None:
+    if not torch.cuda.is_available():
+        raise RuntimeError("This GPU-assisted pilot requires CUDA")
+    print({"gpu": torch.cuda.get_device_name(0)}, flush=True)
     output = Path("/kaggle/working/colorcheck-adaptive-rules")
     output.mkdir(parents=True, exist_ok=True)
     manifest = json.loads(mounted_file(PREFLIGHT, "splits.json").read_text())
@@ -95,7 +129,7 @@ def main() -> None:
     train = rows_as_arrays(selected["train"], scratch)
     validation = rows_as_arrays(selected["validation"], scratch)
     train_features = np.stack([features(source, reference) for source, reference, _ in train])
-    labels = np.stack([training_label(*images) for images in train])
+    labels = np.stack([gpu_training_label(*images) for images in train])
     scaler = StandardScaler().fit(train_features)
     attempts = []
     for alpha in REGULARIZATION:

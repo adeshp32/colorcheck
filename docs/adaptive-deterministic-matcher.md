@@ -17,7 +17,7 @@ or put an ML runtime or image upload into the browser.
   partition is never staged or read. No previously opened test partition is
   used to choose model settings.
 - For each training pair, search a fixed grid of palette/tone settings against
-  the expert edit at 64 pixels. Favor the current 65%/45% starting point in
+  the expert edit at 64 pixels using a Kaggle GPU. Favor the current 65%/45% starting point in
   ties and mildly penalize added clipping. Fit a standardized two-output Ridge
   regression to 18 source/reference color-statistic features. Select the
   regularization from 1, 10, or 100 by validation mean RGB error only.
