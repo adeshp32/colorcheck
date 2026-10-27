@@ -344,11 +344,25 @@ aside {
   z-index: 5;
 }
 @media (min-width: 761px) {
+  main[data-dock="right"] {
+    height: auto;
+    min-height: calc(100dvh - 64px);
+  }
+  main[data-dock="right"] .workspace {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: calc(100dvh - 64px);
+  }
   main[data-dock="right"] aside {
-    position: fixed;
-    right: 0;
-    top: 64px;
-    width: 340px;
+    position: static;
+    align-self: stretch;
+    height: auto;
+    max-height: none;
+  }
+  main[data-dock="right"] .inspector {
+    flex: none;
+    overflow: visible;
   }
   main[data-tool-visibility="hidden"] {
     grid-template-columns: minmax(0, 1fr);

@@ -481,13 +481,43 @@ const { join } = require("node:path");
       path: join(artifacts, "floating-tools.png"),
     });
     await layoutPage.locator("[data-dock-mode=right]").click();
-    await layoutPage.evaluate(() => scrollTo(0, 150));
-    await layoutPage.waitForFunction(
-      () =>
-        Math.round(
-          document.querySelector("#editing-tools").getBoundingClientRect().top,
-        ) === 64,
+    await layoutPage.locator("[data-panel=color]").click();
+    const dockedScroll = await layoutPage.evaluate(() => {
+      const panel = document.querySelector("#editing-tools");
+      const inspector = document.querySelector("#inspector");
+      return {
+        overflow: getComputedStyle(inspector).overflowY,
+        panelHeight: panel.getBoundingClientRect().height,
+        viewportHeight: innerHeight,
+      };
+    });
+    assert.equal(dockedScroll.overflow, "visible");
+    assert.ok(dockedScroll.panelHeight > dockedScroll.viewportHeight);
+    await layoutPage.locator("#inspector").hover();
+    await layoutPage.mouse.wheel(0, 220);
+    await layoutPage.waitForFunction(() => scrollY >= 150);
+    assert.ok(
+      await layoutPage.evaluate(
+        () =>
+          document.querySelector("#editing-tools").getBoundingClientRect().top <
+          0,
+      ),
+      "Docked tools should move with the page scroll",
     );
+    assert.equal(
+      await layoutPage.locator("#inspector").evaluate((node) => node.scrollTop),
+      0,
+    );
+    assert.ok(
+      await layoutPage.evaluate(
+        () =>
+          document.querySelector(".file-bar").getBoundingClientRect().top < 100,
+      ),
+      "The photo controls should remain visible as the page scrolls",
+    );
+    await layoutPage.screenshot({
+      path: join(artifacts, "docked-page-scroll.png"),
+    });
     assert.equal(await layoutPage.locator("#editing-tools").isVisible(), true);
     assert.equal(await layoutPage.locator("#restore-tools").isVisible(), false);
     await layoutPage.evaluate(() => scrollTo(0, 0));
