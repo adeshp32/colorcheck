@@ -94,6 +94,27 @@ const { join } = require("node:path");
     const original = await page
       .locator("#preview")
       .evaluate((c) => c.toDataURL());
+    await page.locator("#button-theme summary").click();
+    await page.locator('[data-theme-color="#e5cb42"]').click();
+    assert.equal(
+      await page
+        .locator("#export")
+        .evaluate((button) => getComputedStyle(button).backgroundColor),
+      "rgb(229, 203, 66)",
+    );
+    assert.equal(
+      await page.locator("#preview").evaluate((c) => c.toDataURL()),
+      original,
+    );
+    await page.locator("#theme-hex").fill("not a color");
+    await page.locator("#theme-hex").press("Tab");
+    assert.equal(
+      await page.locator("#theme-hex").getAttribute("aria-invalid"),
+      "true",
+    );
+    await page.locator("#theme-reset").click();
+    assert.equal(await page.locator("#theme-color").inputValue(), "#7777ff");
+    await page.locator("#button-theme summary").click();
     await page.locator("#reference").setInputFiles({
       name: "reference.png",
       mimeType: "image/png",
@@ -378,6 +399,14 @@ const { join } = require("node:path");
     });
     layoutPage.on("pageerror", (error) => errors.push(error.message));
     await layoutPage.goto(url);
+    await layoutPage.locator("#button-theme summary").click();
+    await layoutPage.locator("#theme-hex").fill("#38bdb6");
+    await layoutPage.locator("#theme-hex").press("Tab");
+    await layoutPage.reload();
+    assert.equal(
+      await layoutPage.locator("#theme-color").inputValue(),
+      "#38bdb6",
+    );
     assert.equal(await layoutPage.locator(".social-footer a svg").count(), 1);
     assert.equal(
       await layoutPage.locator(".social-footer a").getAttribute("href"),
@@ -469,6 +498,16 @@ const { join } = require("node:path");
     await layoutPage.locator("[data-panel=mask]").click();
     await layoutPage.locator("[data-dock-mode=floating]").click();
     await layoutPage.setViewportSize({ width: 320, height: 568 });
+    await layoutPage.locator("#button-theme summary").click();
+    const themeBox = await layoutPage.locator(".theme-options").boundingBox();
+    assert.ok(themeBox.x >= 0 && themeBox.x + themeBox.width <= 320);
+    assert.ok(
+      await layoutPage.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    );
+    await layoutPage.screenshot({ path: join(artifacts, "mobile-theme.png") });
+    await layoutPage.locator("#button-theme summary").click();
     await assertPreviewFits();
     assert.ok(
       await layoutPage.evaluate(

@@ -16,6 +16,86 @@
           alt="colorcheck." /></a
       ><span class="edition">Photos</span
       ><span class="privacy">On-device editing</span>
+      <details class="button-theme" id="button-theme">
+        <summary title="Button theme">
+          <span class="theme-swatch" aria-hidden="true"></span
+          ><span class="theme-label">Button theme</span>
+        </summary>
+        <div class="theme-options">
+          <label for="theme-color">Button theme</label>
+          <div class="theme-fields">
+            <input
+              id="theme-color"
+              type="color"
+              value="#7777ff"
+              aria-label="Choose button theme color"
+            />
+            <input
+              id="theme-hex"
+              type="text"
+              value="#7777FF"
+              maxlength="7"
+              spellcheck="false"
+              aria-label="Button theme hex color"
+            />
+          </div>
+          <div
+            class="theme-presets"
+            role="group"
+            aria-label="Button theme presets"
+          >
+            <button
+              type="button"
+              data-theme-color="#7777ff"
+              aria-label="Violet"
+              title="Violet"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#eb5a67"
+              aria-label="Coral"
+              title="Coral"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#f49b38"
+              aria-label="Amber"
+              title="Amber"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#e5cb42"
+              aria-label="Yellow"
+              title="Yellow"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#56bd78"
+              aria-label="Green"
+              title="Green"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#38bdb6"
+              aria-label="Teal"
+              title="Teal"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#4e9ee8"
+              aria-label="Blue"
+              title="Blue"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#db75c5"
+              aria-label="Pink"
+              title="Pink"
+            ></button>
+          </div>
+          <button type="button" id="theme-reset">Reset theme</button>
+        </div>
+      </details>
     </header>
     <main id="editor-layout" data-dock="right">
       <section class="workspace" aria-label="Photo workspace">

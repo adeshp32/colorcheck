@@ -13,6 +13,8 @@ import { createCurveEditor } from "./curve-editor.js";
 import { initializeMobileEditor } from "./mobile-editor.js";
 import { COLOR_BANDS } from "./color-mixer.js";
 import { classifyPhoto, decodePhotoFile } from "./photo-decoder.js";
+import { initializeButtonTheme } from "./button-theme.js";
+initializeButtonTheme();
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
   clone = (v) => structuredClone(v);
