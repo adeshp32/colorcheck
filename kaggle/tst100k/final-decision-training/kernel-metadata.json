@@ -1,0 +1,17 @@
+{
+  "id": "adides567/colorcheck-tst100k-final-decision-training",
+  "title": "ColorCheck TST100K Final Decision Training",
+  "code_file": "colorcheck-final-decision-training.ipynb",
+  "language": "python",
+  "kernel_type": "notebook",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": [
+    "adides567/colorcheck-tst100k-expanded-validation",
+    "adides567/colorcheck-tst100k-selector-validation",
+    "adides567/colorcheck-tst100k-final-decision-preflight"
+  ]
+}

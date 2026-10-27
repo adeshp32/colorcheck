@@ -19,6 +19,7 @@ are estimates rather than billing records. The user's October 23 estimate of
 | Selector split preflight (CPU only) | `colorcheck-tst100k-selector-preflight/1`      |           <1 min | Passed: reserved 1024/256/256 new target scenes; no GPU or image downloads.                       |
 | Selector validation (GPU-assisted)  | `colorcheck-tst100k-selector-validation/1`     |           49 min | Passed all six predeclared validation gates; final photos remain sealed.                          |
 | Selector final audit (GPU-assisted) | `colorcheck-tst100k-selector-final-audit/1`    |           11 min | Passed all six locked numerical gates on 256 untouched scenes; visual weak cases block promotion. |
+| Final decision preflight (CPU only) | `colorcheck-tst100k-final-decision-preflight/1` |       <1 min | Passed: 1024/256/256 fresh target scenes; no images staged. |
 
 Conservative spend against the stated 20-hour baseline: **about 196 minutes**
 for the second and third expanded attempts, v4, selector validation, and final audit.
@@ -185,3 +186,15 @@ full-resolution appearance, missing browser parity and phone benchmarks,
 and dataset-use review remain. Do not tune this selector against the opened
 final partition. Any next model experiment needs a newly declared protocol
 and genuinely new validation/final scenes. The live editor remains unchanged.
+
+## Final risk-aware decision experiment
+
+The [locked protocol](reference-matcher-final-decision-protocol.md) tests a
+different routing objective after the earlier V4 strong-edit weighting failed.
+Private CPU preflight version 1 completed on October 26. It excluded 6,203
+earlier target or reference scenes and reserved 1,024 training, 256 validation,
+and 256 final target scenes. Its manifest checksum is
+`b7c4b0a0977c2cdf6d998351d9fcc4a95d5b18eb4070defa6b6ac5637c1fee08`;
+the sealed final checksum is
+`d2793beaa619e406424d231190f7d4eafea1f24f64cf4c63b72ec7cb564269c3`.
+Only JSON manifests were read. No GPU time was used and no photos were staged.

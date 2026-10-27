@@ -22,12 +22,13 @@ def scene_set(rows: list[dict]) -> set[str]:
     return {scene_id(row[key]) for row in rows for key in ("content", "reference")}
 
 
-def select_rows(records: list[dict], excluded: set[str], counts: dict[str, int] = COUNTS) -> dict:
+def select_rows(records: list[dict], excluded: set[str], counts: dict[str, int] = COUNTS,
+                seed: int = SEED) -> dict:
     """Hash-rank eligible rows, keeping all three partitions scene-disjoint."""
     ranked = sorted(
         records,
         key=lambda row: hashlib.sha256(
-            f"{SEED}:{row['content']}:{row['reference']}:{row['gt']}".encode()
+            f"{seed}:{row['content']}:{row['reference']}:{row['gt']}".encode()
         ).digest(),
     )
     partitions = {name: [] for name in counts}

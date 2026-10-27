@@ -84,6 +84,7 @@ def extract_split(model: ReferenceLutModel, rows: list[dict], scratch: Path,
     columns: dict[str, list[np.ndarray]] = {name: [] for name in (
         "features", "wrongFeatures", "lutError", "statsError", "wrongLutError",
         "wrongStatsError", "lutSsim", "statsSsim", "lutClipping", "statsClipping",
+        "strongEdit",
     )}
     model.eval()
     for batch in loader:
@@ -113,6 +114,7 @@ def extract_split(model: ReferenceLutModel, rows: list[dict], scratch: Path,
             ("statsSsim", stats_metrics["ssim"]),
             ("lutClipping", lut_metrics["clippingPercent"]),
             ("statsClipping", stats_metrics["clippingPercent"]),
+            ("strongEdit", (expected - source).abs().mean(dim=(1, 2, 3)) >= 0.08),
         ):
             columns[name].append(value.cpu().numpy())
     return {name: np.concatenate(values) for name, values in columns.items()}
