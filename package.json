@@ -22,7 +22,7 @@
   },
   "devDependencies": {
     "@colorhythm/libraw-wasm": "^1.1.1",
-    "esbuild": "^0.25.12",
+    "esbuild": "^0.28.2",
     "heic-to": "^1.6.6",
     "onnxruntime-web": "1.30.0",
     "playwright": "1.64.0",
