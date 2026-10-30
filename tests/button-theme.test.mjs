@@ -36,5 +36,24 @@ test("every selected color yields readable control text and dark-surface accents
     assert.equal(theme.selected, selected);
     assert.ok(contrast(theme.accent, "#28282e") >= 4.5, selected);
     assert.ok(contrast(theme.accent, theme.ink) >= 4.5, selected);
+    assert.equal(theme.brand.length, 5);
+    assert.ok(
+      theme.brand.every((stop) => normalizeHex(stop)),
+      selected,
+    );
   }
+});
+
+test("wordmark keeps its purple gradient and follows custom button themes", () => {
+  assert.deepEqual(resolveThemeColors("#7777ff").brand, [
+    "#aeb4ff",
+    "#5c5cff",
+    "#3434bd",
+    "#8f96ff",
+    "#3f3fce",
+  ]);
+  assert.notDeepEqual(
+    resolveThemeColors("#56bd78").brand,
+    resolveThemeColors("#eb5a67").brand,
+  );
 });

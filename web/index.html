@@ -5,15 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="color-scheme" content="dark" />
     <title>ColorCheck Photos</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/brand/favicon.svg" />
     <link rel="stylesheet" href="./styles/editor.css" />
     <script type="module" src="./src/editor-controller.js"></script>
   </head>
   <body>
     <header>
       <a class="brand" href="./" aria-label="ColorCheck home"
-        ><img
-          src="./assets/brand/colorcheck-wordmark.svg"
-          alt="colorcheck." /></a
+        ><svg class="brand-wordmark" viewBox="0 0 154 40" aria-hidden="true">
+          <defs>
+            <linearGradient
+              id="brand-wordmark-gradient"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0" class="brand-stop-light" />
+              <stop offset="0.48" class="brand-stop-middle" />
+              <stop offset="1" class="brand-stop-dark" />
+            </linearGradient>
+            <linearGradient
+              id="brand-period-gradient"
+              x1="0"
+              y1="1"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0" class="brand-stop-period-light" />
+              <stop offset="1" class="brand-stop-period-dark" />
+            </linearGradient>
+          </defs>
+          <text
+            x="1"
+            y="29"
+            fill="url(#brand-wordmark-gradient)"
+            font-family="Avenir Next, Inter, Helvetica Neue, Arial, sans-serif"
+            font-size="28"
+            font-weight="700"
+            letter-spacing="0"
+            textLength="137"
+            lengthAdjust="spacingAndGlyphs"
+          >
+            colorcheck
+          </text>
+          <circle
+            cx="147"
+            cy="26.5"
+            r="3.2"
+            fill="url(#brand-period-gradient)"
+          /></svg></a
       ><span class="edition">Photos</span
       ><span class="privacy">On-device editing</span>
       <details class="button-theme" id="button-theme">
@@ -145,6 +186,27 @@
             aria-label="Mask selection: drag to reposition; arrow keys move, Shift plus arrows resize"
             tabindex="0"
           ></canvas>
+          <button
+            id="mask-rotate"
+            class="mask-rotate"
+            hidden
+            type="button"
+            aria-label="Rotate selected mask"
+            title="Rotate selected mask"
+            aria-pressed="false"
+          >
+            <span aria-hidden="true">&#8635;</span>
+          </button>
+          <button
+            id="mask-finish"
+            class="mask-finish"
+            hidden
+            type="button"
+            aria-label="Finish selected mask"
+            title="Finish mask"
+          >
+            <span aria-hidden="true">&#10003;</span>
+          </button>
           <div
             class="crop-box"
             id="crop-box"
@@ -152,7 +214,77 @@
             tabindex="0"
             role="group"
             aria-label="Crop selection"
-          ></div>
+          >
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="nw"
+              aria-label="Resize crop from top left"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="n"
+              aria-label="Resize crop from top"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="ne"
+              aria-label="Resize crop from top right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="e"
+              aria-label="Resize crop from right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="se"
+              aria-label="Resize crop from bottom right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="s"
+              aria-label="Resize crop from bottom"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="sw"
+              aria-label="Resize crop from bottom left"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="w"
+              aria-label="Resize crop from left"
+            ></button>
+          </div>
+          <div
+            id="crop-mode-menu"
+            class="crop-mode-menu"
+            hidden
+            role="group"
+            aria-label="Crop mode"
+          >
+            <button type="button" data-crop-mode="free">Free crop</button>
+            <button type="button" data-crop-mode="height">Height only</button>
+            <button type="button" data-crop-mode="width">Width only</button>
+          </div>
+          <button
+            id="apply-crop"
+            class="apply-crop"
+            hidden
+            type="button"
+            aria-label="Apply crop"
+            title="Apply crop"
+          >
+            <span aria-hidden="true">&#10003;</span>
+          </button>
           <button
             id="compare"
             class="compare-hold"
@@ -198,6 +330,12 @@
       </section>
       <aside id="editing-tools" aria-label="Editing tools">
         <div class="panel-bar">
+          <button
+            id="panel-resize"
+            type="button"
+            aria-label="Resize tool panel"
+            title="Drag to resize tools; arrow keys adjust height"
+          ></button>
           <button
             id="panel-grip"
             title="Detach and move tools; arrow keys move the floating panel"
@@ -348,6 +486,10 @@
                 ><button id="append-linear">+ Linear</button
                 ><button id="remove-component">Remove shape</button>
               </div>
+              <div class="commands">
+                <button id="subtract-radial">- Radial</button>
+                <button id="subtract-linear">- Linear</button>
+              </div>
               <div id="mask-geometry"></div>
               <label
                 >Refine by<select id="mask-refinement">
@@ -385,20 +527,6 @@
             <p class="note">
               Distribution detail is an experimental tonal refinement. It starts
               off and keeps the original matcher intact.
-            </p>
-            <div class="commands">
-              <button id="prepare-v11-assist" disabled>
-                Enable V11 assist
-              </button>
-              <button id="cancel-v11-assist" hidden>Cancel</button>
-            </div>
-            <p
-              class="note"
-              id="match-assist-status"
-              role="status"
-              aria-live="polite"
-            >
-              Optional research model. The current matcher remains the default.
             </p>
             <p class="note" id="match-note">
               Reference matching is adjustable, not an exact recreation.
@@ -540,8 +668,8 @@
               </div>
               <canvas
                 id="wheel"
-                width="220"
-                height="220"
+                width="440"
+                height="440"
                 tabindex="0"
                 role="slider"
                 aria-label="Color grading wheel; arrow keys adjust hue and saturation"

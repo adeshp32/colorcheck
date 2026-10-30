@@ -5,6 +5,11 @@
   background: #0f0f10;
   --accent: #7777ff;
   --accent-ink: #111115;
+  --brand-light: #aeb4ff;
+  --brand-middle: #5c5cff;
+  --brand-dark: #3434bd;
+  --brand-period-light: #8f96ff;
+  --brand-period-dark: #3f3fce;
   --line: #3a3a40;
   --surface: #202025;
   --surface-raised: #28282e;
@@ -96,10 +101,25 @@ header {
   color: var(--accent);
   text-decoration: none;
 }
-.brand img {
+.brand-wordmark {
   display: block;
   width: 154px;
   height: 40px;
+}
+.brand-stop-light {
+  stop-color: var(--brand-light);
+}
+.brand-stop-middle {
+  stop-color: var(--brand-middle);
+}
+.brand-stop-dark {
+  stop-color: var(--brand-dark);
+}
+.brand-stop-period-light {
+  stop-color: var(--brand-period-light);
+}
+.brand-stop-period-dark {
+  stop-color: var(--brand-period-dark);
 }
 .edition {
   font-size: 12px;
@@ -424,6 +444,9 @@ aside {
   cursor: grab;
   touch-action: none;
 }
+#panel-resize {
+  display: none;
+}
 #panel-grip:active {
   cursor: grabbing;
 }
@@ -521,6 +544,38 @@ main[data-dock="floating"] aside {
   cursor: crosshair;
   z-index: 2;
 }
+.mask-rotate,
+.mask-finish,
+.apply-crop {
+  position: absolute;
+  top: 52px;
+  right: 8px;
+  z-index: 5;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
+  background: rgb(30 30 35 / 88%);
+  box-shadow: 0 5px 18px #0006;
+  touch-action: manipulation;
+}
+.mask-finish {
+  top: 100px;
+  font-size: 22px;
+}
+.apply-crop {
+  font-size: 22px;
+}
+.mask-rotate[aria-pressed="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.mask-rotate[hidden],
+.mask-finish[hidden],
+.apply-crop[hidden] {
+  display: none;
+}
 .region-button {
   width: 32px;
   min-height: 32px;
@@ -560,6 +615,24 @@ main[data-dock="floating"] aside {
 .single-adjustment-heading strong {
   flex: 1;
   font-size: 13px;
+  min-width: 0;
+}
+.single-adjustment-heading > button {
+  flex: none;
+  align-self: center;
+  margin: 0;
+}
+.single-adjustment-heading .region-button,
+.single-adjustment-heading .sheet-toggle {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 4px;
+}
+.single-adjustment-heading > button:last-child {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
 .single-adjustment::after {
   content: attr(data-scope);
@@ -671,6 +744,7 @@ main[data-dock="floating"] aside {
 }
 #preview,
 #mask-overlay {
+  top: calc(50% + var(--image-center-y, 0px));
   transform: translate(-50%, -50%)
     translate(var(--view-x, 0px), var(--view-y, 0px)) scale(var(--view-zoom, 1));
   transform-origin: center;
@@ -805,11 +879,6 @@ main:fullscreen {
     max-width: 320px;
     margin: 6px auto 0;
   }
-  .single-adjustment-content > div > .region-button {
-    position: absolute;
-    top: 6px;
-    right: 112px;
-  }
   .single-adjustment-content
     #color-mixer-controls
     .control
@@ -823,9 +892,26 @@ main:fullscreen {
     padding: 4px 0;
   }
   .single-adjustment-content #wheel {
-    width: 160px;
-    height: 160px;
-    margin: 4px auto;
+    width: min(70%, 420px);
+    height: auto;
+    margin: 8px auto 12px;
+  }
+  .single-adjustment-content #ranges button {
+    min-height: 32px;
+    padding: 4px;
+    font-size: 11px;
+  }
+  .single-adjustment-content #grade-controls .control-top {
+    margin-bottom: 4px;
+    font-size: 11px;
+  }
+  .single-adjustment-content #grade-controls .control-top input {
+    width: 54px;
+  }
+  .single-adjustment-content #reset-grade {
+    min-height: 28px;
+    padding: 4px 8px;
+    font-size: 11px;
   }
   .single-adjustment-content #grade-controls {
     display: grid;
@@ -1126,6 +1212,102 @@ select {
       #fff6 66.6%,
       transparent 66.9%
     );
+}
+.crop-handle {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  touch-action: none;
+}
+.crop-handle::after {
+  content: "";
+  position: absolute;
+  inset: 9px;
+  background: #fff;
+  border: 1px solid #242428;
+  box-shadow: 0 1px 5px #0009;
+}
+.crop-handle[data-edge="nw"] {
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+.crop-handle[data-edge="n"] {
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  cursor: ns-resize;
+}
+.crop-handle[data-edge="ne"] {
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+.crop-handle[data-edge="e"] {
+  top: 50%;
+  right: 0;
+  transform: translate(50%, -50%);
+  cursor: ew-resize;
+}
+.crop-handle[data-edge="se"] {
+  bottom: 0;
+  right: 0;
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+.crop-handle[data-edge="s"] {
+  bottom: 0;
+  left: 50%;
+  transform: translate(-50%, 50%);
+  cursor: ns-resize;
+}
+.crop-handle[data-edge="sw"] {
+  bottom: 0;
+  left: 0;
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
+.crop-handle[data-edge="w"] {
+  top: 50%;
+  left: 0;
+  transform: translate(-50%, -50%);
+  cursor: ew-resize;
+}
+.crop-box[data-mode="height"]
+  .crop-handle:not([data-edge="n"]):not([data-edge="s"]),
+.crop-box[data-mode="width"]
+  .crop-handle:not([data-edge="e"]):not([data-edge="w"]) {
+  display: none;
+}
+.crop-mode-menu {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  box-shadow: 0 8px 24px #0009;
+}
+.crop-mode-menu button {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.crop-mode-menu button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.crop-mode-menu[hidden] {
+  display: none;
 }
 [hidden] {
   display: none !important;
@@ -1542,7 +1724,7 @@ dialog::backdrop {
     max-height: min(30dvh, 250px);
   }
   .single-adjustment-heading::before,
-  .panel-bar::before {
+  #panel-resize::before {
     content: "";
     position: absolute;
     top: 5px;
@@ -1557,6 +1739,32 @@ dialog::backdrop {
   .panel-bar {
     position: relative;
     padding-top: 12px;
+  }
+  #panel-resize {
+    display: block;
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    left: 50%;
+    width: 76px;
+    height: 28px;
+    min-height: 28px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    transform: translateX(-50%);
+    cursor: ns-resize;
+    touch-action: none;
+  }
+  #panel-resize::before {
+    top: 7px;
+    width: 40px;
+    height: 5px;
+    background: #a4a5af;
+  }
+  #panel-resize:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
   .image-fullscreen .single-adjustment {
     bottom: 0;

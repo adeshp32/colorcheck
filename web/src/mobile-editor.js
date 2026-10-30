@@ -16,6 +16,8 @@ export function initializeMobileEditor({
     media = matchMedia("(max-width:760px)");
   let active = null,
     marker = null,
+    activeRegion = null,
+    regionMarker = null,
     returnTarget = null,
     zoom = 1,
     panX = 0,
@@ -69,6 +71,10 @@ export function initializeMobileEditor({
   dock.append(heading, content);
   layout.append(dock);
   function restore() {
+    if (activeRegion) {
+      regionMarker.replaceWith(activeRegion);
+      activeRegion = regionMarker = null;
+    }
     if (active) {
       marker.replaceWith(active);
       active.classList.remove("focused-control");
@@ -78,6 +84,7 @@ export function initializeMobileEditor({
     dock.hidden = true;
     dock.dataset.sheetState = "hidden";
     delete viewer.dataset.toolSwipe;
+    viewer.dispatchEvent(new Event("photo-layout-change"));
   }
   function close() {
     restore();
@@ -91,6 +98,12 @@ export function initializeMobileEditor({
     active = node;
     node.classList.add("focused-control");
     content.append(node);
+    activeRegion = node.querySelector(":scope > .region-button");
+    if (activeRegion) {
+      regionMarker = document.createComment("active region control");
+      activeRegion.before(regionMarker);
+      heading.insertBefore(activeRegion, overlayToggle);
+    }
     title.textContent = name;
     dock.hidden = false;
     dock.dataset.sheetState = "expanded";
@@ -102,6 +115,7 @@ export function initializeMobileEditor({
     sheetToggle.setAttribute("aria-expanded", "true");
     layout.dataset.tray = "adjustment";
     sync();
+    viewer.dispatchEvent(new Event("photo-layout-change"));
   }
   back.onclick = () => {
     restore();
@@ -115,6 +129,7 @@ export function initializeMobileEditor({
     sheetToggle.title = expanded ? "Expand adjustment" : "Collapse adjustment";
     sheetToggle.setAttribute("aria-label", sheetToggle.title);
     sheetToggle.setAttribute("aria-expanded", String(!expanded));
+    viewer.dispatchEvent(new Event("photo-layout-change"));
     onViewChange();
   };
   heading.addEventListener("pointerdown", (event) => {
@@ -442,6 +457,7 @@ export function initializeMobileEditor({
       start &&
       !dismissed &&
       !gesture &&
+      $("#crop-box").hidden &&
       event.target === preview
     ) {
       const now = performance.now();

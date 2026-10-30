@@ -9,8 +9,8 @@ Python backend, account, or photo-upload service is required.
 ## What works today
 
 - Independent palette and tone matching strengths.
-- Featured ColorCheck V11 reference-conditioned research model, trained in
-  PyTorch and exported to ONNX for guarded, adjustable browser inference.
+- Reference matcher is the default, with independent palette, tone, and optional
+  histogram-distribution refinement. V11 research controls are not in the editor.
 - Optional Quick Enhance, using an upstream PyTorch model exported to ONNX.
 - Exposure, contrast, highlights, shadows, whites, blacks, and editable master/RGB curves.
 - Eight-range hue, saturation, and lightness mixing, globally or inside masks.
@@ -65,7 +65,7 @@ web/                         Deploy this directory as a static website
     editor-controller.js     Files, edit history, controls, preview, and export
     photo-decoder.js          Native, HEIC, and camera RAW decode routing
     raw-decoder-worker.js     Local LibRaw demosaic and sRGB development
-    v11-reference-worker.js   Verified target/reference V11 ONNX inference
+    live-histogram.js         Live edited-image RGB and luminance histogram
     image-processing.js      Pure pixel transforms and reference statistics
     edit-history.js          Bounded, isolated undo/redo settings snapshots
     masking.js               Source-coordinate mask coverage and range refinement
@@ -104,12 +104,12 @@ why responsibilities are separated, and which trade-offs remain.
 The private [TST100K pilot](docs/reference-matcher-tst100k-pilot.md) tests whether
 direct triplet supervision improves reference use before any new model is shipped.
 
-The normal editor uses browser APIs. V11 and Quick Enhance lazily load locally
+The normal editor uses browser APIs. Optional Quick Enhance lazily loads locally
 served ONNX Runtime Web models; there are no remote
 analytics or photo-upload services. Prettier and Playwright are development tools.
 Icons are from Lucide; licenses accompany all third-party assets.
 
-See [learned enhancement](docs/learned-enhancement.md) for both models' PyTorch
+See [learned enhancement](docs/learned-enhancement.md) for historical models' PyTorch
 provenance, exports, download sizes, numerical checks, and current quality limits.
 The export and validation job also has a separate [Docker workflow](docs/ml-container.md).
 Docker is developer tooling, not a hosting dependency for the editor.

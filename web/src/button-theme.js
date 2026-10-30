@@ -30,6 +30,14 @@ function hexFromChannels(rgb) {
   return `#${rgb.map((value) => Math.round(value).toString(16).padStart(2, "0")).join("")}`;
 }
 
+function blend(first, second, amount) {
+  const a = channels(first);
+  const b = channels(second);
+  return hexFromChannels(
+    a.map((value, index) => value * (1 - amount) + b[index] * amount),
+  );
+}
+
 export function resolveThemeColors(value) {
   const selected = normalizeHex(value) ?? DEFAULT_COLOR;
   const rgb = channels(selected);
@@ -57,6 +65,16 @@ export function resolveThemeColors(value) {
       contrast(accent, darkInk) >= contrast(accent, lightInk)
         ? "#111115"
         : "#ffffff",
+    brand:
+      selected === DEFAULT_COLOR
+        ? ["#aeb4ff", "#5c5cff", "#3434bd", "#8f96ff", "#3f3fce"]
+        : [
+            blend(hexFromChannels(accent), "#ffffff", 0.35),
+            hexFromChannels(accent),
+            blend(hexFromChannels(accent), "#111115", 0.35),
+            blend(hexFromChannels(accent), "#ffffff", 0.22),
+            blend(hexFromChannels(accent), "#111115", 0.3),
+          ],
   };
 }
 
@@ -70,6 +88,13 @@ export function initializeButtonTheme() {
     const theme = resolveThemeColors(value);
     document.documentElement.style.setProperty("--accent", theme.accent);
     document.documentElement.style.setProperty("--accent-ink", theme.ink);
+    ["light", "middle", "dark", "period-light", "period-dark"].forEach(
+      (name, index) =>
+        document.documentElement.style.setProperty(
+          `--brand-${name}`,
+          theme.brand[index],
+        ),
+    );
     picker.value = theme.selected;
     hexField.value = theme.selected.toUpperCase();
     hexField.setAttribute("aria-invalid", "false");

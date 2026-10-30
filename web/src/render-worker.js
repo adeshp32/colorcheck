@@ -8,6 +8,7 @@ self.onmessage = ({ data: m }) => {
       m.height,
       m.edits,
       m.enhancementLut,
+      false,
     );
     self.postMessage({ id: m.id, ...result }, [
       result.data.buffer,

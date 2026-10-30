@@ -7,7 +7,7 @@ import {
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
 import { createEnhancementClient } from "./learned-enhancement.js";
-import { createV11ReferenceClient } from "./v11-reference.js";
+import { histogramFromRgba } from "./live-histogram.js";
 import { initializeWorkspaceLayout } from "./workspace-layout.js";
 import { createMaskControls } from "./mask-controls.js";
 import { createCurveEditor } from "./curve-editor.js";
@@ -33,12 +33,10 @@ let edits = createDefaultEditSettings(),
   exporting = false;
 const editHistory = createEditHistory(edits);
 const enhancementClient = createEnhancementClient();
-const v11ReferenceClient = createV11ReferenceClient();
 let masking, curveEditor, mobileEditor;
 const adjustmentSettings = () => masking?.currentAdjustments() ?? edits;
 const enhancements = new Map();
-let enhancing = false,
-  v11Enhancing = false;
+let enhancing = false;
 let worker,
   requests = new Map(),
   rendering = false,
@@ -51,9 +49,7 @@ function enhancementIds(settings) {
   return new Set(
     [
       settings?.enhancementId,
-      settings?.matchV11Id,
       ...(settings?.masks ?? []).map((mask) => mask.adjustments.enhancementId),
-      ...(settings?.masks ?? []).map((mask) => mask.adjustments.matchV11Id),
     ].filter(Boolean),
   );
 }
@@ -213,7 +209,7 @@ function createAdjustmentControl(
             ? quality
             : adjustmentSettings()[key];
   const set = (v, interactive = false) => {
-    v = clamp(v, min, key === "matchV11Strength" ? Number(slider.max) : max);
+    v = clamp(v, min, max);
     if (key.startsWith("grade-"))
       adjustmentSettings().grades[range][key.slice(6)] = v;
     else if (key.startsWith("mix-")) {
@@ -228,10 +224,6 @@ function createAdjustmentControl(
     else adjustmentSettings()[key] = v;
     slider.value = get();
     number.value = get();
-    if (key === "matchV11Strength")
-      $("#match-assist-status").textContent = v
-        ? `V11 contributes ${v}% of the matched look.`
-        : "V11 assist is off. The current matcher is unchanged.";
     if (key === "quality") synchronizeControls();
     else renderPreview(interactive);
   };
@@ -313,13 +305,6 @@ createAdjustmentControl(
   0,
   100,
 );
-createAdjustmentControl(
-  "#match-controls",
-  "matchV11Strength",
-  "V11 assist (experimental)",
-  0,
-  100,
-);
 for (const [key, label, min, max, step, tip] of [
   [
     "exposure",
@@ -377,7 +362,7 @@ createAdjustmentControl(
   20,
 );
 createAdjustmentControl("#detail-controls", "sharpen", "Sharpen", 0, 100);
-createAdjustmentControl("#detail-controls", "vignette", "Vignette", 0, 100);
+createAdjustmentControl("#detail-controls", "vignette", "Vignette", -100, 100);
 createAdjustmentControl("#detail-controls", "grain", "Film grain", 0, 100);
 createAdjustmentControl(
   "#detail-controls",
@@ -426,11 +411,6 @@ function synchronizeControls() {
       "aria-pressed",
       String(button.dataset.colorBand === colorBand),
     );
-  const assist = enhancements.get(adjustmentSettings().matchV11Id);
-  const assistControl = controls.get("matchV11Strength");
-  const assistLimit = assist?.assessment?.recommendedStrength ?? 100;
-  assistControl.slider.max = assistLimit;
-  assistControl.number.max = assistLimit;
   for (const control of controls.values()) {
     control.slider.value = control.get();
     control.number.value = Number(control.get()).toFixed(
@@ -444,19 +424,7 @@ function synchronizeControls() {
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
   $("#match").disabled = !source || !referenceStats;
-  $("#prepare-v11-assist").disabled =
-    !source ||
-    !reference ||
-    !adjustmentSettings().match ||
-    enhancing ||
-    v11Enhancing ||
-    exporting;
-  $("#prepare-v11-assist").textContent = assist
-    ? "Analyze V11 assist again"
-    : "Enable V11 assist";
-  for (const input of [assistControl.slider, assistControl.number])
-    input.disabled = !assist || v11Enhancing;
-  $("#enhance").disabled = !source || enhancing || v11Enhancing || exporting;
+  $("#enhance").disabled = !source || enhancing || exporting;
   const selectedEnhancement = currentEnhancement(),
     currentEnhancementActive = !!selectedEnhancement;
   $("#enhance").textContent =
@@ -464,7 +432,7 @@ function synchronizeControls() {
       ? "Analyze again"
       : "Run Quick Enhance";
   $("#remove-enhance").hidden = !currentEnhancementActive;
-  $("#remove-enhance").disabled = enhancing || v11Enhancing || exporting;
+  $("#remove-enhance").disabled = enhancing || exporting;
   for (const input of [
     controls.get("enhanceStrength").slider,
     controls.get("enhanceStrength").number,
@@ -492,20 +460,12 @@ function createPreviewPixels(bitmap, max = 1200) {
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   return context.getImageData(0, 0, canvas.width, canvas.height);
 }
-function v11PixelsFor(bitmap) {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 128;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  context.drawImage(bitmap, 0, 0, 128, 128);
-  return context.getImageData(0, 0, 128, 128).data;
-}
 let sourceLoad = 0,
   referenceLoad = 0,
   referencePixels = null;
 async function openTargetPhoto(file) {
   const ticket = ++sourceLoad;
   enhancementClient.cancel();
-  v11ReferenceClient.cancel();
   try {
     const format = classifyPhoto(file);
     showStatus(
@@ -536,6 +496,7 @@ async function openTargetPhoto(file) {
     mobileEditor?.resetView();
     interactionPixels = createPreviewPixels(bitmap, 640);
     edits = createDefaultEditSettings();
+    setCropMode("free");
     editHistory.reset(edits);
     $("#empty").hidden = true;
     preview.hidden = false;
@@ -620,7 +581,6 @@ $("#remove-enhance").onclick = () => {
 $("#clear-model-cache").onclick = async () => {
   try {
     await enhancementClient.clearCache();
-    await v11ReferenceClient.clearCache();
     setEnhancementStatus(
       "Downloaded model removed. Current edits are unchanged.",
       usesEnhancement(edits) ? "active" : "idle",
@@ -638,7 +598,6 @@ $("#reference").onchange = async (e) => {
   const file = e.target.files[0];
   e.target.value = "";
   const ticket = ++referenceLoad;
-  v11ReferenceClient.cancel();
   try {
     const bitmap = await decodePhoto(file);
     if (ticket !== referenceLoad) {
@@ -681,64 +640,11 @@ $("#reference").onchange = async (e) => {
         }
       });
     synchronizeControls();
-    $("#match-assist-status").textContent =
-      "Optional research model. The current matcher remains the default.";
     showStatus("Reference ready.");
   } catch (error) {
     showStatus(error.message);
   }
 };
-$("#prepare-v11-assist").onclick = async () => {
-  if (!source || !reference || !adjustmentSettings().match || v11Enhancing)
-    return;
-  const sourceTicket = sourceLoad,
-    referenceTicket = referenceLoad,
-    scopeId = $("#adjustment-scope").value,
-    targetSettings = settingsForScope(scopeId);
-  const existing = enhancements.get(targetSettings.enhancementId);
-  v11Enhancing = true;
-  $("#cancel-v11-assist").hidden = false;
-  $("#match-assist-status").textContent = "Preparing V11 assist locally…";
-  synchronizeControls();
-  try {
-    const result = existing?.research
-      ? existing
-      : await v11ReferenceClient.analyze(
-          v11PixelsFor(source.bitmap),
-          v11PixelsFor(reference),
-          (message) => ($("#match-assist-status").textContent = message),
-        );
-    if (sourceTicket !== sourceLoad || referenceTicket !== referenceLoad)
-      return;
-    if (!settingsForScope(scopeId)?.match) return;
-    const limit = Math.floor(result.assessment.recommendedStrength);
-    if (limit < 1)
-      throw new Error(
-        "V11 did not pass its strength guardrail for this photo.",
-      );
-    const id = existing?.research
-      ? existing.id
-      : `${result.modelId}:${sourceTicket}:${referenceTicket}:${Date.now()}`;
-    enhancements.set(id, { id, ...result });
-    applyEdit(() => {
-      targetSettings.matchV11Id = id;
-      targetSettings.matchV11Strength = Math.min(25, limit);
-      targetSettings.enhancementId = null;
-      targetSettings.enhanceStrength = 0;
-    });
-    $("#match-assist-status").textContent =
-      `V11 assist active. Strength is capped at ${limit}% for this photo.`;
-  } catch (error) {
-    if (sourceTicket === sourceLoad && referenceTicket === referenceLoad)
-      $("#match-assist-status").textContent =
-        `${error.message} The current matcher is unchanged.`;
-  } finally {
-    v11Enhancing = false;
-    $("#cancel-v11-assist").hidden = true;
-    synchronizeControls();
-  }
-};
-$("#cancel-v11-assist").onclick = () => v11ReferenceClient.cancel();
 $("#match").onclick = () => {
   if (!source || !referenceStats) return;
   applyEdit(() => {
@@ -784,14 +690,61 @@ function drawTransformedPhoto(
   context.drawImage(image, -width / 2, -height / 2, width, height);
   context.restore();
 }
-function drawHistogram(bins) {
+const histogramSample = document.createElement("canvas");
+function drawHistogram() {
   const canvas = $("#histogram"),
     c = canvas.getContext("2d");
   c.clearRect(0, 0, canvas.width, canvas.height);
-  const max = Math.max(...bins, 1);
-  c.fillStyle = "#7777dc";
-  for (let i = 0; i < 64; i++)
-    c.fillRect(i * 4, 72 - (68 * bins[i]) / max, 3, (68 * bins[i]) / max);
+  const longest = Math.max(preview.width, preview.height, 1);
+  histogramSample.width = Math.max(
+    1,
+    Math.round((preview.width / longest) * 256),
+  );
+  histogramSample.height = Math.max(
+    1,
+    Math.round((preview.height / longest) * 256),
+  );
+  const sample = histogramSample.getContext("2d", { willReadFrequently: true });
+  sample.drawImage(
+    preview,
+    0,
+    0,
+    histogramSample.width,
+    histogramSample.height,
+  );
+  const bins = histogramFromRgba(
+    sample.getImageData(0, 0, histogramSample.width, histogramSample.height)
+      .data,
+  );
+  const peak = Math.max(
+    1,
+    ...Object.values(bins).flatMap((values) => [...values]),
+  );
+  c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue(
+    "--accent",
+  );
+  c.globalAlpha = 0.42;
+  for (let i = 0; i < 64; i++) {
+    const height = (68 * bins.luminance[i]) / peak;
+    c.fillRect(i * 4, canvas.height - height, 3, height);
+  }
+  c.globalAlpha = 0.75;
+  for (const [name, color] of [
+    ["red", "#f18488"],
+    ["green", "#75d39c"],
+    ["blue", "#82a7ff"],
+  ]) {
+    c.strokeStyle = color;
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let i = 0; i < 64; i++) {
+      const y = canvas.height - (68 * bins[name][i]) / peak;
+      if (i) c.lineTo(i * 4 + 1, y);
+      else c.moveTo(1, y);
+    }
+    c.stroke();
+  }
+  c.globalAlpha = 1;
 }
 function drawCurve() {
   curveEditor?.draw();
@@ -836,9 +789,9 @@ async function renderPreview(interactive = false) {
       previewPixels.width,
       previewPixels.height,
       settings,
-      panel !== "crop" && panel !== "mask",
+      panel !== "crop",
     );
-    if (result.histogram) drawHistogram(result.histogram);
+    drawHistogram();
     positionCrop();
     masking?.drawOverlay();
   } catch (error) {
@@ -855,6 +808,8 @@ $("#undo").onclick = () => {
   const settings = editHistory.undo();
   if (settings) {
     edits = settings;
+    $("#ratio").value = "free";
+    setCropMode("free");
     renderPreview();
     summarizeEnhancement();
   }
@@ -863,6 +818,8 @@ $("#redo").onclick = () => {
   const settings = editHistory.redo();
   if (settings) {
     edits = settings;
+    $("#ratio").value = "free";
+    setCropMode("free");
     renderPreview();
     summarizeEnhancement();
   }
@@ -871,6 +828,7 @@ $("#reset").onclick = () => {
   applyEdit(() => {
     edits = createDefaultEditSettings();
     $("#ratio").value = "free";
+    setCropMode("free");
   });
   summarizeEnhancement();
 };
@@ -905,8 +863,23 @@ $("#curve").onchange = (e) =>
     adjustmentSettings().curve = e.target.value;
     if (adjustmentSettings().curves) delete adjustmentSettings().curves.master;
   });
+let cropReturnPanel = "match";
+function finishCrop() {
+  if (panel !== "crop" || !source) return;
+  $("#crop-mode-menu").hidden = true;
+  $(`[data-panel="${cropReturnPanel}"]`).click();
+  if (matchMedia("(max-width:760px)").matches) $("#close-tools").click();
+}
+$("#apply-crop").onclick = finishCrop;
 for (const button of document.querySelectorAll("[data-panel]"))
-  button.onclick = () => {
+  button.onclick = (event) => {
+    if (button.dataset.panel === "crop" && panel === "crop") {
+      event.stopImmediatePropagation();
+      finishCrop();
+      return;
+    }
+    if (button.dataset.panel === "crop" && panel !== "crop")
+      cropReturnPanel = panel;
     const cropChanged =
       ["crop", "mask"].includes(panel) ||
       ["crop", "mask"].includes(button.dataset.panel);
@@ -915,6 +888,7 @@ for (const button of document.querySelectorAll("[data-panel]"))
       b.setAttribute("aria-selected", String(b === button));
     for (const section of document.querySelectorAll("[data-section]"))
       section.hidden = section.dataset.section !== panel;
+    $("#viewer").dispatchEvent(new Event("photo-layout-change"));
     if (cropChanged) renderPreview();
     else synchronizeControls();
   };
@@ -935,11 +909,20 @@ function drawWheel() {
     c = canvas.getContext("2d"),
     size = 220,
     radius = 96;
+  c.setTransform(canvas.width / size, 0, 0, canvas.height / size, 0, 0);
   c.clearRect(0, 0, size, size);
   if (!wheelBackground) {
     wheelBackground = document.createElement("canvas");
-    wheelBackground.width = wheelBackground.height = size;
+    wheelBackground.width = wheelBackground.height = canvas.width;
     const background = wheelBackground.getContext("2d");
+    background.setTransform(
+      canvas.width / size,
+      0,
+      0,
+      canvas.height / size,
+      0,
+      0,
+    );
     for (let a = 0; a < 360; a++) {
       background.beginPath();
       background.moveTo(110, 110);
@@ -969,7 +952,7 @@ function drawWheel() {
     background.arc(110, 110, radius, 0, Math.PI * 2);
     background.fill();
   }
-  c.drawImage(wheelBackground, 0, 0);
+  c.drawImage(wheelBackground, 0, 0, size, size);
   const g = adjustmentSettings().grades[range],
     a = (g.hue * Math.PI) / 180,
     x = 110 + (Math.cos(a) * radius * g.saturation) / 100,
@@ -1034,7 +1017,9 @@ $("#wheel").onkeydown = (e) => {
       );
   });
 };
-$("#ratio").onchange = (e) =>
+$("#ratio").onchange = (e) => {
+  setCropMode("free");
+  if (e.target.value === "free") return;
   applyEdit(() => {
     if (!source) return;
     const ratio = Number(e.target.value);
@@ -1051,31 +1036,45 @@ $("#ratio").onchange = (e) =>
     c.y = (100 - c.h) / 2;
     boundCrop();
   });
+};
 for (const [id, delta] of [
   ["rotate-left", 270],
   ["rotate-right", 90],
 ])
-  $(`#${id}`).onclick = () =>
+  $(`#${id}`).onclick = () => {
     applyEdit(() => {
       edits.rotation = (edits.rotation + delta) % 360;
-      edits.crop = { x: 0, y: 0, w: 100, h: 100 };
+      const { x, y, w, h } = edits.crop;
+      edits.crop =
+        delta === 90
+          ? { x: 100 - y - h, y: x, w: h, h: w }
+          : { x: y, y: 100 - x - w, w: h, h: w };
       $("#ratio").value = "free";
+      setCropMode("free");
     });
-$("#flip").onclick = () =>
+  };
+$("#flip").onclick = () => {
   applyEdit(() => {
     edits.flip = !edits.flip;
   });
-$("#reset-crop").onclick = () =>
+};
+$("#reset-crop").onclick = () => {
   applyEdit(() => {
     edits.crop = { x: 0, y: 0, w: 100, h: 100 };
     edits.rotation = 0;
     edits.flip = false;
     $("#ratio").value = "free";
+    setCropMode("free");
   });
+};
 function positionCrop() {
   const box = $("#crop-box");
   box.hidden = panel !== "crop" || !source;
-  if (box.hidden) return;
+  $("#apply-crop").hidden = box.hidden;
+  if (box.hidden) {
+    $("#crop-mode-menu").hidden = true;
+    return;
+  }
   const image = preview.getBoundingClientRect(),
     viewer = $("#viewer").getBoundingClientRect(),
     c = edits.crop;
@@ -1084,33 +1083,110 @@ function positionCrop() {
   box.style.width = `${(c.w / 100) * image.width}px`;
   box.style.height = `${(c.h / 100) * image.height}px`;
 }
+let cropMode = "free";
+function setCropMode(mode) {
+  cropMode = mode;
+  $("#crop-box").dataset.mode = mode;
+  for (const button of document.querySelectorAll("[data-crop-mode]"))
+    button.setAttribute(
+      "aria-pressed",
+      String(button.dataset.cropMode === mode),
+    );
+  $("#crop-mode-menu").hidden = true;
+}
+function showCropModes(clientX, clientY) {
+  const menu = $("#crop-mode-menu");
+  menu.hidden = false;
+  const viewer = $("#viewer").getBoundingClientRect();
+  menu.style.left = `${clamp(clientX - viewer.left - menu.offsetWidth / 2, 8, Math.max(8, viewer.width - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${clamp(clientY - viewer.top + 12, 8, Math.max(8, viewer.height - menu.offsetHeight - 8))}px`;
+}
+for (const button of document.querySelectorAll("[data-crop-mode]"))
+  button.onclick = () => {
+    const mode = button.dataset.cropMode;
+    setCropMode(mode);
+    $("#ratio").value = "free";
+    if (mode !== "free")
+      applyEdit(() => {
+        if (mode === "height") {
+          edits.crop.x = 0;
+          edits.crop.w = 100;
+        } else {
+          edits.crop.y = 0;
+          edits.crop.h = 100;
+        }
+      });
+  };
+$("#preview").onclick = (e) => {
+  if (panel === "crop" && source) showCropModes(e.clientX, e.clientY);
+};
+function resizeCrop(original, edge, dx, dy) {
+  let left = original.x,
+    right = original.x + original.w,
+    top = original.y,
+    bottom = original.y + original.h;
+  if (edge.includes("w")) left = clamp(left + dx, 0, right - 1);
+  if (edge.includes("e")) right = clamp(right + dx, left + 1, 100);
+  if (edge.includes("n")) top = clamp(top + dy, 0, bottom - 1);
+  if (edge.includes("s")) bottom = clamp(bottom + dy, top + 1, 100);
+  edits.crop = { x: left, y: top, w: right - left, h: bottom - top };
+}
+function syncCropFields() {
+  for (const key of ["x", "y", "w", "h"]) {
+    const control = controls.get(`crop-${key}`);
+    control.slider.value = edits.crop[key];
+    control.number.value = edits.crop[key].toFixed(2);
+  }
+  positionCrop();
+}
 let cropDrag = null;
 $("#crop-box").onpointerdown = (e) => {
+  if (e.button !== 0 && e.pointerType !== "touch") return;
+  e.preventDefault();
+  $("#crop-mode-menu").hidden = true;
   cropDrag = {
     x: e.clientX,
     y: e.clientY,
     c: clone(edits.crop),
     rect: preview.getBoundingClientRect(),
+    edge: e.target.dataset.edge || "move",
+    moved: false,
   };
   e.currentTarget.setPointerCapture(e.pointerId);
 };
 $("#crop-box").onpointermove = (e) => {
   if (!cropDrag) return;
-  edits.crop.x =
-    cropDrag.c.x + ((e.clientX - cropDrag.x) / cropDrag.rect.width) * 100;
-  edits.crop.y =
-    cropDrag.c.y + ((e.clientY - cropDrag.y) / cropDrag.rect.height) * 100;
+  if (
+    Math.hypot(e.clientX - cropDrag.x, e.clientY - cropDrag.y) < 3 &&
+    !cropDrag.moved
+  )
+    return;
+  cropDrag.moved = true;
+  const dx = ((e.clientX - cropDrag.x) / cropDrag.rect.width) * 100;
+  const dy = ((e.clientY - cropDrag.y) / cropDrag.rect.height) * 100;
+  if (cropDrag.edge === "move") {
+    edits.crop.x = cropDrag.c.x + (cropMode === "height" ? 0 : dx);
+    edits.crop.y = cropDrag.c.y + (cropMode === "width" ? 0 : dy);
+  } else resizeCrop(cropDrag.c, cropDrag.edge, dx, dy);
   boundCrop();
-  synchronizeControls();
+  $("#ratio").value = "free";
+  syncCropFields();
 };
-for (const event of ["pointerup", "pointercancel"])
-  $("#crop-box").addEventListener(event, () => {
-    if (cropDrag) {
-      cropDrag = null;
-      commitEditHistory();
-      renderPreview();
-    }
-  });
+$("#crop-box").onpointerup = (e) => {
+  if (!cropDrag) return;
+  const moved = cropDrag.moved;
+  cropDrag = null;
+  if (moved) {
+    commitEditHistory();
+    renderPreview();
+  } else showCropModes(e.clientX, e.clientY);
+};
+$("#crop-box").onpointercancel = () => {
+  if (!cropDrag) return;
+  edits.crop = cropDrag.c;
+  cropDrag = null;
+  syncCropFields();
+};
 $("#crop-box").onkeydown = (e) => {
   const move = {
     ArrowLeft: [-1, 0],
@@ -1121,9 +1197,20 @@ $("#crop-box").onkeydown = (e) => {
   if (!move) return;
   e.preventDefault();
   applyEdit(() => {
-    edits.crop.x += move[0] * (e.shiftKey ? 5 : 1);
-    edits.crop.y += move[1] * (e.shiftKey ? 5 : 1);
+    const step = e.shiftKey ? 5 : 1;
+    if (e.target.dataset.edge)
+      resizeCrop(
+        edits.crop,
+        e.target.dataset.edge,
+        move[0] * step,
+        move[1] * step,
+      );
+    else {
+      edits.crop.x += move[0] * step;
+      edits.crop.y += move[1] * step;
+    }
     boundCrop();
+    $("#ratio").value = "free";
   });
 };
 masking = createMaskControls({

@@ -4,6 +4,7 @@ import {
   sourcePoint,
   prepareMask,
   transformMaskPinch,
+  rotateMaskComponent,
 } from "./masking.js";
 import { createDefaultEditSettings } from "./image-processing.js";
 
@@ -23,6 +24,8 @@ export function createMaskControls({
 }) {
   const $ = (selector) => document.querySelector(selector);
   const overlay = $("#mask-overlay"),
+    rotateControl = $("#mask-rotate"),
+    finishControl = $("#mask-finish"),
     scope = $("#adjustment-scope");
   let overlayKey = "",
     overlayPixels = null;
@@ -31,6 +34,7 @@ export function createMaskControls({
     showOverlay = true,
     drag = null,
     optionKey = "";
+  let rotationEnabled = false;
   const maskPointers = new Map();
   let pinch = null;
   const geometry = [],
@@ -39,6 +43,7 @@ export function createMaskControls({
     (getEdits().masks ?? []).find((mask) => mask.id === selectedId);
   const component = () => selected()?.components[componentIndex];
   const changed = (final = false) => {
+    if (selected()) selected().finished = false;
     if (final) commit();
     render(!final);
   };
@@ -167,6 +172,7 @@ export function createMaskControls({
       id: crypto.randomUUID(),
       name: `Mask ${masks.length + 1}`,
       enabled: true,
+      finished: false,
       invert: false,
       opacity: 1,
       components: [createMaskComponent(type)],
@@ -196,7 +202,26 @@ export function createMaskControls({
       componentIndex = mask.components.length - 1;
       changed(true);
     };
+    $(`#subtract-${type}`).onclick = () => {
+      const mask = selected();
+      if (!mask) return;
+      if (mask.components.length >= 8)
+        return status("Up to eight shapes can be combined in a mask.");
+      mask.components.push(createMaskComponent(type, "subtract"));
+      componentIndex = mask.components.length - 1;
+      changed(true);
+    };
   }
+  finishControl.onclick = () => {
+    const mask = selected();
+    if (!mask) return;
+    mask.finished = true;
+    selectedId = "";
+    componentIndex = 0;
+    commit();
+    synchronize();
+    render();
+  };
   scope.onchange = () => {
     selectedId = scope.value;
     componentIndex = 0;
@@ -273,12 +298,20 @@ export function createMaskControls({
     const masks = getEdits().masks ?? [];
     if (!selected()) selectedId = "";
     const key = JSON.stringify(
-      masks.map((mask) => [mask.id, mask.name, mask.components.length]),
+      masks.map((mask) => [
+        mask.id,
+        mask.name,
+        mask.components.length,
+        mask.finished,
+      ]),
     );
     if (key !== optionKey) {
       scope.replaceChildren(
         new Option("Whole photo", ""),
-        ...masks.map((mask) => new Option(mask.name, mask.id)),
+        ...masks.map(
+          (mask) =>
+            new Option(`${mask.finished ? "✓" : "•"} ${mask.name}`, mask.id),
+        ),
       );
       optionKey = key;
     }
@@ -288,6 +321,8 @@ export function createMaskControls({
     const mask = selected();
     $("#mask-settings").hidden = !mask;
     if (!mask) {
+      rotationEnabled = false;
+      rotateControl.setAttribute("aria-pressed", "false");
       drawOverlay();
       return;
     }
@@ -321,8 +356,10 @@ export function createMaskControls({
   function drawOverlay() {
     const mask = selected(),
       pixels = getPixels();
-    overlay.hidden = !mask || !pixels || isOriginal();
-    const editingGeometry = !["crop", "output"].includes(getPanel());
+    overlay.hidden = !mask || !pixels || isOriginal() || getPanel() !== "mask";
+    const editingGeometry = getPanel() === "mask";
+    rotateControl.hidden = overlay.hidden || !editingGeometry;
+    finishControl.hidden = overlay.hidden || !editingGeometry;
     overlay.style.pointerEvents = editingGeometry ? "auto" : "none";
     overlay.tabIndex = editingGeometry ? 0 : -1;
     if (overlay.hidden) {
@@ -462,7 +499,7 @@ export function createMaskControls({
       display.width,
       display.height,
       getEdits(),
-      getPanel() !== "mask" && getPanel() !== "crop",
+      getPanel() !== "crop",
     );
     overlay.style.width = preview.style.width;
     overlay.style.height = preview.style.height;
@@ -474,16 +511,19 @@ export function createMaskControls({
     ["move", "Move shape"],
     ["draw", "Draw shape"],
     ["resize", "Resize shape"],
-    ["rotate", "Rotate shape"],
   ])
     gesture.add(new Option(label, value));
   $("#mask-geometry").before(gesture);
+  rotateControl.onclick = () => {
+    rotationEnabled = !rotationEnabled;
+    rotateControl.setAttribute("aria-pressed", String(rotationEnabled));
+    overlay.style.cursor = rotationEnabled ? "crosshair" : "move";
+  };
   function point(event) {
     const rect = overlay.getBoundingClientRect(),
       source = getSource();
-    const crop = ["mask", "crop"].includes(getPanel())
-      ? { x: 0, y: 0, w: 100, h: 100 }
-      : getEdits().crop;
+    const crop =
+      getPanel() === "crop" ? { x: 0, y: 0, w: 100, h: 100 } : getEdits().crop;
     return sourcePoint(
       (crop.x + ((event.clientX - rect.left) / rect.width) * crop.w) / 100,
       (crop.y + ((event.clientY - rect.top) / rect.height) * crop.h) / 100,
@@ -514,8 +554,8 @@ export function createMaskControls({
           rect.width) /
           overlay.width <
         22;
-      let mode = gesture.value;
-      if (mode === "move") {
+      let mode = rotationEnabled ? "rotate" : gesture.value;
+      if (mode === "move" && event.pointerType !== "touch") {
         if (shape.type === "linear") {
           if (near(shape.x2, shape.y2)) mode = "end";
           else if (near(shape.x, shape.y)) mode = "start";
@@ -552,9 +592,12 @@ export function createMaskControls({
       event.preventDefault();
       Object.assign(
         component(),
-        transformMaskPinch(pinch.shape, pinch.start, [
-          ...maskPointers.values(),
-        ]),
+        transformMaskPinch(
+          pinch.shape,
+          pinch.start,
+          [...maskPointers.values()],
+          rotationEnabled,
+        ),
       );
       changed();
       return;
@@ -602,7 +645,7 @@ export function createMaskControls({
           ry: Math.max(0.005, Math.min(1.5, old.ry + dy)),
         });
     } else if (drag.mode === "rotate")
-      shape.angle = (Math.atan2(p.y - shape.y, p.x - shape.x) * 180) / Math.PI;
+      Object.assign(shape, rotateMaskComponent(old, drag.start, p));
     else {
       const mx = Math.max(-old.x, Math.min(1 - old.x, dx)),
         my = Math.max(-old.y, Math.min(1 - old.y, dy));

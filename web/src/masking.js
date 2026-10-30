@@ -135,7 +135,12 @@ export function hasLocalAdjustments(edits) {
 }
 
 /** Two-finger source-space transform, independent of photo zoom and screen density. */
-export function transformMaskPinch(shape, start, current) {
+export function transformMaskPinch(
+  shape,
+  start,
+  current,
+  allowRotation = false,
+) {
   const clamp = (v, min = 0, max = 1) => Math.max(min, Math.min(max, v));
   const vector = (points) => ({
     x: points[1].x - points[0].x,
@@ -144,7 +149,7 @@ export function transformMaskPinch(shape, start, current) {
   const a = vector(start),
     b = vector(current);
   const scale = Math.hypot(b.x, b.y) / Math.max(0.0001, Math.hypot(a.x, a.y));
-  const angle = Math.atan2(b.y, b.x) - Math.atan2(a.y, a.x);
+  const angle = allowRotation ? Math.atan2(b.y, b.x) - Math.atan2(a.y, a.x) : 0;
   const dx = (current[0].x + current[1].x - start[0].x - start[1].x) / 2;
   const dy = (current[0].y + current[1].y - start[0].y - start[1].y) / 2;
   if (shape.type === "radial")
@@ -169,4 +174,29 @@ export function transformMaskPinch(shape, start, current) {
     x2: clamp(cx + rx),
     y2: clamp(cy + ry),
   };
+}
+
+/** Rotate around the shape's center only when the explicit rotate control is active. */
+export function rotateMaskComponent(shape, start, current) {
+  const cx = shape.type === "linear" ? (shape.x + shape.x2) / 2 : shape.x;
+  const cy = shape.type === "linear" ? (shape.y + shape.y2) / 2 : shape.y;
+  const delta =
+    Math.atan2(current.y - cy, current.x - cx) -
+    Math.atan2(start.y - cy, start.x - cx);
+  if (shape.type === "radial")
+    return {
+      ...shape,
+      angle: ((shape.angle + (delta * 180) / Math.PI + 540) % 360) - 180,
+    };
+  const rotate = (x, y) => ({
+    x: cx + (x - cx) * Math.cos(delta) - (y - cy) * Math.sin(delta),
+    y: cy + (x - cx) * Math.sin(delta) + (y - cy) * Math.cos(delta),
+  });
+  const first = rotate(shape.x, shape.y);
+  const last = rotate(shape.x2, shape.y2);
+  if (
+    [first.x, first.y, last.x, last.y].some((value) => value < 0 || value > 1)
+  )
+    return shape;
+  return { ...shape, x: first.x, y: first.y, x2: last.x, y2: last.y };
 }

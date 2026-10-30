@@ -21,12 +21,14 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     viewer = document.querySelector("#viewer"),
     preview = document.querySelector("#preview"),
     grip = document.querySelector("#panel-grip"),
+    resizeHandle = document.querySelector("#panel-resize"),
     showTools = document.querySelector("#show-tools"),
     restoreTools = document.querySelector("#restore-tools"),
     mobile = matchMedia("(max-width: 760px)");
   let mode = mobile.matches ? "bottom" : "right",
     drag = null,
-    sheetDrag = null;
+    sheetDrag = null,
+    resizeDrag = null;
   const buttons = [...document.querySelectorAll("[data-dock-mode]")];
   function toggleAdjustment(label) {
     if (!mobile.matches) return;
@@ -74,15 +76,71 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   function setTray(state) {
     layout.dataset.tray = state;
     showTools.hidden = !(mobile.matches && state === "hidden");
+    resizeHandle.setAttribute("aria-expanded", String(state === "open"));
     updateExpanded();
-    onPreviewLayout();
+    fitPreview();
   }
+  function resizeTray(height) {
+    const minimum = Math.min(180, Math.max(120, innerHeight * 0.25));
+    const maximum = Math.max(
+      minimum,
+      Math.min(innerHeight * 0.78, innerHeight - 120),
+    );
+    layout.style.setProperty(
+      "--tray-height",
+      `${Math.round(Math.max(minimum, Math.min(maximum, height)))}px`,
+    );
+    fitPreview();
+  }
+  resizeHandle.addEventListener("pointerdown", (event) => {
+    if (
+      !mobile.matches ||
+      (event.pointerType === "mouse" && event.button !== 0)
+    )
+      return;
+    event.preventDefault();
+    resizeDrag = {
+      id: event.pointerId,
+      y: event.clientY,
+      height: panel.getBoundingClientRect().height,
+      moved: false,
+    };
+    resizeHandle.setPointerCapture(event.pointerId);
+  });
+  resizeHandle.addEventListener("pointermove", (event) => {
+    if (resizeDrag?.id !== event.pointerId) return;
+    const delta = resizeDrag.y - event.clientY;
+    if (Math.abs(delta) < 3 && !resizeDrag.moved) return;
+    resizeDrag.moved = true;
+    if (layout.dataset.tray !== "open") setTray("open");
+    resizeTray(resizeDrag.height + delta);
+  });
+  for (const name of ["pointerup", "pointercancel", "lostpointercapture"])
+    resizeHandle.addEventListener(name, (event) => {
+      if (resizeDrag?.id !== event.pointerId) return;
+      const moved = resizeDrag.moved;
+      resizeDrag = null;
+      if (!moved && name === "pointerup")
+        setTray(layout.dataset.tray === "open" ? "closed" : "open");
+    });
+  resizeHandle.addEventListener("keydown", (event) => {
+    if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+    event.preventDefault();
+    const step = event.shiftKey ? 60 : 20;
+    if (layout.dataset.tray !== "open") setTray("open");
+    resizeTray(
+      panel.getBoundingClientRect().height +
+        (event.key === "ArrowUp" ? step : -step),
+    );
+  });
   setTray(mobile.matches ? "closed" : "open");
   for (const button of document.querySelectorAll("[data-panel]"))
     button.addEventListener("click", () => {
       if (!mobile.matches) return;
       const same = layout.dataset.activeTool === button.dataset.panel;
-      setTray(same && layout.dataset.tray === "open" ? "closed" : "open");
+      if (button.dataset.panel === "crop")
+        setTray(same && layout.dataset.tray === "closed" ? "open" : "closed");
+      else setTray(same && layout.dataset.tray === "open" ? "closed" : "open");
       layout.dataset.activeTool = button.dataset.panel;
     });
   function updateExpanded() {
@@ -117,11 +175,40 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
   showTools.onclick = () => setTray("closed");
 
   function fitPreview() {
+    const mobileView = mobile.matches,
+      cropActive =
+        document
+          .querySelector('[data-panel="crop"]')
+          ?.getAttribute("aria-selected") === "true",
+      topClearance =
+        !document.body.classList.contains("preview-mode") &&
+        (mobileView || cropActive)
+          ? 104
+          : 0;
+    const sheet = document.querySelector(".single-adjustment:not([hidden])");
+    const obstruction = mobileView
+      ? sheet ||
+        (layout.dataset.tray === "open" && layout.dataset.dock !== "floating"
+          ? panel
+          : null)
+      : null;
+    const viewerBounds = viewer.getBoundingClientRect();
+    const coveredHeight = obstruction
+      ? Math.max(
+          0,
+          viewerBounds.bottom -
+            Math.max(viewerBounds.top, obstruction.getBoundingClientRect().top),
+        )
+      : 0;
+    viewer.style.setProperty(
+      "--image-center-y",
+      `${(topClearance - coveredHeight) / 2}px`,
+    );
     const fitted = fitPreviewDimensions(
       preview.width,
       preview.height,
       Math.max(0, viewer.clientWidth - 24),
-      Math.max(0, viewer.clientHeight - 24),
+      Math.max(0, viewer.clientHeight - topClearance - coveredHeight - 24),
     );
     preview.style.width = `${fitted.width}px`;
     preview.style.height = `${fitted.height}px`;
@@ -228,6 +315,8 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
     keepVisible();
   });
   new ResizeObserver(fitPreview).observe(viewer);
+  new ResizeObserver(fitPreview).observe(panel);
+  viewer.addEventListener("photo-layout-change", fitPreview);
   new ResizeObserver(keepVisible).observe(panel);
   // Canvas attributes change when a crop or rotation changes the preview aspect ratio.
   new MutationObserver(fitPreview).observe(preview, {

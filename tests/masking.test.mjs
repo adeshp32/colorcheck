@@ -5,6 +5,7 @@ import {
   maskCoverage,
   sourcePoint,
   transformMaskPinch,
+  rotateMaskComponent,
 } from "../web/src/masking.js";
 import {
   createDefaultEditSettings,
@@ -38,11 +39,31 @@ test("two-finger gestures resize radial masks and linear endpoints without viewp
   assert.ok(
     Math.abs(changed.x2 - changed.x - (linear.x2 - linear.x) * 2) < 1e-10,
   );
-  const rotated = transformMaskPinch(createMaskComponent(), start, [
+  const turned = [
     { x: 0.5, y: 0.3 },
     { x: 0.5, y: 0.7 },
-  ]);
+  ];
+  assert.equal(
+    transformMaskPinch(createMaskComponent(), start, turned).angle,
+    0,
+  );
+  const rotated = transformMaskPinch(
+    createMaskComponent(),
+    start,
+    turned,
+    true,
+  );
   assert.ok(Math.abs(rotated.angle - 90) < 1e-10);
+});
+test("explicit rotate control can turn radial and linear masks", () => {
+  const start = { x: 0.8, y: 0.5 };
+  const end = { x: 0.5, y: 0.8 };
+  const radial = rotateMaskComponent(createMaskComponent(), start, end);
+  assert.ok(Math.abs(radial.angle - 90) < 1e-10);
+  const linear = createMaskComponent("linear");
+  const rotated = rotateMaskComponent(linear, start, end);
+  assert.ok(rotated.x !== linear.x || rotated.y !== linear.y);
+  assert.ok(rotated.x2 !== linear.x2 || rotated.y2 !== linear.y2);
 });
 test("radial feather, outside selection, and opacity have bounded coverage", () => {
   const mask = makeMask();

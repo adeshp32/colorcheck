@@ -131,7 +131,7 @@ export function createCurveEditor({ getSettings, render, commit }) {
     const p = editable(),
       at = position(event);
     let closest = -1,
-      distance = 24;
+      distance = 32;
     p.forEach((point, i) => {
       const d = Math.hypot(
         (point.x - at.x) * graph.width,
@@ -149,9 +149,14 @@ export function createCurveEditor({ getSettings, render, commit }) {
       );
       if (existing >= 0) closest = existing;
       else {
-        p.push(at);
+        const onCurve = sampleCurve(p, at.x);
+        const added = {
+          x: at.x,
+          y: Math.abs(at.y - onCurve) * graph.height < 28 ? onCurve : at.y,
+        };
+        p.push(added);
         p.sort((a, b) => a.x - b.x);
-        closest = p.indexOf(at);
+        closest = p.indexOf(added);
       }
     }
     selected = closest;
