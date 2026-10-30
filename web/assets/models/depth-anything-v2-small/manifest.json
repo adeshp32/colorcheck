@@ -1,0 +1,23 @@
+{
+  "id": "depth-anything-v2-small-uint8",
+  "revision": "64fe43eba7f8a384b02fe3fadaa26cbba35548d8",
+  "bytes": 27258801,
+  "sha256": "fcf51f1b230362b28690bb9d1809bf0431f29cad20534e3f589bd7285547f20d",
+  "upstream": "https://github.com/DepthAnything/Depth-Anything-V2",
+  "export": "https://huggingface.co/onnx-community/depth-anything-v2-small",
+  "license": "Apache-2.0",
+  "input": "pixel_values",
+  "output": "predicted_depth",
+  "chunks": [
+    {
+      "file": "model.part1.bin",
+      "bytes": 14000000,
+      "sha256": "0863b7dc1f15598bff3a2804a7f55ceec62ce10c9cc2cc927ab4838c53d8f8d3"
+    },
+    {
+      "file": "model.part2.bin",
+      "bytes": 13258801,
+      "sha256": "9f8a0edc096c818e0bd156d6c55b59bc03d11070170bcf5af604c030a0cf50a2"
+    }
+  ]
+}

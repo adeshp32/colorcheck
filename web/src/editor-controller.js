@@ -1,8 +1,6 @@
 import {
   createDefaultEditSettings,
   calculateChannelStatistics,
-  calculateReferenceMatch,
-  calculateDistributionMatch,
   clamp,
 } from "./image-processing.js";
 import { createEditHistory } from "./edit-history.js";
@@ -15,6 +13,12 @@ import { initializeMobileEditor } from "./mobile-editor.js";
 import { COLOR_BANDS } from "./color-mixer.js";
 import { classifyPhoto, decodePhotoFile } from "./photo-decoder.js";
 import { initializeButtonTheme } from "./button-theme.js";
+import { expandedGeometry, assertOutputSize } from "./expand.js";
+import { createDepthClient } from "./depth-client.js";
+import { depthInputSize, focusAtPoint } from "./depth-map.js";
+import { createLensFocusEditor } from "./lens-focus-editor.js";
+import { sourcePoint } from "./masking.js";
+import { inspectPhotoPrecision } from "./photo-precision.js";
 initializeButtonTheme();
 /** UI orchestration: original bitmaps stay separate from non-destructive settings. */
 const $ = (s) => document.querySelector(s),
@@ -33,10 +37,21 @@ let edits = createDefaultEditSettings(),
   exporting = false;
 const editHistory = createEditHistory(edits);
 const enhancementClient = createEnhancementClient();
-let masking, curveEditor, mobileEditor;
+const depthClient = createDepthClient();
+let depthMap = null,
+  analyzingDepth = false;
+const blurPixelLimit =
+  matchMedia("(pointer: coarse)").matches ||
+  (navigator.deviceMemory && navigator.deviceMemory < 4)
+    ? 12_600_000
+    : navigator.deviceMemory >= 8
+      ? 50_000_000
+      : 25_000_000;
+let masking, curveEditor, mobileEditor, lensFocusEditor;
 const adjustmentSettings = () => masking?.currentAdjustments() ?? edits;
 const enhancements = new Map();
-let enhancing = false;
+let enhancing = false,
+  matching = false;
 let worker,
   requests = new Map(),
   rendering = false,
@@ -138,6 +153,8 @@ function renderInWorker(pixels, width, height, settings) {
         width,
         height,
         edits: settings,
+        depthMap,
+        blurPixelLimit,
         enhancementLut: Object.fromEntries(
           [...enhancementIds(settings)]
             .map((enhancementId) => [
@@ -182,6 +199,7 @@ function createAdjustmentControl(
   number.min = min;
   number.max = max;
   number.step = step;
+  if (key.startsWith("lens-")) number.inputMode = "decimal";
   number.value = value;
   number.setAttribute("aria-label", `${label} value`);
   const reset = document.createElement("button");
@@ -205,9 +223,13 @@ function createAdjustmentControl(
         ? (adjustmentSettings().colorMix?.[colorBand]?.[key.slice(4)] ?? 0)
         : key.startsWith("crop-")
           ? edits.crop[key.slice(5)]
-          : key === "quality"
-            ? quality
-            : adjustmentSettings()[key];
+          : key.startsWith("expand-")
+            ? edits.expand[key.slice(7)]
+            : key.startsWith("lens-")
+              ? adjustmentSettings().lensBlur[key.slice(5)]
+              : key === "quality"
+                ? quality
+                : adjustmentSettings()[key];
   const set = (v, interactive = false) => {
     v = clamp(v, min, max);
     if (key.startsWith("grade-"))
@@ -220,6 +242,13 @@ function createAdjustmentControl(
     } else if (key.startsWith("crop-")) {
       edits.crop[key.slice(5)] = v;
       boundCrop();
+    } else if (key.startsWith("expand-")) {
+      if ($("#expand-linked").checked)
+        for (const side of ["left", "right", "top", "bottom"])
+          edits.expand[side] = v;
+      else edits.expand[key.slice(7)] = v;
+    } else if (key.startsWith("lens-")) {
+      adjustmentSettings().lensBlur[key.slice(5)] = v;
     } else if (key === "quality") quality = v;
     else adjustmentSettings()[key] = v;
     slider.value = get();
@@ -364,6 +393,119 @@ createAdjustmentControl(
 createAdjustmentControl("#detail-controls", "sharpen", "Sharpen", 0, 100);
 createAdjustmentControl("#detail-controls", "vignette", "Vignette", -100, 100);
 createAdjustmentControl("#detail-controls", "grain", "Film grain", 0, 100);
+for (const [key, label, value] of [
+  ["amount", "Blur amount", 25],
+  ["roundness", "Aperture roundness", 0],
+  ["edgeProtection", "Depth edge protection", 70],
+])
+  createAdjustmentControl(
+    key === "amount" ? "#lens-controls" : "#lens-advanced-controls",
+    `lens-${key}`,
+    label,
+    0,
+    100,
+    0.1,
+    value,
+  );
+for (const [key, label] of [
+  ["left", "Left border (%)"],
+  ["right", "Right border (%)"],
+  ["top", "Top border (%)"],
+  ["bottom", "Bottom border (%)"],
+])
+  createAdjustmentControl("#expand-controls", `expand-${key}`, label, 0, 100);
+$("#reset-expand").onclick = () =>
+  applyEdit(() => {
+    edits.expand = { left: 0, right: 0, top: 0, bottom: 0 };
+  });
+$("#lens-enabled").onchange = (event) =>
+  applyEdit(() => {
+    adjustmentSettings().lensBlur.enabled = event.target.checked;
+  });
+for (const [id, key] of [
+  ["lens-mode", "mode"],
+  ["lens-blades", "blades"],
+])
+  $("#" + id).onchange = (event) =>
+    applyEdit(() => {
+      adjustmentSettings().lensBlur[key] =
+        key === "blades" ? Number(event.target.value) : event.target.value;
+    });
+$("#rotate-bokeh").onclick = () =>
+  applyEdit(() => {
+    const lens = adjustmentSettings().lensBlur;
+    lens.angle = ((lens.angle ?? 0) + 15) % 360;
+  });
+for (const type of ["radial", "linear"])
+  $("#lens-" + type).onclick = () => {
+    $("[data-panel=mask]").click();
+    masking.addLensBlurMask(type);
+    $("#lens-status").textContent =
+      "Blur outside the selected shape. Use mask feathering and Detail controls to refine it.";
+  };
+$("#cancel-depth").onclick = () => depthClient.cancel();
+function chooseAutoFocus() {
+  const point = sourcePoint(
+    (edits.crop.x + edits.crop.w / 2) / 100,
+    (edits.crop.y + edits.crop.h / 2) / 100,
+    source.width,
+    source.height,
+    edits,
+  );
+  Object.assign(edits.lensBlur, focusAtPoint(depthMap, point.x, point.y), {
+    enabled: true,
+  });
+}
+$("#lens-auto-focus").onclick = () => {
+  if (depthMap && source) applyEdit(chooseAutoFocus);
+};
+$("#analyze-depth").onclick = async () => {
+  if (!source || analyzingDepth) return;
+  const ticket = sourceLoad;
+  analyzingDepth = true;
+  $("#cancel-depth").hidden = false;
+  synchronizeControls();
+  try {
+    const size = depthInputSize(
+      source.width,
+      source.height,
+      matchMedia("(pointer: coarse)").matches ? 252 : 518,
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = size.width;
+    canvas.height = size.height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.drawImage(source.bitmap, 0, 0, size.width, size.height);
+    const result = await depthClient.analyze(
+      context.getImageData(0, 0, size.width, size.height).data,
+      size.width,
+      size.height,
+      (message) => {
+        $("#lens-status").textContent = message;
+      },
+    );
+    if (ticket !== sourceLoad) return;
+    depthMap = {
+      values: result.values,
+      width: result.width,
+      height: result.height,
+    };
+    $("#depth-inspector").open = true;
+    if (!$("#adjustment-scope").value)
+      applyEdit(() => {
+        chooseAutoFocus();
+        edits.lensBlur.mode = "all";
+      });
+    $("#lens-status").textContent =
+      `Relative depth ready · ${Math.round(result.inferenceMs)} ms. Inspect edges and choose focus; this is an estimate, not measured distance.`;
+  } catch (error) {
+    if (ticket === sourceLoad) $("#lens-status").textContent = error.message;
+  } finally {
+    analyzingDepth = false;
+    $("#cancel-depth").hidden = true;
+    synchronizeControls();
+  }
+};
 createAdjustmentControl(
   "#detail-controls",
   "grainSize",
@@ -423,7 +565,26 @@ function synchronizeControls() {
     : adjustmentSettings().curve;
   $("#undo").disabled = !editHistory.canUndo;
   $("#redo").disabled = !editHistory.canRedo;
-  $("#match").disabled = !source || !referenceStats;
+  $("#match").disabled = !source || !referenceStats || matching;
+  $("#match").setAttribute("aria-busy", String(matching));
+  $("#match").textContent = matching ? "Matching…" : "Match reference";
+  const lens = adjustmentSettings().lensBlur;
+  const localScope = !!$("#adjustment-scope").value;
+  $("#lens-enabled").checked = !!lens.enabled;
+  $("#lens-enabled").disabled = !source || (!localScope && !depthMap);
+  $("#analyze-depth").disabled = !source || analyzingDepth || exporting;
+  $("#analyze-depth").textContent = depthMap
+    ? "Analyze again"
+    : "Analyze photo";
+  $("#lens-pick").disabled = !depthMap || localScope;
+  if (!depthMap || localScope || panel !== "detail")
+    $("#lens-pick").checked = false;
+  for (const id of ["lens-radial", "lens-linear"])
+    $("#" + id).disabled = !source || analyzingDepth || exporting;
+  $("#lens-mode").value = lens.mode;
+  $("#lens-mode").disabled = localScope;
+  $("#lens-blades").value = String(lens.blades);
+  lensFocusEditor?.sync();
   $("#enhance").disabled = !source || enhancing || exporting;
   const selectedEnhancement = currentEnhancement(),
     currentEnhancementActive = !!selectedEnhancement;
@@ -466,6 +627,7 @@ let sourceLoad = 0,
 async function openTargetPhoto(file) {
   const ticket = ++sourceLoad;
   enhancementClient.cancel();
+  depthClient.cancel();
   try {
     const format = classifyPhoto(file);
     showStatus(
@@ -475,6 +637,7 @@ async function openTargetPhoto(file) {
           ? "Decoding HEIC photo locally…"
           : "Opening photo…",
     );
+    const precision = await inspectPhotoPrecision(file);
     const bitmap = await decodePhoto(file);
     if (ticket !== sourceLoad) {
       bitmap.close();
@@ -488,8 +651,14 @@ async function openTargetPhoto(file) {
       width: bitmap.width,
       height: bitmap.height,
       format,
+      precision,
       stats: calculateChannelStatistics(pixels.data),
     };
+    depthMap = null;
+    $("#depth-preview").hidden = true;
+    $("#lens-pick").checked = false;
+    $("#lens-status").textContent =
+      "Depth analysis is optional. Radial and linear blur work without a model.";
     enhancements.clear();
     setEnhancementStatus("Ready to analyze this photo.");
     previewPixels = pixels;
@@ -497,12 +666,16 @@ async function openTargetPhoto(file) {
     interactionPixels = createPreviewPixels(bitmap, 640);
     edits = createDefaultEditSettings();
     setCropMode("free");
+    setCompositionMode("crop");
     editHistory.reset(edits);
     $("#empty").hidden = true;
     preview.hidden = false;
     $("#file-info").textContent =
       `${file.name} · ${bitmap.width} × ${bitmap.height}${format === "raw" ? " · RAW developed locally" : ""}`;
     $("#file-info").title = file.name;
+    $("#photo-precision").textContent = precision.bits
+      ? `Source: ${precision.bits}-bit ${precision.kind === "palette-index" ? "palette indices" : "samples"}. Working image: 8-bit sRGB; blur calculations: floating-point linear light.`
+      : "Source bit depth is not verified for this format. Working image: 8-bit sRGB; blur calculations: floating-point linear light.";
     original = false;
     $("#compare").setAttribute("aria-pressed", "false");
     synchronizeControls();
@@ -581,6 +754,7 @@ $("#remove-enhance").onclick = () => {
 $("#clear-model-cache").onclick = async () => {
   try {
     await enhancementClient.clearCache();
+    await depthClient.clearCache();
     setEnhancementStatus(
       "Downloaded model removed. Current edits are unchanged.",
       usesEnhancement(edits) ? "active" : "idle",
@@ -645,18 +819,46 @@ $("#reference").onchange = async (e) => {
     showStatus(error.message);
   }
 };
-$("#match").onclick = () => {
-  if (!source || !referenceStats) return;
-  applyEdit(() => {
-    adjustmentSettings().match = calculateDistributionMatch(
-      previewPixels.data,
-      referencePixels,
-      calculateReferenceMatch(source.stats, referenceStats),
-    );
-    adjustmentSettings().matchColor = 65;
-    adjustmentSettings().matchTone = 45;
-  });
-  showStatus("Reference applied. Adjust palette and tone independently.");
+$("#match").onclick = async () => {
+  if (!source || !referenceStats || matching) return;
+  const settings = adjustmentSettings(),
+    targetTicket = sourceLoad,
+    referenceTicket = referenceLoad;
+  const valid = () =>
+    targetTicket === sourceLoad &&
+    referenceTicket === referenceLoad &&
+    settings === adjustmentSettings();
+  matching = true;
+  synchronizeControls();
+  try {
+    const { match } = await new Promise((resolve, reject) => {
+      const id = ++requestId,
+        pixels = previewPixels.data.slice(),
+        ref = referencePixels.slice();
+      requests.set(id, { resolve, reject });
+      worker.postMessage(
+        {
+          id,
+          type: "reference-match",
+          pixels: pixels.buffer,
+          reference: ref.buffer,
+        },
+        [pixels.buffer, ref.buffer],
+      );
+    });
+    if (!valid()) return;
+    applyEdit(() => {
+      settings.match = match;
+      settings.matchColor = 65;
+      settings.matchTone = 45;
+    });
+    showStatus("Reference applied. Adjust palette and tone independently.");
+  } catch (error) {
+    if (valid()) showStatus(error.message);
+  } finally {
+    matching = false;
+    synchronizeControls();
+  }
 };
 function getRotatedDimensions(width, height, settings = edits) {
   const rotated = settings.rotation % 180 !== 0;
@@ -664,10 +866,12 @@ function getRotatedDimensions(width, height, settings = edits) {
 }
 function outputDimensions() {
   const g = getRotatedDimensions(source.width, source.height);
-  return [
+  const box = expandedGeometry(
     Math.max(1, Math.round((g.width * edits.crop.w) / 100)),
     Math.max(1, Math.round((g.height * edits.crop.h) / 100)),
-  ];
+    edits.expand,
+  );
+  return [box.width, box.height];
 }
 function drawTransformedPhoto(
   destination,
@@ -676,13 +880,31 @@ function drawTransformedPhoto(
   height,
   settings,
   crop = true,
+  borders = false,
 ) {
   const g = getRotatedDimensions(width, height, settings),
     c = crop ? settings.crop : { x: 0, y: 0, w: 100, h: 100 };
-  destination.width = Math.max(1, Math.round((g.width * c.w) / 100));
-  destination.height = Math.max(1, Math.round((g.height * c.h) / 100));
+  const contentWidth = Math.max(1, Math.round((g.width * c.w) / 100));
+  const contentHeight = Math.max(1, Math.round((g.height * c.h) / 100));
+  const box = expandedGeometry(
+    contentWidth,
+    contentHeight,
+    borders ? settings.expand : null,
+  );
+  assertOutputSize(box.width, box.height);
+  destination.width = box.width;
+  destination.height = box.height;
   const context = destination.getContext("2d");
   context.save();
+  if (borders) {
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, box.width, box.height);
+    context.clearRect(box.left, box.top, contentWidth, contentHeight);
+  }
+  context.beginPath();
+  context.rect(box.left, box.top, contentWidth, contentHeight);
+  context.clip();
+  context.translate(box.left, box.top);
   context.translate((-g.width * c.x) / 100, (-g.height * c.y) / 100);
   context.translate(g.width / 2, g.height / 2);
   context.rotate((settings.rotation * Math.PI) / 180);
@@ -789,7 +1011,8 @@ async function renderPreview(interactive = false) {
       previewPixels.width,
       previewPixels.height,
       settings,
-      panel !== "crop",
+      panel !== "crop" || compositionMode === "expand",
+      (panel !== "crop" || compositionMode === "expand") && panel !== "mask",
     );
     drawHistogram();
     positionCrop();
@@ -1077,13 +1300,39 @@ function positionCrop() {
   }
   const image = preview.getBoundingClientRect(),
     viewer = $("#viewer").getBoundingClientRect(),
-    c = edits.crop;
+    c =
+      compositionMode === "expand"
+        ? { x: 0, y: 0, w: 100, h: 100 }
+        : edits.crop;
   box.style.left = `${image.left - viewer.left + (c.x / 100) * image.width}px`;
   box.style.top = `${image.top - viewer.top + (c.y / 100) * image.height}px`;
   box.style.width = `${(c.w / 100) * image.width}px`;
   box.style.height = `${(c.h / 100) * image.height}px`;
 }
 let cropMode = "free";
+let compositionMode = "crop";
+function setCompositionMode(mode) {
+  compositionMode = mode;
+  $("#crop-options").hidden = mode !== "crop";
+  $("#expand-options").hidden = mode !== "expand";
+  $("#edit-crop").setAttribute("aria-pressed", String(mode === "crop"));
+  $("#edit-expand").setAttribute("aria-pressed", String(mode === "expand"));
+  $("#crop-box").dataset.mode = mode === "expand" ? "free" : cropMode;
+  $("#crop-box").classList.toggle("expand-box", mode === "expand");
+  $("#crop-box").setAttribute(
+    "aria-label",
+    mode === "expand" ? "Expand selection" : "Crop selection",
+  );
+  $("#crop-mode-menu").hidden = true;
+}
+$("#edit-crop").onclick = () => {
+  setCompositionMode("crop");
+  renderPreview();
+};
+$("#edit-expand").onclick = () => {
+  setCompositionMode("expand");
+  renderPreview();
+};
 function setCropMode(mode) {
   cropMode = mode;
   $("#crop-box").dataset.mode = mode;
@@ -1118,7 +1367,36 @@ for (const button of document.querySelectorAll("[data-crop-mode]"))
       });
   };
 $("#preview").onclick = (e) => {
-  if (panel === "crop" && source) showCropModes(e.clientX, e.clientY);
+  if (panel === "crop" && compositionMode === "crop" && source)
+    showCropModes(e.clientX, e.clientY);
+  if (
+    panel === "detail" &&
+    $("#lens-pick").checked &&
+    depthMap &&
+    source &&
+    !$("#adjustment-scope").value
+  ) {
+    const rect = preview.getBoundingClientRect(),
+      g = getRotatedDimensions(source.width, source.height);
+    const cw = Math.max(1, Math.round((g.width * edits.crop.w) / 100)),
+      ch = Math.max(1, Math.round((g.height * edits.crop.h) / 100));
+    const box = expandedGeometry(cw, ch, edits.expand);
+    const px = ((e.clientX - rect.left) / rect.width) * box.width - box.left;
+    const py = ((e.clientY - rect.top) / rect.height) * box.height - box.top;
+    if (px < 0 || py < 0 || px > cw || py > ch) return;
+    const point = sourcePoint(
+      (edits.crop.x + (px / cw) * edits.crop.w) / 100,
+      (edits.crop.y + (py / ch) * edits.crop.h) / 100,
+      source.width,
+      source.height,
+      edits,
+    );
+    applyEdit(() => {
+      Object.assign(edits.lensBlur, focusAtPoint(depthMap, point.x, point.y), {
+        enabled: true,
+      });
+    });
+  }
 };
 function resizeCrop(original, edge, dx, dy) {
   let left = original.x,
@@ -1148,6 +1426,7 @@ $("#crop-box").onpointerdown = (e) => {
     x: e.clientX,
     y: e.clientY,
     c: clone(edits.crop),
+    expand: clone(edits.expand),
     rect: preview.getBoundingClientRect(),
     edge: e.target.dataset.edge || "move",
     moved: false,
@@ -1164,6 +1443,32 @@ $("#crop-box").onpointermove = (e) => {
   cropDrag.moved = true;
   const dx = ((e.clientX - cropDrag.x) / cropDrag.rect.width) * 100;
   const dy = ((e.clientY - cropDrag.y) / cropDrag.rect.height) * 100;
+  if (compositionMode === "expand") {
+    const edge = cropDrag.edge;
+    const original = cropDrag.expand;
+    const sx = 1 + (original.left + original.right) / 100,
+      sy = 1 + (original.top + original.bottom) / 100;
+    const next = { ...original };
+    if (edge.includes("w")) next.left = clamp(original.left - dx * sx, 0, 100);
+    if (edge.includes("e"))
+      next.right = clamp(original.right + dx * sx, 0, 100);
+    if (edge.includes("n")) next.top = clamp(original.top - dy * sy, 0, 100);
+    if (edge.includes("s"))
+      next.bottom = clamp(original.bottom + dy * sy, 0, 100);
+    if ($("#expand-linked").checked && edge !== "move") {
+      const value = edge.includes("w")
+        ? next.left
+        : edge.includes("e")
+          ? next.right
+          : edge.includes("n")
+            ? next.top
+            : next.bottom;
+      for (const side of ["left", "right", "top", "bottom"]) next[side] = value;
+    }
+    edits.expand = next;
+    renderPreview(true);
+    return;
+  }
   if (cropDrag.edge === "move") {
     edits.crop.x = cropDrag.c.x + (cropMode === "height" ? 0 : dx);
     edits.crop.y = cropDrag.c.y + (cropMode === "width" ? 0 : dy);
@@ -1179,13 +1484,15 @@ $("#crop-box").onpointerup = (e) => {
   if (moved) {
     commitEditHistory();
     renderPreview();
-  } else showCropModes(e.clientX, e.clientY);
+  } else if (compositionMode === "crop") showCropModes(e.clientX, e.clientY);
 };
 $("#crop-box").onpointercancel = () => {
   if (!cropDrag) return;
   edits.crop = cropDrag.c;
+  edits.expand = cropDrag.expand;
   cropDrag = null;
   syncCropFields();
+  renderPreview();
 };
 $("#crop-box").onkeydown = (e) => {
   const move = {
@@ -1198,6 +1505,32 @@ $("#crop-box").onkeydown = (e) => {
   e.preventDefault();
   applyEdit(() => {
     const step = e.shiftKey ? 5 : 1;
+    if (compositionMode === "expand") {
+      const edge = e.target.dataset.edge;
+      if (!edge) return;
+      const next = { ...edits.expand };
+      if (edge.includes("w"))
+        next.left = clamp(next.left - move[0] * step, 0, 100);
+      if (edge.includes("e"))
+        next.right = clamp(next.right + move[0] * step, 0, 100);
+      if (edge.includes("n"))
+        next.top = clamp(next.top - move[1] * step, 0, 100);
+      if (edge.includes("s"))
+        next.bottom = clamp(next.bottom + move[1] * step, 0, 100);
+      if ($("#expand-linked").checked) {
+        const value = edge.includes("w")
+          ? next.left
+          : edge.includes("e")
+            ? next.right
+            : edge.includes("n")
+              ? next.top
+              : next.bottom;
+        for (const side of ["left", "right", "top", "bottom"])
+          next[side] = value;
+      }
+      edits.expand = next;
+      return;
+    }
     if (e.target.dataset.edge)
       resizeCrop(
         edits.crop,
@@ -1233,6 +1566,13 @@ initializeWorkspaceLayout(() => {
 });
 curveEditor = createCurveEditor({
   getSettings: adjustmentSettings,
+  render: renderPreview,
+  commit: commitEditHistory,
+});
+lensFocusEditor = createLensFocusEditor({
+  getMap: () => depthMap,
+  getSettings: adjustmentSettings,
+  isLocalScope: () => !!$("#adjustment-scope").value,
   render: renderPreview,
   commit: commitEditHistory,
 });
@@ -1301,6 +1641,7 @@ $("#export").onclick = async () => {
       canvas.width,
       canvas.height,
       settings,
+      true,
       true,
     );
     const format = $("#format").value;

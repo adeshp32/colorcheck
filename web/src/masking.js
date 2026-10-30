@@ -165,14 +165,49 @@ export function transformMaskPinch(
     cy = (shape.y + shape.y2) / 2 + dy;
   const vx = ((shape.x2 - shape.x) * scale) / 2,
     vy = ((shape.y2 - shape.y) * scale) / 2;
-  const rx = vx * Math.cos(angle) - vy * Math.sin(angle),
+  let rx = vx * Math.cos(angle) - vy * Math.sin(angle),
     ry = vx * Math.sin(angle) + vy * Math.cos(angle);
+  const fit = Math.min(
+    1,
+    0.5 / Math.max(Math.abs(rx), 1e-6),
+    0.5 / Math.max(Math.abs(ry), 1e-6),
+  );
+  rx *= fit;
+  ry *= fit;
+  const centerX = clamp(cx, Math.abs(rx), 1 - Math.abs(rx)),
+    centerY = clamp(cy, Math.abs(ry), 1 - Math.abs(ry));
   return {
     ...shape,
-    x: clamp(cx - rx),
-    y: clamp(cy - ry),
-    x2: clamp(cx + rx),
-    y2: clamp(cy + ry),
+    x: centerX - rx,
+    y: centerY - ry,
+    x2: centerX + rx,
+    y2: centerY + ry,
+  };
+}
+
+/** Locked-axis endpoint resize: do not cross the opposite endpoint or rotate at a boundary. */
+export function resizeLinearEndpoint(shape, point, end = "end") {
+  const start = end === "start";
+  const ax = start ? shape.x2 : shape.x,
+    ay = start ? shape.y2 : shape.y;
+  const vx = (start ? shape.x : shape.x2) - ax,
+    vy = (start ? shape.y : shape.y2) - ay;
+  const length = Math.max(1e-6, Math.hypot(vx, vy)),
+    ux = vx / length,
+    uy = vy / length;
+  const limit = Math.min(
+    ux > 0 ? (1 - ax) / ux : ux < 0 ? -ax / ux : Infinity,
+    uy > 0 ? (1 - ay) / uy : uy < 0 ? -ay / uy : Infinity,
+  );
+  const distance = Math.max(
+    Math.min(0.005, limit),
+    Math.min(limit, (point.x - ax) * ux + (point.y - ay) * uy),
+  );
+  return {
+    ...shape,
+    ...(start
+      ? { x: ax + ux * distance, y: ay + uy * distance }
+      : { x2: ax + ux * distance, y2: ay + uy * distance }),
   };
 }
 

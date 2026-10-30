@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  resizeLinearEndpoint,
   createMaskComponent,
   maskCoverage,
   sourcePoint,
@@ -19,6 +20,38 @@ const makeMask = () => ({
   components: [createMaskComponent()],
   refinement: "none",
   adjustments: createDefaultEditSettings(),
+});
+
+test("locked linear masks keep orientation when resized or pinched against image boundaries", () => {
+  const shape = {
+    ...createMaskComponent("linear"),
+    x: 0.2,
+    y: 0.3,
+    x2: 0.6,
+    y2: 0.5,
+  };
+  const angle = (s) => Math.atan2(s.y2 - s.y, s.x2 - s.x);
+  const resized = resizeLinearEndpoint(shape, { x: 0.9, y: 0.1 });
+  assert.ok(Math.abs(angle(resized) - angle(shape)) < 1e-10);
+  const crossed = resizeLinearEndpoint(shape, { x: 0, y: 0 });
+  assert.ok(Math.abs(angle(crossed) - angle(shape)) < 1e-10);
+  const pinched = transformMaskPinch(
+    shape,
+    [
+      { x: 0.2, y: 0.2 },
+      { x: 0.4, y: 0.4 },
+    ],
+    [
+      { x: 0.7, y: 0.1 },
+      { x: 1, y: 0.9 },
+    ],
+  );
+  assert.ok(Math.abs(angle(pinched) - angle(shape)) < 1e-10);
+  assert.ok(
+    [pinched.x, pinched.y, pinched.x2, pinched.y2].every(
+      (v) => v >= 0 && v <= 1,
+    ),
+  );
 });
 test("two-finger gestures resize radial masks and linear endpoints without viewport state", () => {
   const start = [

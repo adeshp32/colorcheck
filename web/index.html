@@ -684,6 +684,169 @@
           <section data-section="detail" hidden>
             <h2>Detail</h2>
             <div id="detail-controls"></div>
+            <h3 class="section-label">Lens blur</h3>
+            <div class="commands lens-methods">
+              <button id="analyze-depth" disabled>Analyze photo</button>
+              <button id="cancel-depth" hidden>Cancel</button>
+              <button id="lens-radial" disabled>Radial</button>
+              <button id="lens-linear" disabled>Linear</button>
+            </div>
+            <label class="check"
+              ><input id="lens-enabled" type="checkbox" disabled />Lens
+              blur</label
+            >
+            <div id="lens-controls"></div>
+            <details id="depth-inspector" open hidden>
+              <summary>
+                Focus range <output id="depth-range-value"></output>
+              </summary>
+              <div class="depth-map-stage" id="depth-map-stage">
+                <canvas
+                  id="depth-preview"
+                  width="256"
+                  height="192"
+                  aria-label="Relative depth with sharp areas highlighted"
+                  hidden
+                ></canvas>
+                <button
+                  id="depth-focus-handle"
+                  class="depth-focus-handle"
+                  type="button"
+                  title="Drag focus point"
+                  aria-label="Focus point; arrow keys move focus"
+                >
+                  <img
+                    src="./assets/icons/icon-scan-line.svg"
+                    alt=""
+                    class="icon"
+                  />
+                </button>
+              </div>
+              <div
+                class="depth-range-track"
+                id="depth-range-track"
+                role="group"
+                aria-label="In-focus depth range"
+              >
+                <canvas
+                  id="depth-range-histogram"
+                  width="256"
+                  height="32"
+                  aria-hidden="true"
+                ></canvas>
+                <button
+                  id="depth-focus-band"
+                  class="depth-focus-band"
+                  type="button"
+                  role="slider"
+                  aria-label="Focus range position"
+                ></button>
+                <button
+                  id="depth-range-low"
+                  class="depth-range-handle"
+                  type="button"
+                  role="slider"
+                  aria-label="Far focus boundary"
+                ></button>
+                <button
+                  id="depth-range-high"
+                  class="depth-range-handle"
+                  type="button"
+                  role="slider"
+                  aria-label="Near focus boundary"
+                ></button>
+              </div>
+              <div class="depth-range-labels">
+                <span>Far</span><span>Near</span>
+              </div>
+              <div class="depth-precision-row">
+                <label class="check"
+                  ><input id="depth-fine" type="checkbox" />Fine
+                  adjustment</label
+                >
+                <details id="depth-exact">
+                  <summary>Exact range</summary>
+                  <div class="depth-exact-values">
+                    <label
+                      >Far<input
+                        id="depth-exact-low"
+                        type="number"
+                        inputmode="decimal"
+                        min="0"
+                        max="99"
+                        step="0.1"
+                    /></label>
+                    <label
+                      >Near<input
+                        id="depth-exact-high"
+                        type="number"
+                        inputmode="decimal"
+                        min="1"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                </details>
+              </div>
+            </details>
+            <div class="lens-focus-actions">
+              <button
+                id="lens-auto-focus"
+                type="button"
+                title="Set focus and width from the center of the visible photo"
+                disabled
+              >
+                <img
+                  src="./assets/icons/icon-scan-line.svg"
+                  alt=""
+                  class="icon"
+                />Auto focus
+              </button>
+              <label class="check" id="lens-pick-row" hidden
+                ><input id="lens-pick" type="checkbox" disabled />Pick on
+                photo</label
+              >
+            </div>
+            <details id="lens-advanced">
+              <summary>Bokeh &amp; refinement</summary>
+              <label
+                >Blur region<select id="lens-mode">
+                  <option value="background">Behind focus</option>
+                  <option value="foreground">In front of focus</option>
+                  <option value="all">Both sides</option>
+                </select></label
+              >
+              <label
+                >Aperture<select id="lens-blades">
+                  <option value="0">Circular</option>
+                  <option value="5">5 blades</option>
+                  <option value="6">6 blades</option>
+                  <option value="7">7 blades</option>
+                  <option value="8">8 blades</option>
+                  <option value="9">9 blades</option>
+                </select></label
+              >
+              <div id="lens-advanced-controls"></div>
+              <button
+                id="rotate-bokeh"
+                type="button"
+                title="Rotate aperture 15 degrees"
+                aria-label="Rotate aperture 15 degrees"
+              >
+                <span aria-hidden="true">&#8635;</span>
+              </button>
+            </details>
+            <p id="lens-status" class="note" role="status" aria-live="polite">
+              Depth analysis is optional. Radial and linear blur work without a
+              model.
+            </p>
+            <details class="lens-precision">
+              <summary>Color precision</summary>
+              <p id="photo-precision" class="note">
+                Blur uses floating-point linear-light calculations. The current
+                editor and output remain 8-bit sRGB.
+              </p>
+            </details>
             <p class="note">
               Sharpening accentuates existing detail; it does not recover
               missing information.
@@ -691,23 +854,41 @@
           </section>
           <section data-section="crop" hidden>
             <h2>Composition</h2>
-            <label
-              >Aspect ratio<select id="ratio">
-                <option value="free">Free</option>
-                <option value="1">Square</option>
-                <option value="1.333333">4:3</option>
-                <option value="0.8">4:5</option>
-                <option value="0.5625">9:16</option>
-                <option value="1.777778">16:9</option>
-              </select></label
+            <div
+              class="composition-modes"
+              role="group"
+              aria-label="Composition mode"
             >
-            <div id="crop-controls"></div>
-            <div class="commands">
-              <button id="rotate-left" title="Rotate left">↶ 90°</button
-              ><button id="rotate-right" title="Rotate right">↷ 90°</button
-              ><button id="flip">Flip</button>
+              <button id="edit-crop" aria-pressed="true">Crop</button
+              ><button id="edit-expand" aria-pressed="false">Expand</button>
             </div>
-            <button id="reset-crop">Reset crop</button>
+            <div id="crop-options">
+              <label
+                >Aspect ratio<select id="ratio">
+                  <option value="free">Free</option>
+                  <option value="1">Square</option>
+                  <option value="1.333333">4:3</option>
+                  <option value="0.8">4:5</option>
+                  <option value="0.5625">9:16</option>
+                  <option value="1.777778">16:9</option>
+                </select></label
+              >
+              <div id="crop-controls"></div>
+              <div class="commands">
+                <button id="rotate-left" title="Rotate left">↶ 90°</button
+                ><button id="rotate-right" title="Rotate right">↷ 90°</button
+                ><button id="flip">Flip</button>
+              </div>
+              <button id="reset-crop">Reset crop</button>
+            </div>
+            <div id="expand-options" hidden>
+              <label class="check"
+                ><input id="expand-linked" type="checkbox" checked />Link
+                borders</label
+              >
+              <div id="expand-controls"></div>
+              <button id="reset-expand">Reset borders</button>
+            </div>
           </section>
           <section data-section="output" hidden>
             <h2>Export</h2>

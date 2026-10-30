@@ -458,6 +458,7 @@ export function initializeMobileEditor({
       !dismissed &&
       !gesture &&
       $("#crop-box").hidden &&
+      !$("#lens-pick")?.checked &&
       event.target === preview
     ) {
       const now = performance.now();

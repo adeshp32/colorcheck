@@ -3,6 +3,10 @@ import { buildCurveTable, lookupCurve } from "./tone-curves.js";
 import { prepareColorMix, mixColorInto } from "./color-mixer.js";
 import { grainAt } from "./film-grain.js";
 import { buildHistogramMaps } from "./histogram-match.js";
+import {
+  buildPerceptualMatch,
+  applyPerceptualMatch,
+} from "./perceptual-match.js";
 import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
 export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
 /** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
@@ -35,6 +39,18 @@ export function createDefaultEditSettings() {
     rotation: 0,
     flip: false,
     crop: { x: 0, y: 0, w: 100, h: 100 },
+    expand: { left: 0, right: 0, top: 0, bottom: 0 },
+    lensBlur: {
+      enabled: false,
+      amount: 25,
+      focus: 50,
+      range: 12,
+      mode: "background",
+      blades: 0,
+      angle: 0,
+      roundness: 0,
+      edgeProtection: 70,
+    },
     grades: Object.fromEntries(
       ["global", "shadows", "midtones", "highlights"].map((k) => [
         k,
@@ -81,6 +97,19 @@ export function calculateDistributionMatch(
   return {
     ...match,
     distributionMaps: buildHistogramMaps(sourcePixels, referencePixels),
+  };
+}
+/** New UI matches separate lightness/chroma; legacy match records stay supported. */
+export function calculatePerceptualReferenceMatch(
+  sourcePixels,
+  referencePixels,
+) {
+  return {
+    ...calculateReferenceMatch(
+      calculateChannelStatistics(sourcePixels),
+      calculateChannelStatistics(referencePixels),
+    ),
+    perceptual: buildPerceptualMatch(sourcePixels, referencePixels),
   };
 }
 export function hueToRgb(hue) {
@@ -154,7 +183,8 @@ export function applyPhotoAdjustments(
     distributionMaps = matchDistributionStrength
       ? edits.match?.distributionMaps
       : null,
-    enhanced = new Float64Array(3);
+    enhanced = new Float64Array(3),
+    matchScratch = new Float64Array(3);
   // Scalars avoid allocating multiple RGB arrays and callbacks for every pixel.
   for (let i = 0; i < data.length; i += 4) {
     let r = data[i] / 255,
@@ -175,49 +205,66 @@ export function applyPhotoAdjustments(
     }
     if (edits.match) {
       const m = edits.match;
-      const matchedR =
-        r +
-        (m.reference[0] - m.source[0]) * matchColor +
-        (r - m.source[0]) * (m.gain[0] - 1) * matchTone;
-      const matchedG =
-        g +
-        (m.reference[1] - m.source[1]) * matchColor +
-        (g - m.source[1]) * (m.gain[1] - 1) * matchTone;
-      const matchedB =
-        b +
-        (m.reference[2] - m.source[2]) * matchColor +
-        (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
-      const detailR = distributionMaps
-        ? clamp(
-            distributionMaps[0][Math.round(clamp(r) * 255)] / 255 - r,
-            -0.12,
-            0.12,
-          ) * matchDistributionStrength
-        : 0;
-      const detailG = distributionMaps
-        ? clamp(
-            distributionMaps[1][Math.round(clamp(g) * 255)] / 255 - g,
-            -0.12,
-            0.12,
-          ) * matchDistributionStrength
-        : 0;
-      const detailB = distributionMaps
-        ? clamp(
-            distributionMaps[2][Math.round(clamp(b) * 255)] / 255 - b,
-            -0.12,
-            0.12,
-          ) * matchDistributionStrength
-        : 0;
-      if (matchV11Lut && edits.matchV11Strength > 0) {
-        blendEnhancementInto(r, g, b, matchV11Lut, 100, enhanced);
-        const strength = clamp(edits.matchV11Strength / 100);
-        r = matchedR + detailR + (enhanced[0] - matchedR) * strength;
-        g = matchedG + detailG + (enhanced[1] - matchedG) * strength;
-        b = matchedB + detailB + (enhanced[2] - matchedB) * strength;
+      if (m.perceptual?.version === 1) {
+        applyPerceptualMatch(
+          r,
+          g,
+          b,
+          m.perceptual,
+          matchColor,
+          matchTone,
+          matchDistributionStrength,
+          enhanced,
+          matchScratch,
+        );
+        r = enhanced[0];
+        g = enhanced[1];
+        b = enhanced[2];
       } else {
-        r = matchedR + detailR;
-        g = matchedG + detailG;
-        b = matchedB + detailB;
+        const matchedR =
+          r +
+          (m.reference[0] - m.source[0]) * matchColor +
+          (r - m.source[0]) * (m.gain[0] - 1) * matchTone;
+        const matchedG =
+          g +
+          (m.reference[1] - m.source[1]) * matchColor +
+          (g - m.source[1]) * (m.gain[1] - 1) * matchTone;
+        const matchedB =
+          b +
+          (m.reference[2] - m.source[2]) * matchColor +
+          (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
+        const detailR = distributionMaps
+          ? clamp(
+              distributionMaps[0][Math.round(clamp(r) * 255)] / 255 - r,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        const detailG = distributionMaps
+          ? clamp(
+              distributionMaps[1][Math.round(clamp(g) * 255)] / 255 - g,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        const detailB = distributionMaps
+          ? clamp(
+              distributionMaps[2][Math.round(clamp(b) * 255)] / 255 - b,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        if (matchV11Lut && edits.matchV11Strength > 0) {
+          blendEnhancementInto(r, g, b, matchV11Lut, 100, enhanced);
+          const strength = clamp(edits.matchV11Strength / 100);
+          r = matchedR + detailR + (enhanced[0] - matchedR) * strength;
+          g = matchedG + detailG + (enhanced[1] - matchedG) * strength;
+          b = matchedB + detailB + (enhanced[2] - matchedB) * strength;
+        } else {
+          r = matchedR + detailR;
+          g = matchedG + detailG;
+          b = matchedB + detailB;
+        }
       }
     }
     r *= exposure;

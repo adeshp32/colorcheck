@@ -5,6 +5,7 @@ import {
   prepareMask,
   transformMaskPinch,
   rotateMaskComponent,
+  resizeLinearEndpoint,
 } from "./masking.js";
 import { createDefaultEditSettings } from "./image-processing.js";
 
@@ -35,6 +36,10 @@ export function createMaskControls({
     drag = null,
     optionKey = "";
   let rotationEnabled = false;
+  function lockRotation() {
+    rotationEnabled = false;
+    rotateControl.setAttribute("aria-pressed", "false");
+  }
   const maskPointers = new Map();
   let pinch = null;
   const geometry = [],
@@ -92,6 +97,34 @@ export function createMaskControls({
       step,
       () => (component()?.[key] ?? 0) * scale,
       (value) => {
+        const shape = component();
+        if (key === "angle" && !rotationEnabled) return;
+        if (shape.type === "linear" && ["x", "y"].includes(key)) {
+          const delta = Math.max(
+            -Math.min(shape[key], shape[key + "2"]),
+            Math.min(
+              1 - Math.max(shape[key], shape[key + "2"]),
+              value / scale - shape[key],
+            ),
+          );
+          shape[key] += delta;
+          shape[key + "2"] += delta;
+          return;
+        }
+        if (
+          shape.type === "linear" &&
+          ["x2", "y2"].includes(key) &&
+          !rotationEnabled
+        ) {
+          Object.assign(
+            shape,
+            resizeLinearEndpoint(shape, {
+              x: key === "x2" ? value / scale : shape.x2,
+              y: key === "y2" ? value / scale : shape.y2,
+            }),
+          );
+          return;
+        }
         component()[key] = value / scale;
       },
     );
@@ -163,7 +196,8 @@ export function createMaskControls({
     refinements,
   );
 
-  function newMask(type) {
+  function newMask(type, lensBlur = false) {
+    lockRotation();
     if (!getSource()) return status("Choose a photo first.");
     const masks = (getEdits().masks ??= []);
     if (masks.length >= 8)
@@ -185,6 +219,11 @@ export function createMaskControls({
       adjustments: createDefaultEditSettings(),
     };
     masks.push(mask);
+    if (lensBlur) {
+      mask.name = `${type === "radial" ? "Radial" : "Linear"} blur ${masks.length}`;
+      mask.invert = true;
+      mask.adjustments.lensBlur.enabled = true;
+    }
     selectedId = mask.id;
     componentIndex = 0;
     changed(true);
@@ -192,6 +231,7 @@ export function createMaskControls({
   for (const type of ["radial", "linear"]) {
     $(`#add-${type}`).onclick = () => newMask(type);
     $(`#append-${type}`).onclick = () => {
+      lockRotation();
       const mask = selected();
       if (!mask) return;
       if (mask.components.length >= 8)
@@ -203,6 +243,7 @@ export function createMaskControls({
       changed(true);
     };
     $(`#subtract-${type}`).onclick = () => {
+      lockRotation();
       const mask = selected();
       if (!mask) return;
       if (mask.components.length >= 8)
@@ -223,12 +264,14 @@ export function createMaskControls({
     render();
   };
   scope.onchange = () => {
+    lockRotation();
     selectedId = scope.value;
     componentIndex = 0;
     synchronize();
     render();
   };
   $("#mask-component").onchange = (event) => {
+    lockRotation();
     componentIndex = Number(event.target.value);
     sync();
     drawOverlay();
@@ -344,6 +387,8 @@ export function createMaskControls({
       "#" + mask.color.map((v) => v.toString(16).padStart(2, "0")).join("");
     $("#remove-component").disabled = mask.components.length === 1;
     for (const control of [...geometry, ...refinements]) {
+      control.input.disabled = control.number.disabled =
+        control.label === "Angle" && !rotationEnabled;
       control.input.value = control.number.value =
         Math.round(control.get() * 100) / 100;
       if (["Radius X", "Radius Y", "Angle", "Feather"].includes(control.label))
@@ -518,6 +563,7 @@ export function createMaskControls({
     rotationEnabled = !rotationEnabled;
     rotateControl.setAttribute("aria-pressed", String(rotationEnabled));
     overlay.style.cursor = rotationEnabled ? "crosshair" : "move";
+    sync();
   };
   function point(event) {
     const rect = overlay.getBoundingClientRect(),
@@ -608,8 +654,8 @@ export function createMaskControls({
       old = drag.shape,
       dx = p.x - drag.start.x,
       dy = p.y - drag.start.y;
-    if (drag.mode === "start") Object.assign(shape, { x: p.x, y: p.y });
-    else if (drag.mode === "end") Object.assign(shape, { x2: p.x, y2: p.y });
+    if (drag.mode === "start" || drag.mode === "end")
+      Object.assign(shape, resizeLinearEndpoint(old, p, drag.mode));
     else if (drag.mode === "radius-x" || drag.mode === "radius-y") {
       const angle = (old.angle * Math.PI) / 180,
         dx = p.x - old.x,
@@ -638,7 +684,8 @@ export function createMaskControls({
           ry: Math.max(0.005, Math.abs(dy) / 2),
         });
     } else if (drag.mode === "resize") {
-      if (shape.type === "linear") Object.assign(shape, { x2: p.x, y2: p.y });
+      if (shape.type === "linear")
+        Object.assign(shape, resizeLinearEndpoint(old, p));
       else
         Object.assign(shape, {
           rx: Math.max(0.005, Math.min(1.5, old.rx + dx)),
@@ -688,11 +735,39 @@ export function createMaskControls({
       x = event.shiftKey ? (shape.type === "linear" ? "x2" : "rx") : "x",
       y = event.shiftKey ? (shape.type === "linear" ? "y2" : "ry") : "y";
     const step = event.altKey ? 0.0001 : 0.001;
+    if (shape.type === "linear" && !event.shiftKey) {
+      const dx = Math.max(
+        -Math.min(shape.x, shape.x2),
+        Math.min(1 - Math.max(shape.x, shape.x2), delta[0] * step),
+      );
+      const dy = Math.max(
+        -Math.min(shape.y, shape.y2),
+        Math.min(1 - Math.max(shape.y, shape.y2), delta[1] * step),
+      );
+      shape.x += dx;
+      shape.x2 += dx;
+      shape.y += dy;
+      shape.y2 += dy;
+      changed(true);
+      return;
+    }
+    if (shape.type === "linear" && event.shiftKey && !rotationEnabled) {
+      Object.assign(
+        shape,
+        resizeLinearEndpoint(shape, {
+          x: shape.x2 + delta[0] * step,
+          y: shape.y2 + delta[1] * step,
+        }),
+      );
+      changed(true);
+      return;
+    }
     shape[x] = Math.max(0.0005, Math.min(1, shape[x] + delta[0] * step));
     shape[y] = Math.max(0.0005, Math.min(1, shape[y] + delta[1] * step));
     changed(true);
   };
   return {
+    addLensBlurMask: (type) => newMask(type, true),
     sync,
     drawOverlay,
     isGeometryActive: () =>

@@ -130,6 +130,10 @@ const { join } = require("node:path");
       buffer: Buffer.from(bytes, "base64"),
     });
     await page.locator("#match").click();
+    await page.waitForFunction(
+      () =>
+        document.querySelector("#match").getAttribute("aria-busy") === "false",
+    );
     await page.waitForTimeout(200);
     assert.equal(await page.locator("#slider-matchColor").inputValue(), "65");
     assert.equal(
@@ -1364,6 +1368,10 @@ const { join } = require("node:path");
       () => document.querySelector("#preview").width === 600,
     );
     await orderPage.locator("#match").click();
+    await orderPage.waitForFunction(
+      () =>
+        document.querySelector("#match").getAttribute("aria-busy") === "false",
+    );
     await orderPage.locator("[data-panel=mask]").click();
     await orderPage.locator("#add-radial").click();
     await orderPage.locator("#mask-finish").click();
@@ -1442,6 +1450,12 @@ const { join } = require("node:path");
       path: join(artifacts, "mobile-crop-menu.png"),
     });
     await orderPage.locator('[data-crop-mode="free"]').click();
+    await orderPage.waitForFunction(
+      () =>
+        document.querySelector("#preview").width === 800 &&
+        document.querySelector("#preview").height === 600,
+    );
+    await orderPage.locator('[data-edge="s"]').click({ trial: true });
     const cropHeightBefore = Number(
       await orderPage.locator("#slider-crop-h").inputValue(),
     );

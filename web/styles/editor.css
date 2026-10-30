@@ -588,6 +588,248 @@ main[data-dock="floating"] aside {
 .region-picker .commands {
   margin: 0;
 }
+#depth-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 180px;
+  width: auto;
+  margin: 8px auto;
+}
+.lens-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lens-methods button {
+  min-height: 36px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+.lens-methods #analyze-depth {
+  flex: 1;
+}
+#depth-inspector {
+  margin: 12px 0;
+}
+#depth-inspector summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+#depth-range-value {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.depth-map-stage {
+  position: relative;
+  width: min(100%, calc(180px * var(--depth-aspect, 1.33333)));
+  aspect-ratio: var(--depth-aspect, 1.33333);
+  margin: 0 auto 10px;
+  border: 1px solid var(--line);
+  touch-action: none;
+  cursor: crosshair;
+}
+.depth-map-stage #depth-preview {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+}
+.depth-focus-handle {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 5px;
+  border-radius: 50%;
+  border: 1px solid #fff;
+  background: rgb(20 20 24 / 72%);
+  box-shadow: 0 0 0 1px #0008;
+  touch-action: none;
+  cursor: grab;
+}
+.depth-focus-handle:active {
+  cursor: grabbing;
+}
+.depth-range-track {
+  height: 44px;
+  position: relative;
+  margin: 0 16px;
+  touch-action: none;
+}
+#depth-range-histogram {
+  position: absolute;
+  bottom: 4px;
+  left: 0;
+  width: 100%;
+  height: 32px;
+  pointer-events: none;
+}
+.depth-focus-band {
+  position: absolute;
+  top: 4px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 2px;
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  touch-action: none;
+  cursor: grab;
+}
+.depth-range-handle {
+  position: absolute;
+  top: 2px;
+  width: 30px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  transform: translateX(-50%);
+  background: transparent;
+  border: 0;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.depth-range-handle::after {
+  content: "";
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 12px;
+  width: 6px;
+  border: 1px solid #fff;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.depth-range-labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0 16px;
+}
+.depth-precision-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.depth-precision-row .check {
+  margin: 0;
+  min-height: 36px;
+}
+#depth-exact summary {
+  margin: 0;
+  min-height: 36px;
+}
+.depth-exact-values {
+  display: flex;
+  gap: 8px;
+}
+.depth-exact-values label {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.depth-exact-values input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100px;
+  min-height: 36px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+}
+@media (pointer: coarse), (max-width: 760px) {
+  .depth-map-stage {
+    width: min(100%, calc(min(140px, 24dvh) * var(--depth-aspect, 1.33333)));
+  }
+  .depth-focus-handle {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+  .depth-range-track {
+    height: 48px;
+    margin-inline: 22px;
+  }
+  .depth-range-handle {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+  .depth-range-handle::after {
+    left: 19px;
+  }
+  .depth-focus-band {
+    height: 40px;
+  }
+  .depth-precision-row .check,
+  #depth-exact summary,
+  .depth-exact-values input,
+  .lens-methods button,
+  .lens-focus-actions button {
+    min-height: 44px;
+  }
+  .depth-exact-values input {
+    font-size: 16px;
+  }
+}
+.lens-focus-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.lens-focus-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  font-size: 11px;
+  padding: 4px 7px;
+}
+.lens-focus-actions label {
+  font-size: 11px;
+  margin: 0;
+}
+@media (pointer: coarse), (max-width: 760px) {
+  .lens-focus-actions button {
+    min-height: 44px;
+  }
+}
+#lens-advanced,
+.lens-precision {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  margin-top: 12px;
+}
+#lens-advanced summary,
+.lens-precision summary {
+  cursor: pointer;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+#rotate-bokeh {
+  width: 36px;
+  min-height: 36px;
+  padding: 4px;
+  font-size: 23px;
+}
 .single-adjustment {
   position: fixed;
   z-index: 6;
@@ -973,6 +1215,14 @@ h3 {
   background: var(--surface);
   color: inherit;
 }
+@media (max-width: 760px) {
+  #lens-controls .control-top input[type="number"],
+  #lens-advanced-controls .control-top input[type="number"],
+  .focused-control:has(#slider-lens-amount) input[type="number"] {
+    font-size: 16px;
+    min-height: 44px;
+  }
+}
 .control-top button {
   padding: 0;
   border: 0;
@@ -1222,6 +1472,25 @@ select {
   border: 0;
   background: transparent;
   touch-action: none;
+}
+.expand-box {
+  background: none;
+  border-color: var(--accent);
+  cursor: default;
+}
+.composition-modes {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.composition-modes button {
+  flex: 1;
+  min-height: 36px;
+  padding: 5px 10px;
+}
+.composition-modes [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 .crop-handle::after {
   content: "";

@@ -23,6 +23,8 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+      - run: npm run test:match
+      - run: npm run test:lens
 
   reference-matcher:
     runs-on: ubuntu-24.04
