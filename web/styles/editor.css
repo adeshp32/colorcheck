@@ -736,6 +736,9 @@ main[data-dock="floating"] aside {
   gap: 8px;
 }
 .depth-exact-values label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-width: 0;
   font-size: 12px;

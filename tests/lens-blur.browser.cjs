@@ -366,6 +366,12 @@ const { tmpdir } = require("node:os");
       await page.locator("#depth-exact-high").press("Tab");
     };
     await setRange();
+    const exactRows = await page
+      .locator(".depth-exact-values input")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getBoundingClientRect().top),
+      );
+    assert.equal(exactRows[0], exactRows[1], "Exact focus fields stay aligned");
     assert.equal(
       await page.locator("#depth-range-value").innerText(),
       "30.1 - 70.2",
