@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>ColorCheck Photos</title>
+    <link rel="icon" type="image/svg+xml" href="./assets/brand/favicon.svg" />
+    <link rel="stylesheet" href="./styles/editor.css" />
+    <script type="module" src="./src/editor-controller.js"></script>
+  </head>
+  <body>
+    <header>
+      <a class="brand" href="./" aria-label="ColorCheck home"
+        ><svg class="brand-wordmark" viewBox="0 0 154 40" aria-hidden="true">
+          <defs>
+            <linearGradient
+              id="brand-wordmark-gradient"
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0" class="brand-stop-light" />
+              <stop offset="0.48" class="brand-stop-middle" />
+              <stop offset="1" class="brand-stop-dark" />
+            </linearGradient>
+            <linearGradient
+              id="brand-period-gradient"
+              x1="0"
+              y1="1"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0" class="brand-stop-period-light" />
+              <stop offset="1" class="brand-stop-period-dark" />
+            </linearGradient>
+          </defs>
+          <text
+            x="1"
+            y="29"
+            fill="url(#brand-wordmark-gradient)"
+            font-family="Avenir Next, Inter, Helvetica Neue, Arial, sans-serif"
+            font-size="28"
+            font-weight="700"
+            letter-spacing="0"
+            textLength="137"
+            lengthAdjust="spacingAndGlyphs"
+          >
+            colorcheck
+          </text>
+          <circle
+            cx="147"
+            cy="26.5"
+            r="3.2"
+            fill="url(#brand-period-gradient)"
+          /></svg></a
+      ><span class="edition">Photos</span
+      ><span class="privacy">On-device editing</span>
+      <details class="button-theme" id="button-theme">
+        <summary title="Button theme">
+          <span class="theme-swatch" aria-hidden="true"></span
+          ><span class="theme-label">Button theme</span>
+        </summary>
+        <div class="theme-options">
+          <label for="theme-color">Button theme</label>
+          <div class="theme-fields">
+            <input
+              id="theme-color"
+              type="color"
+              value="#7777ff"
+              aria-label="Choose button theme color"
+            />
+            <input
+              id="theme-hex"
+              type="text"
+              value="#7777FF"
+              maxlength="7"
+              spellcheck="false"
+              aria-label="Button theme hex color"
+            />
+          </div>
+          <div
+            class="theme-presets"
+            role="group"
+            aria-label="Button theme presets"
+          >
+            <button
+              type="button"
+              data-theme-color="#7777ff"
+              aria-label="Violet"
+              title="Violet"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#eb5a67"
+              aria-label="Coral"
+              title="Coral"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#f49b38"
+              aria-label="Amber"
+              title="Amber"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#e5cb42"
+              aria-label="Yellow"
+              title="Yellow"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#56bd78"
+              aria-label="Green"
+              title="Green"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#38bdb6"
+              aria-label="Teal"
+              title="Teal"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#4e9ee8"
+              aria-label="Blue"
+              title="Blue"
+            ></button>
+            <button
+              type="button"
+              data-theme-color="#db75c5"
+              aria-label="Pink"
+              title="Pink"
+            ></button>
+          </div>
+          <button type="button" id="theme-reset">Reset theme</button>
+        </div>
+      </details>
+    </header>
+    <main id="editor-layout" data-dock="right">
+      <section class="workspace" aria-label="Photo workspace">
+        <div class="file-bar">
+          <label class="file-button"
+            ><img
+              class="icon"
+              src="./assets/icons/icon-image-plus.svg"
+              alt="" />
+            Photo<input
+              id="target"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f"
+          /></label>
+          <label class="file-button secondary"
+            ><img
+              class="icon"
+              src="./assets/icons/icon-image-plus.svg"
+              alt="" />
+            Reference<input
+              id="reference"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f"
+          /></label>
+          <span id="file-info"></span>
+          <button id="export" disabled>Export</button>
+        </div>
+        <div class="viewer" id="viewer">
+          <div class="empty" id="empty">
+            <h1>Find your photo's balance.</h1>
+            <p>Choose a photo. Add a reference look.</p>
+            <label class="start"
+              >Open photo<input
+                id="start-file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif,.3fr,.arw,.cr2,.cr3,.crw,.dcr,.dng,.erf,.iiq,.k25,.kdc,.mef,.mos,.mrw,.nef,.nrw,.orf,.pef,.raf,.raw,.rw2,.sr2,.srf,.srw,.x3f" /></label
+            ><small>JPEG · PNG · WebP · HEIC · RAW</small>
+          </div>
+          <canvas
+            id="preview"
+            hidden
+            aria-label="Edited photo preview"
+          ></canvas>
+          <canvas
+            id="mask-overlay"
+            hidden
+            aria-label="Mask selection: drag to reposition; arrow keys move, Shift plus arrows resize"
+            tabindex="0"
+          ></canvas>
+          <button
+            id="mask-rotate"
+            class="mask-rotate"
+            hidden
+            type="button"
+            aria-label="Rotate selected mask"
+            title="Rotate selected mask"
+            aria-pressed="false"
+          >
+            <span aria-hidden="true">&#8635;</span>
+          </button>
+          <button
+            id="mask-finish"
+            class="mask-finish"
+            hidden
+            type="button"
+            aria-label="Finish selected mask"
+            title="Finish mask"
+          >
+            <span aria-hidden="true">&#10003;</span>
+          </button>
+          <div
+            class="crop-box"
+            id="crop-box"
+            hidden
+            tabindex="0"
+            role="group"
+            aria-label="Crop selection"
+          >
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="nw"
+              aria-label="Resize crop from top left"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="n"
+              aria-label="Resize crop from top"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="ne"
+              aria-label="Resize crop from top right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="e"
+              aria-label="Resize crop from right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="se"
+              aria-label="Resize crop from bottom right"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="s"
+              aria-label="Resize crop from bottom"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="sw"
+              aria-label="Resize crop from bottom left"
+            ></button>
+            <button
+              type="button"
+              class="crop-handle"
+              data-edge="w"
+              aria-label="Resize crop from left"
+            ></button>
+          </div>
+          <div
+            id="crop-mode-menu"
+            class="crop-mode-menu"
+            hidden
+            role="group"
+            aria-label="Crop mode"
+          >
+            <button type="button" data-crop-mode="free">Free crop</button>
+            <button type="button" data-crop-mode="height">Height only</button>
+            <button type="button" data-crop-mode="width">Width only</button>
+          </div>
+          <button
+            id="apply-crop"
+            class="apply-crop"
+            hidden
+            type="button"
+            aria-label="Apply crop"
+            title="Apply crop"
+          >
+            <span aria-hidden="true">&#10003;</span>
+          </button>
+          <button
+            id="compare"
+            class="compare-hold"
+            disabled
+            title="Hold to view original"
+            aria-label="Hold to view original"
+            aria-pressed="false"
+          >
+            <img class="icon" src="./assets/icons/icon-eye.svg" alt="" />
+          </button>
+          <button
+            id="show-tools"
+            class="show-tools"
+            hidden
+            aria-label="Show editing tools"
+            title="Show editing tools"
+          >
+            <img
+              class="icon"
+              src="./assets/icons/icon-panel-bottom.svg"
+              alt=""
+            /><span>Tools</span>
+          </button>
+        </div>
+        <div class="transport">
+          <button id="undo" title="Undo" aria-label="Undo" disabled>
+            <img
+              class="icon"
+              src="./assets/icons/icon-undo-2.svg"
+              alt=""
+            /></button
+          ><button id="redo" title="Redo" aria-label="Redo" disabled>
+            <img
+              class="icon"
+              src="./assets/icons/icon-redo-2.svg"
+              alt=""
+            /></button
+          ><button id="reset" disabled>Reset edits</button
+          ><span id="status" role="status" aria-live="polite"
+            >Photos stay on this device.</span
+          >
+        </div>
+      </section>
+      <aside id="editing-tools" aria-label="Editing tools">
+        <div class="panel-bar">
+          <button
+            id="panel-resize"
+            type="button"
+            aria-label="Resize tool panel"
+            title="Drag to resize tools; arrow keys adjust height"
+          ></button>
+          <button
+            id="panel-grip"
+            title="Detach and move tools; arrow keys move the floating panel"
+            aria-label="Move editing tools"
+          >
+            <img class="icon" src="./assets/icons/icon-grip.svg" alt="" />
+          </button>
+          <span>Tools</span>
+          <button
+            id="close-tools"
+            aria-label="Collapse tool controls"
+            title="Collapse controls"
+          >
+            ×
+          </button>
+          <div
+            class="panel-docks"
+            role="group"
+            aria-label="Tool panel position"
+          >
+            <button
+              data-dock-mode="right"
+              aria-label="Dock tools right"
+              title="Dock right"
+              aria-pressed="true"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panel-right.svg"
+                alt=""
+              />
+            </button>
+            <button
+              data-dock-mode="bottom"
+              aria-label="Dock tools bottom"
+              title="Dock bottom"
+              aria-pressed="false"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panel-bottom.svg"
+                alt=""
+              />
+            </button>
+            <button
+              data-dock-mode="floating"
+              aria-label="Detach tools"
+              title="Float and resize"
+              aria-pressed="false"
+            >
+              <img
+                class="icon"
+                src="./assets/icons/icon-panels-top-left.svg"
+                alt=""
+              />
+            </button>
+          </div>
+        </div>
+        <nav class="tools" aria-label="Tools">
+          <button data-panel="mask" title="Local masks">
+            <img
+              class="icon"
+              src="./assets/icons/icon-scan-line.svg"
+              alt=""
+            /><span>Masks</span>
+          </button>
+          <button
+            data-panel="match"
+            aria-selected="true"
+            title="Reference matcher and optional enhancements"
+          >
+            <img
+              class="icon"
+              src="./assets/icons/icon-wand-sparkles.svg"
+              alt=""
+            /><span>Matcher</span></button
+          ><button data-panel="light" title="Light and tone">
+            <img class="icon" src="./assets/icons/icon-sun.svg" alt="" /><span
+              >Light</span
+            ></button
+          ><button data-panel="color" title="Color and grading">
+            <img
+              class="icon"
+              src="./assets/icons/icon-palette.svg"
+              alt=""
+            /><span>Color</span></button
+          ><button data-panel="detail" title="Detail adjustments">
+            <img
+              class="icon"
+              src="./assets/icons/icon-scan-line.svg"
+              alt=""
+            /><span>Detail</span></button
+          ><button data-panel="crop" title="Crop and composition">
+            <img class="icon" src="./assets/icons/icon-crop.svg" alt="" /><span
+              >Crop</span
+            ></button
+          ><button data-panel="output" title="Export settings">
+            <img
+              class="icon"
+              src="./assets/icons/icon-download.svg"
+              alt=""
+            /><span>Output</span>
+          </button>
+        </nav>
+        <label class="adjustment-scope"
+          >Editing<select id="adjustment-scope" aria-label="Adjustment scope">
+            <option value="">Whole photo</option>
+          </select></label
+        >
+        <div class="inspector" id="inspector">
+          <section data-section="mask" hidden>
+            <h2>Masks</h2>
+            <div class="commands">
+              <button id="add-radial">+ Radial</button
+              ><button id="add-linear">+ Linear</button>
+            </div>
+            <div id="mask-settings" hidden>
+              <label>Name<input id="mask-name" maxlength="48" /></label>
+              <div class="mask-toggles">
+                <label class="check"
+                  ><input
+                    id="mask-enabled"
+                    type="checkbox"
+                    checked
+                  />Enabled</label
+                ><label class="check"
+                  ><input id="mask-invert" type="checkbox" />Outside</label
+                ><label class="check"
+                  ><input
+                    id="mask-show"
+                    type="checkbox"
+                    checked
+                  />Overlay</label
+                >
+              </div>
+              <label
+                >Shape<select
+                  id="mask-component"
+                  aria-label="Mask component"
+                ></select
+              ></label>
+              <div class="commands">
+                <select id="mask-operation" aria-label="New shape operation">
+                  <option value="add">Add area</option>
+                  <option value="subtract">Subtract area</option>
+                  <option value="intersect">Intersect area</option></select
+                ><button id="append-radial">+ Radial</button
+                ><button id="append-linear">+ Linear</button
+                ><button id="remove-component">Remove shape</button>
+              </div>
+              <div class="commands">
+                <button id="subtract-radial">- Radial</button>
+                <button id="subtract-linear">- Linear</button>
+              </div>
+              <div id="mask-geometry"></div>
+              <label
+                >Refine by<select id="mask-refinement">
+                  <option value="none">No range restriction</option>
+                  <option value="luminance">Luminance range</option>
+                  <option value="color">Color range</option>
+                </select></label
+              >
+              <div id="mask-luminance" hidden></div>
+              <div id="mask-color" hidden>
+                <label
+                  >Color<input
+                    id="mask-color-value"
+                    type="color"
+                    value="#808080"
+                /></label>
+                <div id="mask-color-controls"></div>
+              </div>
+              <div class="commands">
+                <button id="duplicate-mask">Duplicate mask</button
+                ><button id="delete-mask">Delete mask</button>
+              </div>
+              <p class="note">
+                Color and light controls apply to the selected mask. Crop,
+                rotation, and export apply to the whole photo.
+              </p>
+            </div>
+          </section>
+          <section data-section="match">
+            <h2>Matcher</h2>
+            <h3 class="section-label">Reference match</h3>
+            <div id="reference-preview"><span>No reference selected</span></div>
+            <button id="match" disabled>Match reference</button>
+            <div id="match-controls"></div>
+            <p class="note">
+              Distribution detail is an experimental tonal refinement. It starts
+              off and keeps the original matcher intact.
+            </p>
+            <p class="note" id="match-note">
+              Reference matching is adjustable, not an exact recreation.
+            </p>
+            <div
+              class="smart-enhance quick-enhance"
+              id="smart-enhance"
+              data-state="idle"
+            >
+              <div class="smart-enhance-heading">
+                <div>
+                  <h3>Quick Enhance</h3>
+                  <span>Optional single-photo suggestion</span>
+                </div>
+                <span class="model-badge">On-device ML</span>
+              </div>
+              <p>
+                Builds a conservative look without a reference. Manual controls
+                remain available afterward.
+              </p>
+              <div class="smart-enhance-actions">
+                <button id="enhance" disabled>Run Quick Enhance</button>
+                <button id="cancel-enhance" hidden>Cancel</button>
+              </div>
+            </div>
+            <div class="model-result-controls">
+              <div id="enhancement-controls"></div>
+              <button id="remove-enhance" hidden>Remove active model</button>
+              <p
+                class="note"
+                id="enhancement-status"
+                role="status"
+                aria-live="polite"
+              >
+                Ready when a photo is open.
+              </p>
+              <details class="model-options">
+                <summary>Model storage</summary>
+                <button id="clear-model-cache">Clear downloaded models</button>
+              </details>
+            </div>
+          </section>
+          <section data-section="light" hidden>
+            <h2>Light &amp; tone</h2>
+            <div id="light-controls"></div>
+            <button id="open-curves" class="advanced-tool">Curves</button>
+            <div id="curve-panel">
+              <h3>Tone curve</h3>
+              <canvas
+                id="curve-preview"
+                width="320"
+                height="320"
+                aria-label="Tone curve"
+                tabindex="0"
+              ></canvas>
+              <div
+                id="curve-channels"
+                class="segments"
+                role="group"
+                aria-label="Curve channel"
+              >
+                <button data-channel="master" aria-pressed="true">RGB</button
+                ><button data-channel="red" aria-pressed="false">Red</button
+                ><button data-channel="green" aria-pressed="false">Green</button
+                ><button data-channel="blue" aria-pressed="false">Blue</button>
+              </div>
+              <details id="curve-point-options" open>
+                <summary>Selected point</summary>
+                <select id="curve">
+                  <option value="custom" disabled>Custom curve</option>
+                  <option value="linear">Linear</option>
+                  <option value="soft">Soft contrast</option>
+                  <option value="strong">Strong contrast</option>
+                  <option value="matte">Lifted blacks</option>
+                </select>
+                <div class="curve-values">
+                  <label
+                    >Input<input
+                      id="curve-input"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1" /></label
+                  ><label
+                    >Output<input
+                      id="curve-output"
+                      type="number"
+                      min="0"
+                      max="255"
+                      step="1"
+                  /></label>
+                </div>
+                <div class="commands">
+                  <button id="delete-curve-point">Remove point</button
+                  ><button id="reset-curve-channel">Reset channel</button>
+                </div>
+              </details>
+            </div>
+            <canvas
+              id="histogram"
+              width="256"
+              height="72"
+              aria-label="Photo luminance histogram"
+            ></canvas>
+          </section>
+          <section data-section="color" hidden>
+            <h2>Color</h2>
+            <div id="color-controls"></div>
+            <button id="open-color-mixer" class="advanced-tool">
+              Color mixer
+            </button>
+            <div id="color-mixer-panel">
+              <h3>Color mixer</h3>
+              <div
+                id="color-bands"
+                class="color-bands"
+                role="group"
+                aria-label="Color ranges"
+              ></div>
+              <div id="color-mixer-controls"></div>
+              <button id="reset-color-band">Reset this color</button>
+            </div>
+            <label class="check"
+              ><input id="bw" type="checkbox" />Black &amp; white</label
+            >
+            <button id="open-grading" class="advanced-tool">
+              Color wheels
+            </button>
+            <div id="grading-panel">
+              <h3>Color grading</h3>
+              <div class="segments" id="ranges">
+                <button data-range="global" aria-pressed="true">Global</button
+                ><button data-range="shadows" aria-pressed="false">
+                  Shadows</button
+                ><button data-range="midtones" aria-pressed="false">Mids</button
+                ><button data-range="highlights" aria-pressed="false">
+                  Lights
+                </button>
+              </div>
+              <canvas
+                id="wheel"
+                width="440"
+                height="440"
+                tabindex="0"
+                role="slider"
+                aria-label="Color grading wheel; arrow keys adjust hue and saturation"
+                aria-valuemin="0"
+                aria-valuemax="360"
+                aria-valuenow="0"
+              ></canvas>
+              <div id="grade-controls"></div>
+              <button id="reset-grade">Reset this range</button>
+            </div>
+          </section>
+          <section data-section="detail" hidden>
+            <h2>Detail</h2>
+            <div id="detail-controls"></div>
+            <h3 class="section-label">Lens blur</h3>
+            <div class="commands lens-methods">
+              <button id="analyze-depth" disabled>Analyze photo</button>
+              <button id="cancel-depth" hidden>Cancel</button>
+              <button id="lens-radial" disabled>Radial</button>
+              <button id="lens-linear" disabled>Linear</button>
+            </div>
+            <label class="check"
+              ><input id="lens-enabled" type="checkbox" disabled />Lens
+              blur</label
+            >
+            <div id="lens-controls"></div>
+            <details id="depth-inspector" open hidden>
+              <summary>
+                Focus range <output id="depth-range-value"></output>
+              </summary>
+              <div class="depth-map-stage" id="depth-map-stage">
+                <canvas
+                  id="depth-preview"
+                  width="256"
+                  height="192"
+                  aria-label="Relative depth with sharp areas highlighted"
+                  hidden
+                ></canvas>
+                <button
+                  id="depth-focus-handle"
+                  class="depth-focus-handle"
+                  type="button"
+                  title="Drag focus point"
+                  aria-label="Focus point; arrow keys move focus"
+                >
+                  <img
+                    src="./assets/icons/icon-scan-line.svg"
+                    alt=""
+                    class="icon"
+                  />
+                </button>
+              </div>
+              <div
+                class="depth-range-track"
+                id="depth-range-track"
+                role="group"
+                aria-label="In-focus depth range"
+              >
+                <canvas
+                  id="depth-range-histogram"
+                  width="256"
+                  height="32"
+                  aria-hidden="true"
+                ></canvas>
+                <button
+                  id="depth-focus-band"
+                  class="depth-focus-band"
+                  type="button"
+                  role="slider"
+                  aria-label="Focus range position"
+                ></button>
+                <button
+                  id="depth-range-low"
+                  class="depth-range-handle"
+                  type="button"
+                  role="slider"
+                  aria-label="Far focus boundary"
+                ></button>
+                <button
+                  id="depth-range-high"
+                  class="depth-range-handle"
+                  type="button"
+                  role="slider"
+                  aria-label="Near focus boundary"
+                ></button>
+              </div>
+              <div class="depth-range-labels">
+                <span>Far</span><span>Near</span>
+              </div>
+              <div class="depth-precision-row">
+                <label class="check"
+                  ><input id="depth-fine" type="checkbox" />Fine
+                  adjustment</label
+                >
+                <details id="depth-exact">
+                  <summary>Exact range</summary>
+                  <div class="depth-exact-values">
+                    <label
+                      >Far<input
+                        id="depth-exact-low"
+                        type="number"
+                        inputmode="decimal"
+                        min="0"
+                        max="99"
+                        step="0.1"
+                    /></label>
+                    <label
+                      >Near<input
+                        id="depth-exact-high"
+                        type="number"
+                        inputmode="decimal"
+                        min="1"
+                        max="100"
+                        step="0.1"
+                    /></label>
+                  </div>
+                </details>
+              </div>
+            </details>
+            <div class="lens-focus-actions">
+              <button
+                id="lens-auto-focus"
+                type="button"
+                title="Set focus and width from the center of the visible photo"
+                disabled
+              >
+                <img
+                  src="./assets/icons/icon-scan-line.svg"
+                  alt=""
+                  class="icon"
+                />Auto focus
+              </button>
+              <label class="check" id="lens-pick-row" hidden
+                ><input id="lens-pick" type="checkbox" disabled />Pick on
+                photo</label
+              >
+            </div>
+            <details id="lens-advanced">
+              <summary>Bokeh &amp; refinement</summary>
+              <label
+                >Blur region<select id="lens-mode">
+                  <option value="background">Behind focus</option>
+                  <option value="foreground">In front of focus</option>
+                  <option value="all">Both sides</option>
+                </select></label
+              >
+              <label
+                >Aperture<select id="lens-blades">
+                  <option value="0">Circular</option>
+                  <option value="5">5 blades</option>
+                  <option value="6">6 blades</option>
+                  <option value="7">7 blades</option>
+                  <option value="8">8 blades</option>
+                  <option value="9">9 blades</option>
+                </select></label
+              >
+              <div id="lens-advanced-controls"></div>
+              <button
+                id="rotate-bokeh"
+                type="button"
+                title="Rotate aperture 15 degrees"
+                aria-label="Rotate aperture 15 degrees"
+              >
+                <span aria-hidden="true">&#8635;</span>
+              </button>
+            </details>
+            <p id="lens-status" class="note" role="status" aria-live="polite">
+              Depth analysis is optional. Radial and linear blur work without a
+              model.
+            </p>
+            <details class="lens-precision">
+              <summary>Color precision</summary>
+              <p id="photo-precision" class="note">
+                Blur uses floating-point linear-light calculations. The current
+                editor and output remain 8-bit sRGB.
+              </p>
+            </details>
+            <p class="note">
+              Sharpening accentuates existing detail; it does not recover
+              missing information.
+            </p>
+          </section>
+          <section data-section="crop" hidden>
+            <h2>Composition</h2>
+            <div
+              class="composition-modes"
+              role="group"
+              aria-label="Composition mode"
+            >
+              <button id="edit-crop" aria-pressed="true">Crop</button
+              ><button id="edit-expand" aria-pressed="false">Expand</button>
+            </div>
+            <div id="crop-options">
+              <label
+                >Aspect ratio<select id="ratio">
+                  <option value="free">Free</option>
+                  <option value="1">Square</option>
+                  <option value="1.333333">4:3</option>
+                  <option value="0.8">4:5</option>
+                  <option value="0.5625">9:16</option>
+                  <option value="1.777778">16:9</option>
+                </select></label
+              >
+              <div id="crop-controls"></div>
+              <div class="commands">
+                <button id="rotate-left" title="Rotate left">↶ 90°</button
+                ><button id="rotate-right" title="Rotate right">↷ 90°</button
+                ><button id="flip">Flip</button>
+              </div>
+              <button id="reset-crop">Reset crop</button>
+            </div>
+            <div id="expand-options" hidden>
+              <label class="check"
+                ><input id="expand-linked" type="checkbox" checked />Link
+                borders</label
+              >
+              <div id="expand-controls"></div>
+              <button id="reset-expand">Reset borders</button>
+            </div>
+          </section>
+          <section data-section="output" hidden>
+            <h2>Export</h2>
+            <label
+              >Format<select id="format">
+                <option value="image/jpeg">JPEG</option>
+                <option value="image/png">PNG</option>
+                <option value="image/webp">WebP</option>
+              </select></label
+            >
+            <div id="output-controls"></div>
+            <p id="output-size"></p>
+            <label class="check"
+              ><input id="report" type="checkbox" />Include settings
+              report</label
+            >
+            <p class="note">
+              sRGB output. Location metadata is not copied. PNG is lossless;
+              JPEG and WebP use the selected quality.
+            </p>
+          </section>
+        </div>
+      </aside>
+      <button
+        id="restore-tools"
+        hidden
+        aria-label="Restore editing tools"
+        title="Restore editing tools"
+      >
+        <img class="icon" src="./assets/icons/icon-panel-right.svg" alt="" />
+      </button>
+    </main>
+    <section class="product-info" aria-label="About ColorCheck">
+      <p>
+        ColorCheck helps you bring a reference photo's color and tone into your
+        own image, with simple controls to make the result your own.
+      </p>
+    </section>
+    <footer class="social-footer">
+      <a
+        href="https://adideshpande.dev/"
+        target="_blank"
+        rel="noreferrer"
+        aria-label="Aditya Deshpande portfolio"
+        title="Portfolio"
+        ><svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20" />
+          <path
+            d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10A15.3 15.3 0 0 1 12 2z"
+          /></svg
+      ></a>
+    </footer>
+    <dialog id="export-dialog">
+      <h2>Export photo</h2>
+      <p id="export-progress" role="status">Rendering original resolution…</p>
+      <button id="cancel-export">Cancel</button>
+    </dialog>
+  </body>
+</html>

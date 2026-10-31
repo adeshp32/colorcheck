@@ -1,0 +1,367 @@
+import { buildCurveTable, lookupCurve } from "./tone-curves.js";
+import { prepareColorMix, mixColorInto } from "./color-mixer.js";
+import { grainAt } from "./film-grain.js";
+import { buildHistogramMaps } from "./histogram-match.js";
+import {
+  buildPerceptualMatch,
+  applyPerceptualMatch,
+} from "./perceptual-match.js";
+import { maskCoverage, hasLocalAdjustments, prepareMask } from "./masking.js";
+export const clamp = (v, min = 0, max = 1) => Math.min(max, Math.max(min, v));
+/** Neutral, serializable settings. Crop coordinates and strengths are percentages. */
+export function createDefaultEditSettings() {
+  return {
+    exposure: 0,
+    contrast: 0,
+    highlights: 0,
+    shadows: 0,
+    whites: 0,
+    blacks: 0,
+    temperature: 0,
+    tint: 0,
+    saturation: 0,
+    vibrance: 0,
+    sharpen: 0,
+    vignette: 0,
+    grain: 0,
+    grainSize: 1,
+    bw: false,
+    curve: "linear",
+    matchColor: 0,
+    matchTone: 0,
+    matchDistributionStrength: 0,
+    match: null,
+    rotation: 0,
+    flip: false,
+    crop: { x: 0, y: 0, w: 100, h: 100 },
+    expand: { left: 0, right: 0, top: 0, bottom: 0 },
+    lensBlur: {
+      enabled: false,
+      amount: 25,
+      focus: 50,
+      range: 12,
+      mode: "background",
+      blades: 0,
+      angle: 0,
+      roundness: 0,
+      edgeProtection: 70,
+    },
+    grades: Object.fromEntries(
+      ["global", "shadows", "midtones", "highlights"].map((k) => [
+        k,
+        { hue: 0, saturation: 0, amount: 20 },
+      ]),
+    ),
+  };
+}
+/** Mean/spread in normalized RGB; mostly transparent pixels do not affect the match. */
+export function calculateChannelStatistics(data) {
+  const mean = [0, 0, 0],
+    variance = [0, 0, 0];
+  let count = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue;
+    count++;
+    for (let c = 0; c < 3; c++) mean[c] += data[i + c] / 255;
+  }
+  if (!count) throw new Error("The image has no opaque pixels to match.");
+  for (let c = 0; c < 3; c++) mean[c] /= count;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] < 128) continue;
+    for (let c = 0; c < 3; c++)
+      variance[c] += (data[i + c] / 255 - mean[c]) ** 2;
+  }
+  return { mean, std: variance.map((v) => Math.sqrt(v / count)) };
+}
+/** Derive bounded spread gains and mean offsets; this is not learned inference. */
+export function calculateReferenceMatch(source, reference) {
+  return {
+    gain: source.std.map((v, c) =>
+      clamp(reference.std[c] / Math.max(v, 0.015), 0.65, 1.5),
+    ),
+    source: source.mean,
+    reference: reference.mean,
+  };
+}
+/** Add a three-channel 256-entry quantile transform to an existing match. */
+export function calculateDistributionMatch(
+  sourcePixels,
+  referencePixels,
+  match,
+) {
+  return {
+    ...match,
+    distributionMaps: buildHistogramMaps(sourcePixels, referencePixels),
+  };
+}
+/** New UI matches separate lightness/chroma; legacy match records stay supported. */
+export function calculatePerceptualReferenceMatch(
+  sourcePixels,
+  referencePixels,
+) {
+  return {
+    ...calculateReferenceMatch(
+      calculateChannelStatistics(sourcePixels),
+      calculateChannelStatistics(referencePixels),
+    ),
+    perceptual: buildPerceptualMatch(sourcePixels, referencePixels),
+  };
+}
+export function hueToRgb(hue) {
+  const h = (((hue % 360) + 360) % 360) / 60,
+    x = 1 - Math.abs((h % 2) - 1);
+  return [
+    [1, x, 0],
+    [x, 1, 0],
+    [0, 1, x],
+    [0, x, 1],
+    [x, 0, 1],
+    [1, 0, x],
+  ][Math.floor(h)];
+}
+export function applyToneCurve(v, name) {
+  if (name === "matte") return 0.035 + 0.93 * v;
+  const amount = name === "strong" ? 0.35 : name === "soft" ? 0.16 : 0;
+  if (!amount) return clamp(v);
+  return clamp(v + amount * Math.sin((v - 0.5) * Math.PI * 2) * 0.25);
+}
+/**
+ * Pure RGBA transformation shared by preview and export. Does not mutate input.
+ * Processing is gamma-encoded sRGB, not scene-linear camera RAW processing.
+ * Returns an 8-bit pixel buffer and a diagnostic 64-bin luminance histogram.
+ */
+export function applyPhotoAdjustments(
+  data,
+  width,
+  height,
+  edits,
+  collectHistogram = true,
+) {
+  const out = new Uint8ClampedArray(data.length),
+    grades = Object.entries(edits.grades)
+      .filter(([, g]) => g.amount && g.saturation)
+      .map(([range, g]) => {
+        const rgb = hueToRgb(g.hue),
+          mean = rgb.reduce((a, b) => a + b, 0) / 3;
+        return {
+          range,
+          rgb: rgb.map(
+            (v) =>
+              (((((v - mean) * g.saturation) / 100) * g.amount) / 100) * 0.35,
+          ),
+        };
+      });
+  const histogram = new Uint32Array(64);
+  const colorMix = prepareColorMix(edits.colorMix);
+  const curveTables = ["master", "red", "green", "blue"].map((channel) =>
+    buildCurveTable(edits.curves?.[channel]),
+  );
+  const exposure = 2 ** edits.exposure,
+    contrast = 1 + edits.contrast / 100,
+    temperature = (edits.temperature / 100) * 0.08,
+    tintRed = (edits.tint / 100) * 0.03,
+    tintGreen = (edits.tint / 100) * 0.06,
+    matchColor = edits.matchColor / 100,
+    matchTone = edits.matchTone / 100,
+    matchDistributionStrength = clamp(
+      (edits.matchDistributionStrength || 0) / 100,
+    ),
+    distributionMaps = matchDistributionStrength
+      ? edits.match?.distributionMaps
+      : null,
+    enhanced = new Float64Array(3),
+    matchScratch = new Float64Array(3);
+  // Scalars avoid allocating multiple RGB arrays and callbacks for every pixel.
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i] / 255,
+      g = data[i + 1] / 255,
+      b = data[i + 2] / 255;
+    if (edits.match) {
+      const m = edits.match;
+      if (m.perceptual?.version === 1) {
+        applyPerceptualMatch(
+          r,
+          g,
+          b,
+          m.perceptual,
+          matchColor,
+          matchTone,
+          matchDistributionStrength,
+          enhanced,
+          matchScratch,
+        );
+        r = enhanced[0];
+        g = enhanced[1];
+        b = enhanced[2];
+      } else {
+        const matchedR =
+          r +
+          (m.reference[0] - m.source[0]) * matchColor +
+          (r - m.source[0]) * (m.gain[0] - 1) * matchTone;
+        const matchedG =
+          g +
+          (m.reference[1] - m.source[1]) * matchColor +
+          (g - m.source[1]) * (m.gain[1] - 1) * matchTone;
+        const matchedB =
+          b +
+          (m.reference[2] - m.source[2]) * matchColor +
+          (b - m.source[2]) * (m.gain[2] - 1) * matchTone;
+        const detailR = distributionMaps
+          ? clamp(
+              distributionMaps[0][Math.round(clamp(r) * 255)] / 255 - r,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        const detailG = distributionMaps
+          ? clamp(
+              distributionMaps[1][Math.round(clamp(g) * 255)] / 255 - g,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        const detailB = distributionMaps
+          ? clamp(
+              distributionMaps[2][Math.round(clamp(b) * 255)] / 255 - b,
+              -0.12,
+              0.12,
+            ) * matchDistributionStrength
+          : 0;
+        r = matchedR + detailR;
+        g = matchedG + detailG;
+        b = matchedB + detailB;
+      }
+    }
+    r *= exposure;
+    g *= exposure;
+    b *= exposure;
+    const l = clamp(0.2126 * r + 0.7152 * g + 0.0722 * b);
+    const shadow = (1 - l) ** 2,
+      highlight = l * l;
+    const lift =
+      (edits.shadows / 100) * shadow * 0.25 +
+      (edits.highlights / 100) * highlight * 0.25 +
+      (edits.blacks ? (edits.blacks / 100) * (1 - l) ** 4 * 0.15 : 0) +
+      (edits.whites ? (edits.whites / 100) * l ** 4 * 0.15 : 0);
+    r = applyToneCurve((r - 0.5) * contrast + 0.5 + lift, edits.curve);
+    g = applyToneCurve((g - 0.5) * contrast + 0.5 + lift, edits.curve);
+    b = applyToneCurve((b - 0.5) * contrast + 0.5 + lift, edits.curve);
+    if (edits.curves) {
+      r = lookupCurve(curveTables[1], lookupCurve(curveTables[0], r));
+      g = lookupCurve(curveTables[2], lookupCurve(curveTables[0], g));
+      b = lookupCurve(curveTables[3], lookupCurve(curveTables[0], b));
+    }
+    r += temperature;
+    b -= temperature;
+    g -= tintGreen;
+    r += tintRed;
+    b += tintRed;
+    for (const grade of grades) {
+      const weight =
+        grade.range === "global"
+          ? 1
+          : grade.range === "shadows"
+            ? shadow
+            : grade.range === "highlights"
+              ? highlight
+              : 4 * l * (1 - l);
+      r += grade.rgb[0] * weight;
+      g += grade.rgb[1] * weight;
+      b += grade.rgb[2] * weight;
+    }
+    if (colorMix) {
+      mixColorInto(r, g, b, colorMix, enhanced);
+      r = enhanced[0];
+      g = enhanced[1];
+      b = enhanced[2];
+    }
+    const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const chroma = Math.max(r, g, b) - Math.min(r, g, b),
+      sat = edits.bw
+        ? 0
+        : Math.max(
+            0,
+            1 +
+              edits.saturation / 100 +
+              (edits.vibrance / 100) * (1 - clamp(chroma)),
+          );
+    let vignette = 1;
+    if (edits.vignette) {
+      const px = (i / 4) % width,
+        py = Math.floor(i / 4 / width);
+      const radius = ((px / width - 0.5) ** 2 + (py / height - 0.5) ** 2) * 2;
+      vignette = 1 - (edits.vignette / 100) * radius * 0.65;
+    }
+    out[i] = clamp((gray + (r - gray) * sat) * vignette) * 255;
+    out[i + 1] = clamp((gray + (g - gray) * sat) * vignette) * 255;
+    out[i + 2] = clamp((gray + (b - gray) * sat) * vignette) * 255;
+    out[i + 3] = data[i + 3];
+    if (collectHistogram)
+      histogram[Math.min(63, Math.floor(clamp(gray) * 64))]++;
+  }
+  if (edits.sharpen > 0) {
+    const copy = out.slice(),
+      amount = (edits.sharpen / 100) * 0.65;
+    for (let y = 1; y < height - 1; y++)
+      for (let x = 1; x < width - 1; x++) {
+        const i = (y * width + x) * 4;
+        for (let c = 0; c < 3; c++) {
+          const blur =
+            (copy[i - 4 + c] +
+              copy[i + 4 + c] +
+              copy[i - width * 4 + c] +
+              copy[i + width * 4 + c]) /
+            4;
+          out[i + c] = copy[i + c] + amount * (copy[i + c] - blur);
+        }
+      }
+  }
+  if (edits.grain > 0) {
+    const amount = (edits.grain / 100) * 60;
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (!out[i + 3]) continue;
+        const value = grainAt(x, y, width, height, edits.grainSize) * amount;
+        for (let c = 0; c < 3; c++) out[i + c] += value;
+      }
+  }
+  let masked = false;
+  for (const mask of (edits.masks ?? []).slice(0, 8)) {
+    if (!mask.enabled || !hasLocalAdjustments(mask.adjustments)) continue;
+    masked = true;
+    const preparedMask = prepareMask(mask);
+    const adjusted = applyPhotoAdjustments(
+      out,
+      width,
+      height,
+      { ...mask.adjustments, masks: [] },
+      false,
+    ).data;
+    const rgb = [0, 0, 0];
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        rgb[0] = data[i];
+        rgb[1] = data[i + 1];
+        rgb[2] = data[i + 2];
+        const amount = maskCoverage(
+          preparedMask,
+          (x + 0.5) / width,
+          (y + 0.5) / height,
+          rgb,
+        );
+        for (let c = 0; c < 3; c++)
+          out[i + c] += (adjusted[i + c] - out[i + c]) * amount;
+      }
+  }
+  if ((masked || edits.grain > 0) && collectHistogram) {
+    histogram.fill(0);
+    for (let i = 0; i < out.length; i += 4) {
+      const gray =
+        (0.2126 * out[i] + 0.7152 * out[i + 1] + 0.0722 * out[i + 2]) / 255;
+      histogram[Math.min(63, Math.floor(gray * 64))]++;
+    }
+  }
+  return { data: out, histogram };
+}
