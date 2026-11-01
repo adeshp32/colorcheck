@@ -1066,6 +1066,29 @@ main:fullscreen {
 .image-fullscreen .social-footer {
   display: none;
 }
+@media (min-width: 761px) {
+  .image-fullscreen main[data-dock="right"] {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .image-fullscreen main[data-dock="right"] .workspace,
+  .image-fullscreen main[data-dock="right"] aside {
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+  }
+  .image-fullscreen main[data-dock="right"] aside {
+    overflow: hidden;
+  }
+  .image-fullscreen main[data-dock="right"] .inspector {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
 @media (max-width: 760px) {
   .viewer[data-tool-swipe="true"] {
     touch-action: none;
@@ -1344,31 +1367,11 @@ select {
 }
 .smart-enhance-heading {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  align-items: center;
 }
 .smart-enhance-heading h3 {
-  margin: 0 0 3px;
-  font-size: 15px;
-}
-.smart-enhance-heading div > span,
-.smart-enhance > p {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.45;
-}
-.smart-enhance > p {
-  margin: 12px 0;
-}
-.model-badge {
-  flex: none;
-  padding: 4px 6px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 700;
+  margin: 0 0 8px;
+  font-size: 14px;
 }
 .smart-enhance-actions {
   display: flex;
