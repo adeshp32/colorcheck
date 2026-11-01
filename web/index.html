@@ -521,7 +521,22 @@
           <section data-section="match">
             <h2>Matcher</h2>
             <h3 class="section-label">Reference match</h3>
-            <div id="reference-preview"><span>No reference selected</span></div>
+            <button
+              id="reference-preview"
+              type="button"
+              aria-label="Add a reference photo"
+              title="Add a reference photo"
+              data-has-reference="false"
+            >
+              <span class="reference-preview-empty">
+                <img
+                  class="icon"
+                  src="./assets/icons/icon-image-plus.svg"
+                  alt=""
+                />
+                <span id="reference-picker-label">Add reference</span>
+              </span>
+            </button>
             <button id="match" disabled>Match reference</button>
             <div id="match-controls"></div>
             <p class="note">
