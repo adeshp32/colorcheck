@@ -185,9 +185,13 @@ export function initializeWorkspaceLayout(onPreviewLayout) {
         (mobileView || cropActive)
           ? 104
           : 0;
-    const sheet = document.querySelector(".single-adjustment:not([hidden])");
+    const sheet = document.querySelector(".single-adjustment:not([hidden])"),
+      compositionQuick = document.querySelector(
+        ".composition-quick:not([hidden])",
+      );
     const obstruction = mobileView
       ? sheet ||
+        compositionQuick ||
         (layout.dataset.tray === "open" && layout.dataset.dock !== "floating"
           ? panel
           : null)

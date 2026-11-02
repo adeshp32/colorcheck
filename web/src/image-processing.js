@@ -49,7 +49,7 @@ export function createDefaultEditSettings() {
     grades: Object.fromEntries(
       ["global", "shadows", "midtones", "highlights"].map((k) => [
         k,
-        { hue: 0, saturation: 0, amount: 20 },
+        { hue: 0, saturation: 0, amount: 40 },
       ]),
     ),
   };

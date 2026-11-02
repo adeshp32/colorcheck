@@ -11,51 +11,57 @@
   </head>
   <body>
     <header>
-      <a class="brand" href="./" aria-label="ColorCheck home"
-        ><svg class="brand-wordmark" viewBox="0 0 154 40" aria-hidden="true">
-          <defs>
-            <linearGradient
-              id="brand-wordmark-gradient"
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
+      <div class="brand-lockup">
+        <a class="brand" href="./" aria-label="ColorCheck home"
+          ><svg class="brand-wordmark" viewBox="0 0 154 40" aria-hidden="true">
+            <defs>
+              <linearGradient
+                id="brand-wordmark-gradient"
+                x1="0"
+                y1="0"
+                x2="1"
+                y2="0"
+              >
+                <stop offset="0" class="brand-stop-light" />
+                <stop offset="0.48" class="brand-stop-middle" />
+                <stop offset="1" class="brand-stop-dark" />
+              </linearGradient>
+              <linearGradient
+                id="brand-period-gradient"
+                x1="0"
+                y1="1"
+                x2="1"
+                y2="0"
+              >
+                <stop offset="0" class="brand-stop-period-light" />
+                <stop offset="1" class="brand-stop-period-dark" />
+              </linearGradient>
+            </defs>
+            <text
+              x="1"
+              y="29"
+              fill="url(#brand-wordmark-gradient)"
+              font-family="Avenir Next, Inter, Helvetica Neue, Arial, sans-serif"
+              font-size="28"
+              font-weight="700"
+              letter-spacing="0"
+              textLength="137"
+              lengthAdjust="spacingAndGlyphs"
             >
-              <stop offset="0" class="brand-stop-light" />
-              <stop offset="0.48" class="brand-stop-middle" />
-              <stop offset="1" class="brand-stop-dark" />
-            </linearGradient>
-            <linearGradient
-              id="brand-period-gradient"
-              x1="0"
-              y1="1"
-              x2="1"
-              y2="0"
-            >
-              <stop offset="0" class="brand-stop-period-light" />
-              <stop offset="1" class="brand-stop-period-dark" />
-            </linearGradient>
-          </defs>
-          <text
-            x="1"
-            y="29"
-            fill="url(#brand-wordmark-gradient)"
-            font-family="Avenir Next, Inter, Helvetica Neue, Arial, sans-serif"
-            font-size="28"
-            font-weight="700"
-            letter-spacing="0"
-            textLength="137"
-            lengthAdjust="spacingAndGlyphs"
-          >
-            colorcheck
-          </text>
-          <circle
-            cx="147"
-            cy="26.5"
-            r="3.2"
-            fill="url(#brand-period-gradient)"
-          /></svg></a
-      ><span class="edition">Photos</span
+              colorcheck
+            </text>
+            <circle
+              cx="147"
+              cy="26.5"
+              r="3.2"
+              fill="url(#brand-period-gradient)"
+            /></svg
+        ></a>
+        <p class="brand-line">
+          Reference-guided color and tone, shaped by you.
+        </p>
+      </div>
+      <span class="edition">Photos</span
       ><span class="privacy">On-device editing</span>
       <details class="button-theme" id="button-theme">
         <summary title="Button theme">
@@ -285,6 +291,20 @@
           >
             <span aria-hidden="true">&#10003;</span>
           </button>
+          <div
+            id="composition-quick"
+            class="composition-quick"
+            hidden
+            role="group"
+            aria-label="Composition mode"
+          >
+            <button id="quick-crop" type="button" aria-pressed="true">
+              Crop
+            </button>
+            <button id="quick-expand" type="button" aria-pressed="false">
+              Expand
+            </button>
+          </div>
           <button
             id="compare"
             class="compare-hold"
@@ -928,12 +948,6 @@
         <img class="icon" src="./assets/icons/icon-panel-right.svg" alt="" />
       </button>
     </main>
-    <section class="product-info" aria-label="About ColorCheck">
-      <p>
-        ColorCheck helps you bring a reference photo's color and tone into your
-        own image, with simple controls to make the result your own.
-      </p>
-    </section>
     <footer class="social-footer">
       <a
         href="https://adideshpande.dev/"

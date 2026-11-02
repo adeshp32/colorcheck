@@ -1,4 +1,4 @@
-import { sampleCurve } from "./tone-curves.js";
+import { constrainCurvePoint, sampleCurve } from "./tone-curves.js";
 import { applyToneCurve } from "./image-processing.js";
 
 export function createCurveEditor({ getSettings, render, commit }) {
@@ -9,7 +9,7 @@ export function createCurveEditor({ getSettings, render, commit }) {
     output = document.querySelector("#curve-output");
   let channel = "master",
     selected = 0,
-    dragging = false;
+    dragging = null;
   const graph = {
     left: 20,
     top: 20,
@@ -157,36 +157,41 @@ export function createCurveEditor({ getSettings, render, commit }) {
         p.push(added);
         p.sort((a, b) => a.x - b.x);
         closest = p.indexOf(added);
+        Object.assign(added, constrainCurvePoint(p, closest, added.x, added.y));
       }
     }
     selected = closest;
-    dragging = true;
+    dragging = {
+      pointerId: event.pointerId,
+      startAt: at,
+      startPoint: { ...p[selected] },
+    };
     canvas.setPointerCapture(event.pointerId);
     draw();
     render(true);
   };
   function move(x, y) {
     const p = editable(),
-      point = p[selected];
-    if (selected > 0 && selected < p.length - 1)
-      point.x = Math.max(
-        p[selected - 1].x + 1 / 255,
-        Math.min(p[selected + 1].x - 1 / 255, x),
-      );
-    point.y = Math.max(0, Math.min(1, y));
+      point = p[selected],
+      safe = constrainCurvePoint(p, selected, x, y);
+    point.x = safe.x;
+    point.y = safe.y;
     draw();
     render(true);
   }
   canvas.onpointermove = (event) => {
-    if (dragging) {
+    if (dragging?.pointerId === event.pointerId) {
       const at = position(event);
-      move(at.x, at.y);
+      move(
+        dragging.startPoint.x + (at.x - dragging.startAt.x) * 0.65,
+        dragging.startPoint.y + (at.y - dragging.startAt.y) * 0.65,
+      );
     }
   };
   for (const event of ["pointerup", "pointercancel", "lostpointercapture"])
-    canvas.addEventListener(event, () => {
-      if (dragging) {
-        dragging = false;
+    canvas.addEventListener(event, (pointerEvent) => {
+      if (dragging?.pointerId === pointerEvent.pointerId) {
+        dragging = null;
         commit();
         render();
       }

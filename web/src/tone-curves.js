@@ -1,4 +1,30 @@
 /** Shape-preserving cubic Hermite interpolation with sorted, bounded control points. */
+export function constrainCurvePoint(points, index, x, y) {
+  const last = points.length - 1,
+    previous = points[index - 1],
+    next = points[index + 1],
+    spacing = 8 / 255;
+  let safeX = index === 0 ? 0 : index === last ? 1 : x;
+  if (previous && next) {
+    const available = Math.max(0, next.x - previous.x),
+      safeSpacing = Math.min(spacing, available / 3);
+    safeX = Math.max(
+      previous.x + safeSpacing,
+      Math.min(next.x - safeSpacing, safeX),
+    );
+  }
+  const previousY = previous?.y ?? 0,
+    nextY = next?.y ?? 1,
+    availableY = Math.max(0, nextY - previousY),
+    verticalSpacing = Math.min(4 / 255, availableY / 3),
+    minimumY = previous ? previousY + verticalSpacing : 0,
+    maximumY = next ? nextY - verticalSpacing : 1;
+  return {
+    x: Math.max(0, Math.min(1, safeX)),
+    y: Math.max(minimumY, Math.min(maximumY, y)),
+  };
+}
+
 export function sampleCurve(points, value) {
   const x = Math.max(0, Math.min(1, value));
   if (!points || points.length < 2) return x;

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  constrainCurvePoint,
   sampleCurve,
   buildCurveTable,
   lookupCurve,
@@ -34,6 +35,27 @@ test("editable curves preserve identity, remain bounded and do not overshoot mon
   }
   for (const point of points)
     assert.ok(Math.abs(sampleCurve(points, point.x) - point.y) < 1e-10);
+});
+test("curve points keep safe spacing and cannot create tonal reversals", () => {
+  const points = [
+    { x: 0, y: 0 },
+    { x: 0.25, y: 0.25 },
+    { x: 0.5, y: 0.5 },
+    { x: 0.75, y: 0.75 },
+    { x: 1, y: 1 },
+  ];
+  const high = constrainCurvePoint(points, 2, 0.749, 1),
+    low = constrainCurvePoint(points, 2, 0.251, 0);
+  assert.ok(high.x <= points[3].x - 8 / 255 + 1e-12);
+  assert.ok(low.x >= points[1].x + 8 / 255 - 1e-12);
+  assert.ok(high.y <= points[3].y - 4 / 255 + 1e-12);
+  assert.ok(low.y >= points[1].y + 4 / 255 - 1e-12);
+  const black = constrainCurvePoint(points, 0, 0.4, 0.9),
+    white = constrainCurvePoint(points, 4, 0.6, 0.1);
+  assert.equal(black.x, 0);
+  assert.ok(black.y <= points[1].y - 4 / 255 + 1e-12);
+  assert.equal(white.x, 1);
+  assert.ok(white.y >= points[3].y + 4 / 255 - 1e-12);
 });
 test("red-channel curves do not alter green, blue or alpha", () => {
   const edits = createDefaultEditSettings();

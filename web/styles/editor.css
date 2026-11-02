@@ -22,17 +22,6 @@ body {
   margin: 0;
   background: #0f0f10;
 }
-.product-info {
-  padding: 24px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-}
-.product-info p {
-  max-width: 640px;
-  margin: 0 auto;
-  font-size: 14px;
-  line-height: 1.6;
-}
 .social-footer {
   padding: 0 24px 24px;
   text-align: center;
@@ -96,10 +85,24 @@ header {
   background: #17171a;
 }
 .brand {
+  display: block;
   font-size: 25px;
   font-weight: 800;
   color: var(--accent);
   text-decoration: none;
+}
+.brand-lockup {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.brand-line {
+  margin: -7px 0 0 2px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
 }
 .brand-wordmark {
   display: block;
@@ -1062,7 +1065,6 @@ main:fullscreen {
   margin: 0;
   border: 0;
 }
-.image-fullscreen .product-info,
 .image-fullscreen .social-footer {
   display: none;
 }
@@ -1160,9 +1162,9 @@ main:fullscreen {
     padding: 4px 0;
   }
   .single-adjustment-content #wheel {
-    width: min(70%, 420px);
+    width: min(58%, 300px);
     height: auto;
-    margin: 8px auto 12px;
+    margin: 6px auto 8px;
   }
   .single-adjustment-content #ranges button {
     min-height: 32px;
@@ -1184,7 +1186,7 @@ main:fullscreen {
   .single-adjustment-content #grade-controls {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: 8px;
   }
   .single-adjustment-content .commands {
     margin-bottom: 0;
@@ -1539,6 +1541,9 @@ select {
   border-color: var(--accent);
   color: var(--accent);
 }
+.composition-quick {
+  display: none;
+}
 .crop-handle::after {
   content: "";
   position: absolute;
@@ -1693,6 +1698,12 @@ dialog::backdrop {
   }
   .brand {
     font-size: 23px;
+  }
+  .brand-line {
+    max-width: 210px;
+    overflow: hidden;
+    font-size: 8px;
+    text-overflow: ellipsis;
   }
   main {
     height: auto;
@@ -1979,7 +1990,6 @@ dialog::backdrop {
 .preview-mode .transport,
 .preview-mode aside,
 .preview-mode .single-adjustment,
-.preview-mode .product-info,
 .preview-mode .social-footer,
 .preview-mode .view-controls,
 .preview-mode .compare-hold,
@@ -2001,6 +2011,34 @@ dialog::backdrop {
   border: 0;
 }
 @media (max-width: 760px) {
+  .composition-quick {
+    position: absolute;
+    z-index: 5;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    width: 70px;
+    flex-direction: column;
+    gap: 3px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: rgb(30 30 35 / 88%);
+    box-shadow: 0 5px 18px #0006;
+    backdrop-filter: blur(10px);
+  }
+  .composition-quick[hidden] {
+    display: none;
+  }
+  .composition-quick button {
+    min-height: 30px;
+    padding: 3px 5px;
+    font-size: 10px;
+  }
+  .composition-quick button[aria-pressed="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
   main aside,
   main[data-dock="bottom"] aside {
     background: rgb(30 30 35 / 82%);
