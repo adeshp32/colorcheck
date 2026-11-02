@@ -892,12 +892,18 @@ main[data-dock="floating"] aside {
 .single-adjustment-content {
   padding: 12px 14px;
   max-height: min(48dvh, 420px);
-  overflow: auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 .single-adjustment[data-sheet-state="peek"] .single-adjustment-content {
   max-height: min(30dvh, 260px);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .sheet-toggle {
   width: 34px;
@@ -1162,9 +1168,9 @@ main:fullscreen {
     padding: 4px 0;
   }
   .single-adjustment-content #wheel {
-    width: min(58%, 300px);
+    width: min(44vw, 220px);
     height: auto;
-    margin: 6px auto 8px;
+    margin: 4px auto 6px;
   }
   .single-adjustment-content #ranges button {
     min-height: 32px;
@@ -1527,6 +1533,15 @@ select {
   border-color: var(--accent);
   cursor: default;
 }
+.expand-box
+  .crop-handle:is(
+    [data-edge="nw"],
+    [data-edge="ne"],
+    [data-edge="se"],
+    [data-edge="sw"]
+  ) {
+  display: none;
+}
 .composition-modes {
   display: flex;
   gap: 4px;
@@ -1538,6 +1553,25 @@ select {
   padding: 5px 10px;
 }
 .composition-modes [aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.expand-tone {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 5px;
+  margin: 10px 0;
+}
+.expand-tone span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.expand-tone button {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.expand-tone button[aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -2039,6 +2073,33 @@ dialog::backdrop {
     border-color: var(--accent);
     color: var(--accent);
   }
+  .composition-quick[data-mode="crop"] .quick-expand-tone {
+    display: none;
+  }
+  .quick-expand-tone {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+  }
+  .composition-quick .quick-expand-tone button {
+    display: grid;
+    min-height: 26px;
+    padding: 3px;
+    place-items: center;
+  }
+  .expand-swatch {
+    display: block;
+    width: 14px;
+    height: 14px;
+    border: 1px solid #777982;
+    border-radius: 50%;
+  }
+  .expand-swatch-dark {
+    background: #000;
+  }
+  .expand-swatch-light {
+    background: #fff;
+  }
   main aside,
   main[data-dock="bottom"] aside {
     background: rgb(30 30 35 / 82%);
@@ -2072,10 +2133,10 @@ dialog::backdrop {
     border-radius: 14px 14px 0 0;
   }
   .single-adjustment[data-sheet-state="expanded"] .single-adjustment-content {
-    max-height: min(58dvh, 520px);
+    max-height: min(44dvh, 400px);
   }
   .single-adjustment[data-sheet-state="peek"] .single-adjustment-content {
-    max-height: min(30dvh, 250px);
+    max-height: min(22dvh, 180px);
   }
   .single-adjustment-heading::before,
   #panel-resize::before {

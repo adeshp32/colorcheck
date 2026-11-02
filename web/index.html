@@ -294,6 +294,7 @@
           <div
             id="composition-quick"
             class="composition-quick"
+            data-mode="crop"
             hidden
             role="group"
             aria-label="Composition mode"
@@ -304,6 +305,28 @@
             <button id="quick-expand" type="button" aria-pressed="false">
               Expand
             </button>
+            <div class="quick-expand-tone" aria-label="Expanded border color">
+              <button
+                id="quick-expand-dark"
+                type="button"
+                data-expand-color="dark"
+                aria-label="Use a dark expanded border"
+                title="Dark border"
+                aria-pressed="true"
+              >
+                <span class="expand-swatch expand-swatch-dark"></span>
+              </button>
+              <button
+                id="quick-expand-light"
+                type="button"
+                data-expand-color="light"
+                aria-label="Use a light expanded border"
+                title="Light border"
+                aria-pressed="false"
+              >
+                <span class="expand-swatch expand-swatch-light"></span>
+              </button>
+            </div>
           </div>
           <button
             id="compare"
@@ -910,9 +933,29 @@
             </div>
             <div id="expand-options" hidden>
               <label class="check"
-                ><input id="expand-linked" type="checkbox" checked />Link
-                borders</label
+                ><input id="expand-linked" type="checkbox" />Link borders</label
               >
+              <div
+                class="expand-tone"
+                role="group"
+                aria-label="Expanded border color"
+              >
+                <span>Border</span>
+                <button
+                  type="button"
+                  data-expand-color="dark"
+                  aria-pressed="true"
+                >
+                  Dark
+                </button>
+                <button
+                  type="button"
+                  data-expand-color="light"
+                  aria-pressed="false"
+                >
+                  Light
+                </button>
+              </div>
               <div id="expand-controls"></div>
               <button id="reset-expand">Reset borders</button>
             </div>

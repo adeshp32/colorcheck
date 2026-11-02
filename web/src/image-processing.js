@@ -39,6 +39,7 @@ export function createDefaultEditSettings() {
     flip: false,
     crop: { x: 0, y: 0, w: 100, h: 100 },
     expand: { left: 0, right: 0, top: 0, bottom: 0 },
+    expandColor: "dark",
     lensBlur: {
       enabled: false,
       amount: 25,

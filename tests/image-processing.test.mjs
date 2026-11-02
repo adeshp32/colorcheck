@@ -10,6 +10,14 @@ import {
 const pixels = new Uint8ClampedArray([
   32, 64, 128, 255, 180, 120, 40, 255, 240, 230, 220, 255, 90, 100, 110, 0,
 ]);
+const defaultSettings = createDefaultEditSettings();
+assert.deepEqual(defaultSettings.expand, {
+  left: 0,
+  right: 0,
+  top: 0,
+  bottom: 0,
+});
+assert.equal(defaultSettings.expandColor, "dark");
 assert.deepEqual(
   applyPhotoAdjustments(pixels, 2, 2, createDefaultEditSettings()).data,
   pixels,
