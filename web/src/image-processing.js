@@ -1,4 +1,8 @@
-import { buildCurveTable, lookupCurve } from "./tone-curves.js";
+import {
+  CURVE_EFFECT_STRENGTH,
+  buildCurveTable,
+  lookupCurve,
+} from "./tone-curves.js";
 import { prepareColorMix, mixColorInto } from "./color-mixer.js";
 import { grainAt } from "./film-grain.js";
 import { buildHistogramMaps } from "./histogram-match.js";
@@ -247,9 +251,15 @@ export function applyPhotoAdjustments(
     g = applyToneCurve((g - 0.5) * contrast + 0.5 + lift, edits.curve);
     b = applyToneCurve((b - 0.5) * contrast + 0.5 + lift, edits.curve);
     if (edits.curves) {
-      r = lookupCurve(curveTables[1], lookupCurve(curveTables[0], r));
-      g = lookupCurve(curveTables[2], lookupCurve(curveTables[0], g));
-      b = lookupCurve(curveTables[3], lookupCurve(curveTables[0], b));
+      const originalR = r,
+        originalG = g,
+        originalB = b,
+        curvedR = lookupCurve(curveTables[1], lookupCurve(curveTables[0], r)),
+        curvedG = lookupCurve(curveTables[2], lookupCurve(curveTables[0], g)),
+        curvedB = lookupCurve(curveTables[3], lookupCurve(curveTables[0], b));
+      r += (curvedR - originalR) * CURVE_EFFECT_STRENGTH;
+      g += (curvedG - originalG) * CURVE_EFFECT_STRENGTH;
+      b += (curvedB - originalB) * CURVE_EFFECT_STRENGTH;
     }
     r += temperature;
     b -= temperature;

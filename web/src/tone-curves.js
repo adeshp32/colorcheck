@@ -1,4 +1,6 @@
 /** Shape-preserving cubic Hermite interpolation with sorted, bounded control points. */
+export const CURVE_EFFECT_STRENGTH = 0.7;
+
 export function constrainCurvePoint(points, index, x, y) {
   const last = points.length - 1,
     previous = points[index - 1],

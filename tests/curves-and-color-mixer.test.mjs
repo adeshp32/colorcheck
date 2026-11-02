@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  CURVE_EFFECT_STRENGTH,
   constrainCurvePoint,
   sampleCurve,
   buildCurveTable,
@@ -57,7 +58,7 @@ test("curve points keep safe spacing and cannot create tonal reversals", () => {
   assert.equal(white.x, 1);
   assert.ok(white.y >= points[3].y + 4 / 255 - 1e-12);
 });
-test("red-channel curves do not alter green, blue or alpha", () => {
+test("editable curves cap pixel impact at 70 percent without altering other channels", () => {
   const edits = createDefaultEditSettings();
   edits.curves = {
     red: [
@@ -71,7 +72,8 @@ test("red-channel curves do not alter green, blue or alpha", () => {
     1,
     edits,
   ).data;
-  assert.deepEqual([...result], [80, 100, 80, 91]);
+  assert.equal(CURVE_EFFECT_STRENGTH, 0.7);
+  assert.deepEqual([...result], [104, 100, 80, 91]);
 });
 test("individual color adjustments protect grays and untouched hue ranges", () => {
   const bands = prepareColorMix({
